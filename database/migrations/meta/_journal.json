@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1792748619075,
+      "tag": "0000_giant_leopardon",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792759163216,
+      "tag": "0001_audit_logs_login_attempts",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792831796499,
+      "tag": "0002_users_password_session",
+      "breakpoints": true
+    }
+  ]
+}
