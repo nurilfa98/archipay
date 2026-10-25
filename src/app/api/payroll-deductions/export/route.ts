@@ -1,21 +1,37 @@
 // GET /api/payroll-deductions/export: unduh daftar "Belum dipotong" sebagai
-// CSV untuk bagian penggajian (OWNER & FINANCE).
+// file Excel (.xlsx) untuk bagian penggajian (OWNER & FINANCE).
 //
-// Format agar langsung rapi saat dibuka di Excel berbahasa Indonesia:
-// - pemisah titik koma (;), karena Excel locale Indonesia memakai koma
-//   sebagai pemisah desimal;
-// - diawali BOM UTF-8 agar huruf non-ASCII pada nama terbaca benar;
-// - nominal berupa angka bulat tanpa titik ribuan, agar bisa dijumlahkan.
+// Kenapa .xlsx, bukan CSV? Excel membaca CSV memakai "List separator" di
+// pengaturan Region Windows masing-masing laptop (bisa koma, titik koma, atau
+// titik). Bila tidak cocok, isi kolom tercampur. File .xlsx sudah menyimpan
+// kolomnya sendiri, jadi selalu rapi di laptop mana pun.
+// - Sisa berupa angka (format ribuan), bisa langsung dijumlahkan.
+// - Batas pengembalian berupa tanggal Excel (bisa diurutkan/difilter).
+// - Teks disimpan sebagai teks biasa, bukan rumus, jadi aman dari injeksi
+//   rumus (= + - @).
 //
-// Referensi: node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/route.md
+// Daftar kosong → 409 tanpa file, agar tidak terunduh file berisi judul kolom
+// saja (tombol di halaman menampilkan toast, lihat payroll-export-button.tsx).
+//
+// Referensi:
+// - node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/route.md
+// - node_modules/write-excel-file/README.md
 
 import { NextResponse } from "next/server";
+import writeXlsxFile, { type Row } from "write-excel-file/node";
 import { listPayrollCandidates } from "@/features/payroll/queries";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { zonedDateString } from "@/lib/dates";
 
-const HEADERS = ["Nama karyawan", "Email", "No. pertanggungjawaban", "No. uang muka", "Batas pengembalian", "Sisa (Rp)"];
+const COLUMNS = [
+  { header: "Nama karyawan", width: 28 },
+  { header: "Email", width: 32 },
+  { header: "No. pertanggungjawaban", width: 24 },
+  { header: "No. uang muka", width: 18 },
+  { header: "Batas pengembalian", width: 20 },
+  { header: "Sisa (Rp)", width: 16 },
+];
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -23,32 +39,43 @@ export async function GET() {
   if (!can(user, "payroll:manage")) return new NextResponse("Forbidden", { status: 403 });
 
   const candidates = await listPayrollCandidates();
-  const lines = [
-    HEADERS,
-    ...candidates.map((candidate) => [
-      candidate.recipientName,
-      candidate.recipientEmail,
-      candidate.settlementNumber,
-      candidate.advanceNumber,
-      zonedDateString(candidate.returnDueAt),
-      String(candidate.outstanding),
+  if (candidates.length === 0) {
+    return new NextResponse("Belum ada sisa uang muka yang perlu dipotong dari gaji.", {
+      status: 409,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "private, no-store" },
+    });
+  }
+
+  const rows: Row[] = [
+    COLUMNS.map((column) => ({ value: column.header, fontWeight: "bold" as const })),
+    ...candidates.map((candidate): Row => [
+      { value: candidate.recipientName, type: String },
+      { value: candidate.recipientEmail, type: String },
+      { value: candidate.settlementNumber, type: String },
+      { value: candidate.advanceNumber, type: String },
+      { value: dateOnly(zonedDateString(candidate.returnDueAt)), type: Date, format: "dd/mm/yyyy" },
+      { value: candidate.outstanding, type: Number, format: "#,##0" },
     ]),
-  ].map((row) => row.map(csvCell).join(";"));
+  ];
+
+  const file = await writeXlsxFile(rows, {
+    sheet: "Potong Gaji",
+    columns: COLUMNS.map((column) => ({ width: column.width })),
+    stickyRowsCount: 1,
+  }).toBuffer();
 
   const today = zonedDateString(new Date());
-  return new NextResponse("﻿" + lines.join("\r\n"), {
+  return new NextResponse(new Uint8Array(file), {
     headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="potong-gaji-${today}.csv"`,
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": `attachment; filename="potong-gaji-${today}.xlsx"`,
       "Cache-Control": "private, no-store",
     },
   });
 }
 
-// Kutip setiap sel; tanda kutip di dalam teks digandakan (standar CSV).
-// Awalan = + - @ diberi tanda kutip tunggal agar tidak dijalankan sebagai
-// rumus oleh Excel (CSV injection).
-function csvCell(value: string) {
-  const safe = /^[=+\-@]/.test(value) ? `'${value}` : value;
-  return `"${safe.replace(/"/g, '""')}"`;
+// "2026-10-25" (tanggal WIB) → Date tengah malam UTC. write-excel-file
+// menghitung tanggal Excel dari UTC, jadi tanggalnya tidak bergeser sehari.
+function dateOnly(value: string) {
+  return new Date(`${value}T00:00:00Z`);
 }

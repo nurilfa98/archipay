@@ -1,5 +1,6 @@
 // Form edit data & role pengguna. Polanya sama dengan user-create-form.tsx
 // (onSubmit + startTransition agar isian tidak hilang saat validasi gagal).
+// Hasil simpan (berhasil / error umum) tampil sebagai toast.
 //
 // Role memakai Checkbox Base UI: setiap checkbox yang dicentang mengirim
 // name="roles" value="OWNER" (dst), lalu dibaca server dengan
@@ -11,9 +12,9 @@
 
 "use client";
 
-import { CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
-import { startTransition, useActionState, type FormEvent } from "react";
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { LoaderCircleIcon } from "lucide-react";
+import { startTransition, useActionState, useEffect, type FormEvent } from "react";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -36,6 +37,11 @@ export function UserEditForm({ user, isSelf }: { user: UserDetail; isSelf: boole
 
   const error = state && !state.success ? state : undefined;
   const fieldError = (name: string) => error?.fieldErrors?.[name]?.[0];
+
+  useEffect(() => {
+    if (state?.success) notify.success("Perubahan disimpan.");
+    else if (state && !state.fieldErrors) notify.error(state.message);
+  }, [state]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -127,19 +133,6 @@ export function UserEditForm({ user, isSelf }: { user: UserDetail; isSelf: boole
           )}
           <FieldError>{fieldError("roles")}</FieldError>
         </FieldSet>
-
-        {error && !error.fieldErrors && (
-          <Alert variant="destructive">
-            <CircleAlertIcon />
-            <AlertTitle>{error.message}</AlertTitle>
-          </Alert>
-        )}
-        {state?.success && !pending && (
-          <Alert>
-            <CircleCheckIcon />
-            <AlertTitle>Perubahan disimpan.</AlertTitle>
-          </Alert>
-        )}
 
         <Field orientation="horizontal">
           <Button type="submit" disabled={pending}>

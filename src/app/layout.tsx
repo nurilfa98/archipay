@@ -1,6 +1,6 @@
 // Root layout: membungkus SELURUH halaman (login maupun halaman setelah login).
 // Isinya hanya hal global: <html>, font, CSS, dan provider yang dipakai di mana-mana
-// (tema terang/gelap, tooltip).
+// (tema terang/gelap, tooltip, toast).
 // Layout khusus (sidebar, navbar) ada di route group masing-masing:
 // - src/app/(auth)/layout.tsx → halaman login
 // - src/app/(app)/layout.tsx  → halaman setelah login
@@ -10,6 +10,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
+import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
@@ -44,6 +45,10 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <ThemeProvider>
           {/* Dibutuhkan tooltip menu sidebar saat sidebar diciutkan (mode ikon) */}
           <TooltipProvider>{children}</TooltipProvider>
+          {/* Toast hasil simpan data, tampil di pojok kanan bawah. Dipanggil lewat
+              notify.* (src/lib/notify.ts). Diletakkan di root agar tetap tampil
+              walau halaman berpindah. */}
+          <Toaster />
         </ThemeProvider>
       </body>
     </html>

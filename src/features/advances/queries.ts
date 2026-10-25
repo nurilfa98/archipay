@@ -16,6 +16,8 @@ import "server-only";
 import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
+import { can } from "@/lib/auth/permissions";
+import { isRole, type Role } from "@/lib/auth/roles";
 import { db } from "@/lib/db";
 import { advanceRequests, roles, userRoles, users } from "@/lib/db/schema";
 import { ADVANCE_STATUS, type AdvanceStatus, type DisbursementMethod } from "./constants";
@@ -263,4 +265,27 @@ export async function getOwnerContacts(extraUserIds: (string | null)[]): Promise
     : [];
 
   return [...new Map([...owners, ...extras].map((contact) => [contact.id, contact])).values()];
+}
+
+// Semua user aktif yang boleh menyetujui uang muka (advance:approve). Dicek
+// lewat can() agar tetap mengikuti ROLE_PERMISSIONS, bukan nama role.
+// Saring lagi dengan eligibleApprovers() (service.ts) per uang muka.
+export async function listApprovers(): Promise<Contact[]> {
+  await io();
+  const rows = await db
+    .select({ id: users.id, fullName: users.fullName, phoneNumber: users.phoneNumber, role: roles.name })
+    .from(users)
+    .innerJoin(userRoles, eq(userRoles.userId, users.id))
+    .innerJoin(roles, eq(userRoles.roleId, roles.id))
+    .where(eq(users.isActive, true));
+
+  const people = new Map<string, Contact & { roles: Role[] }>();
+  for (const { role, ...contact } of rows) {
+    const person = people.get(contact.id) ?? { ...contact, roles: [] };
+    if (isRole(role)) person.roles.push(role);
+    people.set(contact.id, person);
+  }
+  return [...people.values()]
+    .filter((person) => can(person, "advance:approve"))
+    .map(({ id, fullName, phoneNumber }) => ({ id, fullName, phoneNumber }));
 }

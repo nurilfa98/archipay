@@ -40,6 +40,7 @@ export function SettlementSubmitButton({
         </>
       }
       confirmLabel="Kirim"
+      successMessage="Pertanggungjawaban terkirim untuk diverifikasi."
       onConfirm={() => submitSettlement(settlementId)}
     />
   );

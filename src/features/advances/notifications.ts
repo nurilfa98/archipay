@@ -25,6 +25,48 @@ type AdvanceSummary = {
 
 type Person = { fullName: string; phoneNumber: string | null };
 
+// Pengajuan karyawan / usulan FINANCE baru → penyetuju (OWNER selain
+// penerima & pengusul, lihat eligibleApprovers di service.ts).
+export function notifyApprovalRequested(
+  advance: AdvanceSummary,
+  people: { recipientName: string; creatorName: string; isOwnRequest: boolean },
+  approvers: Person[],
+) {
+  const who = people.isOwnRequest
+    ? `${people.recipientName} mengajukan uang muka`
+    : `${people.creatorName} mengusulkan uang muka untuk ${people.recipientName}`;
+  return send(
+    approvers,
+    (approver) =>
+      `Halo ${approver.fullName},\n\n` +
+      `${who} *${advance.number}* sebesar *${formatRupiah(advance.amount)}* ` +
+      `(${DISBURSEMENT_METHOD_LABELS[advance.disbursementMethod]}) untuk keperluan: ${advance.purpose}\n\n` +
+      `Mohon setujui atau tolak di ArchiPay:\n${link(advance.id)}`,
+  );
+}
+
+// Pengajuan/usulan ditolak → pengusulnya (karyawan yang mengajukan untuk diri
+// sendiri, atau FINANCE yang mengusulkan). Pada usulan FINANCE, calon penerima
+// belum pernah diberi tahu, jadi tidak ikut dikirimi.
+export function notifyRejected(
+  advance: AdvanceSummary & { recipientName: string },
+  creator: Person,
+  isOwnRequest: boolean,
+  deciderName: string,
+  reason: string,
+) {
+  const subject = isOwnRequest
+    ? `Pengajuan uang muka *${advance.number}*`
+    : `Usulan uang muka *${advance.number}* untuk ${advance.recipientName}`;
+  return send(
+    [creator],
+    () =>
+      `Halo ${creator.fullName},\n\n` +
+      `${subject} sebesar ${formatRupiah(advance.amount)} *ditolak* oleh ${deciderName}.\n` +
+      `Alasan: ${reason}\n\n${link(advance.id)}`,
+  );
+}
+
 // Dana dicairkan → karyawan diminta konfirmasi.
 export function notifyDisbursed(advance: AdvanceSummary & { settlementDueAt: Date }, recipient: Person) {
   return send(

@@ -40,14 +40,17 @@ import { getCompanySettings } from "@/features/settings/queries";
 import { ADVANCE_NUMBER_PREFIX, type AdvanceStatus, type DisbursementMethod } from "./constants";
 import {
   notifyAcknowledged,
+  notifyApprovalRequested,
   notifyCancelled,
   notifyDisbursed,
   notifyDisputed,
+  notifyRejected,
 } from "./notifications";
 import {
   getActiveRecipient,
   getAdvanceDetail,
   getOwnerContacts,
+  listApprovers,
   type AdvanceDetail,
   type RecipientOption,
 } from "./queries";
@@ -57,7 +60,7 @@ import {
   reasonSchema,
   transferReferenceSchema,
 } from "./schemas";
-import { buildAcknowledgmentText, getAvailableActions } from "./service";
+import { buildAcknowledgmentText, eligibleApprovers, getAvailableActions } from "./service";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses untuk tindakan ini." } as const;
 const NOT_FOUND = { success: false, message: "Uang muka tidak ditemukan." } as const;
@@ -75,6 +78,8 @@ const STALE = {
 // - "push" + FINANCE (advance:propose) → PENDING_APPROVAL, menunggu OWNER.
 // - "request" (advance:request)        → PENDING_APPROVAL; penerimanya SELALU
 //   user yang login, apa pun yang dikirim browser.
+// PENDING_APPROVAL hanya dibuat bila ada penyetuju sah (eligibleApprovers),
+// lalu penyetuju tersebut diberi tahu lewat WhatsApp.
 // Berhasil → pindah ke halaman detail uang muka yang baru dibuat.
 export async function createAdvance(
   _prevState: ActionResult | undefined,
@@ -105,6 +110,17 @@ export async function createAdvance(
   }
   const recipient = await getActiveRecipient(input.recipientId);
   if (!recipient) return fieldError("recipientId", "Karyawan tidak ditemukan atau sudah nonaktif");
+
+  // Tanpa penyetuju sah, pengajuan/usulan akan menunggu selamanya (misal
+  // FINANCE mengusulkan untuk satu-satunya OWNER).
+  const approvers = direct
+    ? []
+    : eligibleApprovers(await listApprovers(), { recipientId: recipient.id, createdById: actor.id });
+  if (!direct && approvers.length === 0) {
+    return isRequest
+      ? { success: false, message: "Belum ada Owner yang dapat menyetujui pengajuan Anda. Silakan hubungi Owner." }
+      : fieldError("recipientId", `Tidak ada Owner lain yang dapat menyetujui uang muka untuk ${recipient.fullName}`);
+  }
 
   const disbursement = direct
     ? await buildDisbursement(actor.id, input.disbursementMethod, input.transferReference, recipient)
@@ -152,6 +168,14 @@ export async function createAdvance(
         recipient,
       ),
     );
+  } else {
+    after(() =>
+      notifyApprovalRequested(
+        { ...input, ...created },
+        { recipientName: recipient.fullName, creatorName: actor.fullName, isOwnRequest: isRequest },
+        approvers,
+      ),
+    );
   }
 
   revalidateAdvances();
@@ -196,7 +220,14 @@ export async function rejectAdvance(advanceId: string, reason: string): Promise<
       newValues: { status: "REJECTED", reason: parsedReason.data },
     },
   });
-  return updated ? done() : STALE;
+  if (!updated) return STALE;
+
+  const creator = await getActiveRecipient(advance.createdById);
+  if (creator) {
+    const isOwnRequest = advance.createdById === advance.recipientId;
+    after(() => notifyRejected(advance, creator, isOwnRequest, actor.fullName, parsedReason.data));
+  }
+  return done();
 }
 
 // ---------------------------------------------------------------------------

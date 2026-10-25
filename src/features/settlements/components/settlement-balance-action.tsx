@@ -39,6 +39,7 @@ export function SettlementBalanceAction({
           : `${summary}. Kekurangan yang belum dibayar ${formatRupiah(outstanding)}. Catat setelah uang benar-benar diserahkan ke karyawan.`
       }
       confirmLabel="Simpan"
+      successMessage={isReturn ? "Pengembalian dana tercatat." : "Pembayaran penggantian tercatat."}
       onConfirm={(formData) => (isReturn ? recordReturn(settlementId, formData) : recordReimbursement(settlementId, formData))}
     >
       {(fieldError) => (

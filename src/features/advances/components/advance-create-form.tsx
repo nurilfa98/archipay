@@ -8,7 +8,8 @@
 //
 // Polanya sama dengan features/users/components/user-create-form.tsx
 // (onSubmit + startTransition agar isian tidak hilang saat validasi gagal).
-// Berhasil → Server Action me-redirect ke halaman detail.
+// Berhasil → Server Action me-redirect ke halaman detail. Error umum (bukan
+// per isian) tampil sebagai toast.
 //
 // Referensi:
 // - https://ui.shadcn.com/docs/components/combobox
@@ -18,7 +19,8 @@
 
 import { CircleAlertIcon, InfoIcon, LoaderCircleIcon } from "lucide-react";
 import Link from "next/link";
-import { startTransition, useActionState, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useEffect, useState, type FormEvent } from "react";
+import { notify } from "@/lib/notify";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -72,6 +74,10 @@ export function AdvanceCreateForm(props: AdvanceCreateFormProps) {
 
   const error = state && !state.success ? state : undefined;
   const fieldError = (name: string) => error?.fieldErrors?.[name]?.[0];
+
+  useEffect(() => {
+    if (state && !state.success && !state.fieldErrors) notify.error(state.message);
+  }, [state]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -229,13 +235,6 @@ export function AdvanceCreateForm(props: AdvanceCreateFormProps) {
             pertanggungjawaban diverifikasi.
           </AlertDescription>
         </Alert>
-
-        {error && !error.fieldErrors && (
-          <Alert variant="destructive">
-            <CircleAlertIcon />
-            <AlertTitle>{error.message}</AlertTitle>
-          </Alert>
-        )}
 
         <Field orientation="horizontal">
           <Button type="submit" disabled={pending}>

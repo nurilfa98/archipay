@@ -4,7 +4,7 @@
 
 "use client";
 
-import { PencilIcon, PowerIcon } from "lucide-react";
+import { PencilIcon, ToggleLeftIcon, ToggleRightIcon } from "lucide-react";
 import { ToneBadge } from "@/components/tone-badge";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -36,6 +36,7 @@ export function ExpenseCategoriesManager({ categories }: { categories: ExpenseCa
           title="Tambah kategori biaya"
           description="Kategori baru langsung bisa dipilih karyawan saat mengisi nota."
           confirmLabel="Simpan"
+          successMessage="Kategori ditambahkan."
           onConfirm={(formData) => createExpenseCategory(nameOf(formData))}
         >
           {(fieldError) => <NameField error={fieldError("name")} />}
@@ -71,18 +72,27 @@ export function ExpenseCategoriesManager({ categories }: { categories: ExpenseCa
                     <ActionDialog
                       label="Ganti nama"
                       icon={<PencilIcon className="size-[18px]" />}
-                      variant="ghost"
+                      variant="edit"
                       title="Ganti nama kategori"
                       description={`Nama baru juga tampil di nota lama yang memakai kategori "${category.name}".`}
                       confirmLabel="Simpan"
+                      successMessage="Nama kategori diperbarui."
                       onConfirm={(formData) => renameExpenseCategory(category.id, nameOf(formData))}
                     >
                       {(fieldError) => <NameField defaultValue={category.name} error={fieldError("name")} />}
                     </ActionDialog>
                     <ActionDialog
                       label={category.isActive ? "Nonaktifkan" : "Aktifkan"}
-                      icon={<PowerIcon className="size-[18px]" />}
-                      variant={category.isActive ? "destructive" : "outline"}
+                      // Ikon & warna mengikuti status saat ini: on (hijau) = Aktif,
+                      // off (abu-abu) = Nonaktif.
+                      icon={
+                        category.isActive ? (
+                          <ToggleRightIcon className="size-[18px]" />
+                        ) : (
+                          <ToggleLeftIcon className="size-[18px]" />
+                        )
+                      }
+                      variant={category.isActive ? "success" : "pending"}
                       title={category.isActive ? `Nonaktifkan "${category.name}"?` : `Aktifkan "${category.name}"?`}
                       description={
                         category.isActive
@@ -90,6 +100,7 @@ export function ExpenseCategoriesManager({ categories }: { categories: ExpenseCa
                           : "Kategori bisa dipilih lagi saat mengisi nota."
                       }
                       confirmLabel={category.isActive ? "Nonaktifkan" : "Aktifkan"}
+                      successMessage={category.isActive ? "Kategori dinonaktifkan." : "Kategori diaktifkan."}
                       onConfirm={() => setExpenseCategoryActive(category.id, !category.isActive)}
                     />
                   </div>

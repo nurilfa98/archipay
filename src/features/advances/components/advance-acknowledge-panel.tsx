@@ -9,6 +9,7 @@
 
 import { CircleAlertIcon, LoaderCircleIcon } from "lucide-react";
 import { useState, useTransition } from "react";
+import { notify } from "@/lib/notify";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -35,7 +36,9 @@ export function AdvanceAcknowledgePanel({
     startTransition(async () => {
       const result = await acknowledgeAdvance(advanceId, consent);
       // Berhasil: halaman dimuat ulang oleh revalidatePath dan panel ini hilang.
-      if (!result.success) setError(result.fieldErrors?.consent?.[0] ?? result.message);
+      if (result.success) notify.success("Penerimaan dana dikonfirmasi.");
+      else if (result.fieldErrors?.consent) setError(result.fieldErrors.consent[0]);
+      else notify.error(result.message);
     });
   }
 
@@ -84,6 +87,7 @@ export function AdvanceAcknowledgePanel({
             title="Laporkan dana tidak sesuai?"
             description="Owner akan menerima laporan Anda lewat WhatsApp untuk dicek."
             confirmLabel="Kirim laporan"
+            successMessage="Laporan terkirim ke Owner."
             onConfirm={(formData) => disputeAdvance(advanceId, String(formData.get("reason") ?? ""))}
           >
             {(fieldError) => (

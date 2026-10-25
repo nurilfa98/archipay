@@ -1,20 +1,19 @@
 // Halaman /payroll-deductions (Potong Gaji, OWNER & FINANCE).
 //
 // - Belum dipotong: sisa uang muka yang lewat batas pengembalian. Bisa
-//   diekspor ke CSV untuk bagian penggajian, lalu ditandai "sudah dipotong".
+//   diekspor ke Excel (.xlsx) untuk bagian penggajian, lalu ditandai "sudah dipotong".
 // - Riwayat potongan: filter Tahun/Bulan periode gaji (?year=&month=).
 //
 // Polanya sama dengan halaman Uang Muka: judul statis di luar <Suspense>,
 // cek permission & data di dalamnya.
 
-import { DownloadIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PayrollCandidatesTable } from "@/features/payroll/components/payroll-candidates-table";
 import { PayrollDeductionsTable } from "@/features/payroll/components/payroll-deductions-table";
+import { PayrollExportButton } from "@/features/payroll/components/payroll-export-button";
 import {
   getCurrentPayrollPeriod,
   listPayrollCandidates,
@@ -36,13 +35,7 @@ export default function PayrollDeductionsPage({ searchParams }: PageProps<"/payr
       <PageHeader
         title="Potong Gaji"
         description="Sisa uang muka yang tidak dikembalikan sampai batas waktu, sesuai pernyataan karyawan saat menerima dana."
-        action={
-          // Link biasa (bukan <Link>): unduhan file, tidak perlu navigasi client.
-          <Button variant="outline" nativeButton={false} render={<a href="/api/payroll-deductions/export" />}>
-            <DownloadIcon />
-            Ekspor CSV
-          </Button>
-        }
+        action={<PayrollExportButton />}
       />
       <Suspense fallback={<PayrollSkeleton />}>
         <PayrollContent searchParams={searchParams} />

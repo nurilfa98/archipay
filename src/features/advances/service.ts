@@ -74,6 +74,20 @@ function canCancel(
   }
 }
 
+// Penyetuju yang sah untuk satu pengajuan/usulan: pemegang advance:approve
+// selain penerima dan pengusulnya (aturan yang sama dengan `decide` di atas).
+// Daftar kosong = pengajuan tidak akan pernah bisa disetujui, jadi harus
+// ditolak sejak dibuat. Contoh: FINANCE mengusulkan uang muka untuk satu-
+// satunya OWNER.
+export function eligibleApprovers<T extends { id: string }>(
+  approvers: readonly T[],
+  advance: Pick<AdvanceForRules, "recipientId" | "createdById">,
+) {
+  return approvers.filter(
+    (approver) => approver.id !== advance.recipientId && approver.id !== advance.createdById,
+  );
+}
+
 // Uang muka yang menunggu tindakan viewer (tampil di "Perlu tindakan Anda").
 // Pembatalan tidak dihitung, kecuali karyawan sudah melaporkan tidak sesuai.
 export function needsActionFrom(advance: AdvanceForRules, viewer: AdvanceViewer) {

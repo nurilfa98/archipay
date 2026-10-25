@@ -29,6 +29,7 @@ export function PayrollDeductionAction({
       title="Tandai sudah dipotong dari gaji?"
       description={`${summary}. Sisa ${formatRupiah(outstanding)}. Catat setelah potongan benar-benar diterapkan di penggajian.`}
       confirmLabel="Simpan"
+      successMessage="Potongan gaji tercatat."
       onConfirm={(formData) => recordPayrollDeduction(settlementId, formData)}
     >
       {(fieldError) => (

@@ -17,6 +17,16 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground",
         ghost:
           "hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:hover:bg-muted/50",
+        // Kotak oranye untuk tombol ikon "ubah", sepasang dengan gaya destructive
+        // (misal pensil di sebelah tombol aktif/nonaktifkan kategori).
+        edit:
+          "bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 focus-visible:border-orange-500/40 focus-visible:ring-orange-500/20 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/30",
+        // Warna sama dengan ToneBadge "success" / "pending" (components/tone-badge.tsx),
+        // misal tombol on/off kategori yang mengikuti status Aktif/Nonaktif.
+        success:
+          "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-950",
+        pending:
+          "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700",
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",

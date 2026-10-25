@@ -3,17 +3,19 @@
 // di dalam dialog sebagai <form>, lalu FormData-nya dikirim ke `onConfirm`.
 //
 // Dialog tetap terbuka bila Server Action menolak (misal alasan terlalu
-// pendek) agar pesan error tampil di tempat; tertutup bila berhasil.
-// Setelah berhasil, revalidatePath() di Server Action membuat halaman
-// detail menampilkan status terbaru.
+// pendek): error per isian tampil di bawah isiannya, error umum lewat toast.
+// Bila berhasil, dialog tertutup dan `successMessage` tampil sebagai toast;
+// revalidatePath() di Server Action membuat halaman menampilkan status terbaru.
 //
-// Referensi: https://ui.shadcn.com/docs/components/alert-dialog
+// Referensi:
+// - https://ui.shadcn.com/docs/components/alert-dialog
+// - https://ui.shadcn.com/docs/components/base/toast
 
 "use client";
 
-import { CircleAlertIcon, LoaderCircleIcon } from "lucide-react";
+import { LoaderCircleIcon } from "lucide-react";
 import { useState, useTransition, type ComponentProps, type FormEvent, type ReactNode } from "react";
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { notify } from "@/lib/notify";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -38,6 +40,7 @@ export function ActionDialog({
   title,
   description,
   confirmLabel,
+  successMessage,
   onConfirm,
   children,
 }: {
@@ -49,6 +52,7 @@ export function ActionDialog({
   title: string;
   description: ReactNode;
   confirmLabel: string;
+  successMessage: string;
   onConfirm: (formData: FormData) => Promise<ActionResult>;
   children?: (fieldError: FieldErrorOf) => ReactNode;
 }) {
@@ -69,8 +73,13 @@ export function ActionDialog({
     const formData = new FormData(event.currentTarget);
     startTransition(async () => {
       const result = await onConfirm(formData);
-      if (result.success) setOpen(false);
-      else setError(result);
+      if (result.success) {
+        setOpen(false);
+        notify.success(successMessage);
+      } else {
+        setError(result);
+        if (!result.fieldErrors) notify.error(result.message);
+      }
     });
   }
 
@@ -94,12 +103,6 @@ export function ActionDialog({
               <AlertDialogDescription>{description}</AlertDialogDescription>
             </AlertDialogHeader>
             {children && <FieldGroup>{children(fieldError)}</FieldGroup>}
-            {error && !error.fieldErrors && (
-              <Alert variant="destructive">
-                <CircleAlertIcon />
-                <AlertTitle>{error.message}</AlertTitle>
-              </Alert>
-            )}
             <AlertDialogFooter>
               <AlertDialogCancel disabled={pending}>Batal</AlertDialogCancel>
               <Button

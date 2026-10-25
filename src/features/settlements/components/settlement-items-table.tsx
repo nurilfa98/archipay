@@ -101,6 +101,7 @@ export function SettlementItemsTable({
                     title="Hapus nota ini?"
                     description={`${item.description} · ${formatRupiah(item.amount)}`}
                     confirmLabel="Hapus nota"
+                    successMessage="Nota dihapus."
                     onConfirm={() => removeSettlementItem(settlementId, item.id)}
                   />
                 </TableCell>

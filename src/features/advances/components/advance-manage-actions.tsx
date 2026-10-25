@@ -40,6 +40,7 @@ export function AdvanceManageActions({
             title="Setujui pengajuan ini?"
             description={`${summary}. Setelah disetujui, serahkan dana lalu tekan “Catat pencairan”.`}
             confirmLabel="Setujui"
+            successMessage="Pengajuan disetujui."
             onConfirm={() => approveAdvance(advanceId)}
           />
           <ActionDialog
@@ -48,6 +49,7 @@ export function AdvanceManageActions({
             title="Tolak pengajuan ini?"
             description={summary}
             confirmLabel="Tolak pengajuan"
+            successMessage="Pengajuan ditolak."
             onConfirm={(formData) => rejectAdvance(advanceId, text(formData, "reason"))}
           >
             {(fieldError) => (
@@ -67,6 +69,7 @@ export function AdvanceManageActions({
           title="Dana sudah diserahkan?"
           description={`${summary}. Waktu pencairan dicatat sekarang dan batas unggah nota mulai dihitung. Karyawan menerima WhatsApp untuk konfirmasi.`}
           confirmLabel="Ya, dana sudah diserahkan"
+          successMessage="Pencairan dana tercatat."
           onConfirm={(formData) => disburseApprovedAdvance(advanceId, text(formData, "transferReference"))}
         >
           {isTransfer
@@ -93,6 +96,7 @@ export function AdvanceManageActions({
               : `${summary}. Uang muka yang dibatalkan tidak bisa diaktifkan kembali.`
           }
           confirmLabel="Batalkan uang muka"
+          successMessage="Uang muka dibatalkan."
           onConfirm={(formData) => cancelAdvance(advanceId, text(formData, "reason"))}
         >
           {(fieldError) => (

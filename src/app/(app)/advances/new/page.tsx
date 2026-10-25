@@ -12,7 +12,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdvanceCreateForm } from "@/features/advances/components/advance-create-form";
-import { listRecipientOptions } from "@/features/advances/queries";
+import { listApprovers, listRecipientOptions } from "@/features/advances/queries";
+import { eligibleApprovers } from "@/features/advances/service";
 import { getCompanySettings } from "@/features/settings/queries";
 import { verifySession } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
@@ -52,10 +53,19 @@ async function NewAdvanceContent() {
   const direct = can(user, "advance:disburse");
   if (!direct && !can(user, "advance:propose")) redirect("/advances");
 
-  const [recipients, settings] = await Promise.all([
+  const [options, approvers, settings] = await Promise.all([
     listRecipientOptions(user.id),
+    direct ? [] : listApprovers(),
     getCompanySettings(),
   ]);
+  // Usulan FINANCE: sembunyikan penerima yang tidak punya penyetuju sah
+  // (misal satu-satunya OWNER), karena usulannya tidak akan bisa disetujui.
+  // Server Action tetap mengecek ulang.
+  const recipients = direct
+    ? options
+    : options.filter(
+        (option) => eligibleApprovers(approvers, { recipientId: option.id, createdById: user.id }).length > 0,
+      );
 
   return (
     <AdvanceCreateForm

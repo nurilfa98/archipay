@@ -161,6 +161,7 @@ export function SettlementVerifyForm({
           title="Selesaikan verifikasi?"
           description={`${summary}. Nota disetujui ${formatRupiah(approvedTotal)}. ${outcomeText(balance)} Keputusan tidak bisa diubah setelah disimpan.`}
           confirmLabel="Simpan hasil verifikasi"
+          successMessage="Hasil verifikasi disimpan."
           onConfirm={handleVerify}
         />
         <ActionDialog
@@ -169,6 +170,7 @@ export function SettlementVerifyForm({
           title="Kembalikan untuk diperbaiki?"
           description="Laporan dikirim kembali ke karyawan beserta catatan Anda. Keputusan per nota di atas tidak disimpan."
           confirmLabel="Kembalikan"
+          successMessage="Laporan dikembalikan ke karyawan untuk diperbaiki."
           onConfirm={(formData) => requestSettlementRevision(settlementId, String(formData.get("reason") ?? ""))}
         >
           {(fieldError) => (

@@ -13,9 +13,9 @@
 
 "use client";
 
-import { CircleAlertIcon, FileTextIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
+import { FileTextIcon, LoaderCircleIcon, PlusIcon } from "lucide-react";
 import { useState, useTransition, type FormEvent } from "react";
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -117,8 +117,13 @@ function ItemForm({
 
     startTransition(async () => {
       const result = await addSettlementItem(settlementId, formData);
-      if (result.success) onSaved();
-      else setError(result);
+      if (result.success) {
+        notify.success("Nota disimpan.");
+        onSaved();
+      } else {
+        setError(result);
+        if (!result.fieldErrors) notify.error(result.message);
+      }
     });
   }
 
@@ -240,13 +245,6 @@ function ItemForm({
             </FieldDescription>
             <FieldError>{fieldError("file")}</FieldError>
           </Field>
-        )}
-
-        {error && !error.fieldErrors && (
-          <Alert variant="destructive">
-            <CircleAlertIcon />
-            <AlertTitle>{error.message}</AlertTitle>
-          </Alert>
         )}
 
         <Field orientation="horizontal">

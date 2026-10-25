@@ -28,7 +28,10 @@ import { AppHeader } from "@/components/layout/app-header";
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { NavMain, NavMainSkeleton } from "@/components/layout/nav-main";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { UserMenu, UserMenuSkeleton } from "@/features/auth/components/user-menu";
+import {
+  UserMenu,
+  UserMenuSkeleton,
+} from "@/features/auth/components/user-menu";
 import { verifySession } from "@/lib/auth/dal";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
@@ -49,8 +52,7 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
             </Suspense>
           }
         />
-        {/* Padding lebih kecil di HP, lebih lega di desktop */}
-        <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</div>
+        <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
       </SidebarInset>
     </SidebarProvider>
   );
@@ -67,5 +69,9 @@ async function SidebarNav() {
 
 async function HeaderUserMenu() {
   const user = await verifySession();
-  return <UserMenu user={{ fullName: user.fullName, email: user.email, roles: user.roles }} />;
+  return (
+    <UserMenu
+      user={{ fullName: user.fullName, email: user.email, roles: user.roles }}
+    />
+  );
 }

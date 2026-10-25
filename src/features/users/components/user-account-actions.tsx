@@ -1,6 +1,6 @@
 // Tombol "Reset password" dan "Nonaktifkan/Aktifkan" di halaman detail
 // pengguna. Keduanya berdampak besar, jadi selalu meminta konfirmasi lewat
-// AlertDialog sebelum Server Action dipanggil.
+// AlertDialog sebelum Server Action dipanggil. Hasilnya tampil sebagai toast.
 //
 // Referensi:
 // - https://ui.shadcn.com/docs/components/alert-dialog
@@ -9,9 +9,9 @@
 
 "use client";
 
-import { CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
+import { LoaderCircleIcon } from "lucide-react";
 import { useState, useTransition, type ComponentProps } from "react";
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { notify } from "@/lib/notify";
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -25,25 +25,18 @@ import { Button } from "@/components/ui/button";
 import { resetUserPassword, setUserActive } from "@/features/users/actions";
 import type { UserDetail } from "@/features/users/queries";
 
-type Feedback = { ok: boolean; text: string };
-
 export function UserAccountActions({ user, isSelf }: { user: UserDetail; isSelf: boolean }) {
-  const [feedback, setFeedback] = useState<Feedback | null>(null);
-
   async function handleReset() {
     const result = await resetUserPassword(user.id);
-    if (!result.success) return setFeedback({ ok: false, text: result.message });
-    setFeedback(
-      result.data.emailSent
-        ? { ok: true, text: `Password sementara baru sudah dikirim ke ${user.email}.` }
-        : { ok: false, text: "Password di-reset, tetapi email gagal dikirim. Coba reset lagi." },
-    );
+    if (!result.success) notify.error(result.message);
+    else if (result.data.emailSent) notify.success(`Password sementara baru sudah dikirim ke ${user.email}.`);
+    else notify.warning("Password di-reset, tetapi email gagal dikirim. Coba reset lagi.");
   }
 
   async function handleToggleActive() {
     const result = await setUserActive(user.id, !user.isActive);
-    if (!result.success) return setFeedback({ ok: false, text: result.message });
-    setFeedback({ ok: true, text: user.isActive ? "Akun dinonaktifkan." : "Akun diaktifkan kembali." });
+    if (!result.success) notify.error(result.message);
+    else notify.success(user.isActive ? "Akun dinonaktifkan." : "Akun diaktifkan kembali.");
   }
 
   return (
@@ -93,13 +86,6 @@ export function UserAccountActions({ user, isSelf }: { user: UserDetail; isSelf:
           onConfirm={handleToggleActive}
         />
       </ActionRow>
-
-      {feedback && (
-        <Alert variant={feedback.ok ? "default" : "destructive"}>
-          {feedback.ok ? <CircleCheckIcon /> : <CircleAlertIcon />}
-          <AlertTitle>{feedback.text}</AlertTitle>
-        </Alert>
-      )}
     </div>
   );
 }

@@ -1,11 +1,12 @@
 // Form kebijakan uang muka (OWNER). Memakai onSubmit + startTransition agar
 // isian tidak hilang saat validasi gagal (lihat user-create-form.tsx).
+// Hasil simpan (berhasil / error umum) tampil sebagai toast.
 
 "use client";
 
-import { CircleAlertIcon, CircleCheckIcon, LoaderCircleIcon } from "lucide-react";
-import { startTransition, useActionState, useState, type FormEvent } from "react";
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { LoaderCircleIcon } from "lucide-react";
+import { startTransition, useActionState, useEffect, useState, type FormEvent } from "react";
+import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,11 @@ export function CompanySettingsForm({ settings }: { settings: CompanySettings })
   const [maxDigits, setMaxDigits] = useState(String(settings.noReceiptMaxAmount));
   const error = state && !state.success ? state : undefined;
   const fieldError = (name: string) => error?.fieldErrors?.[name]?.[0];
+
+  useEffect(() => {
+    if (state?.success) notify.success("Pengaturan tersimpan.");
+    else if (state && !state.fieldErrors) notify.error(state.message);
+  }, [state]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -65,19 +71,6 @@ export function CompanySettingsForm({ settings }: { settings: CompanySettings })
           <FieldDescription>Untuk parkir, ojek, dll. Isi 0 bila semua biaya wajib bernota.</FieldDescription>
           <FieldError>{fieldError("noReceiptMaxAmount")}</FieldError>
         </Field>
-
-        {state?.success && (
-          <Alert>
-            <CircleCheckIcon />
-            <AlertTitle>Pengaturan tersimpan.</AlertTitle>
-          </Alert>
-        )}
-        {error && !error.fieldErrors && (
-          <Alert variant="destructive">
-            <CircleAlertIcon />
-            <AlertTitle>{error.message}</AlertTitle>
-          </Alert>
-        )}
 
         <Field orientation="horizontal">
           <Button type="submit" disabled={pending}>
