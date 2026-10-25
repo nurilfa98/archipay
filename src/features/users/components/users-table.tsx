@@ -8,6 +8,7 @@
 
 import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
+import { ToneBadge } from "@/components/tone-badge";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -32,7 +33,7 @@ export function UsersTable({ users, search }: { users: UserListItem[]; search?: 
   }
 
   return (
-    <div className="rounded-lg border">
+    <div className="rounded-lg border bg-card">
       <Table>
         <TableHeader>
           <TableRow>
@@ -92,9 +93,16 @@ function RoleBadges({ roles, className }: { roles: UserListItem["roles"]; classN
   );
 }
 
+// Aktif = hijau (teks hijau tua), Nonaktif = abu-abu (teks hitam).
 export function StatusBadge({ user }: { user: Pick<UserListItem, "isActive" | "mustChangePassword"> }) {
-  if (!user.isActive) return <Badge variant="destructive">Nonaktif</Badge>;
+  if (!user.isActive) {
+    return (
+      <ToneBadge tone="pending" className="text-slate-900 dark:text-slate-100">
+        Nonaktif
+      </ToneBadge>
+    );
+  }
   // Belum pernah login / belum mengganti password sementara.
   if (user.mustChangePassword) return <Badge variant="outline">Menunggu login</Badge>;
-  return <Badge variant="secondary">Aktif</Badge>;
+  return <ToneBadge tone="success">Aktif</ToneBadge>;
 }

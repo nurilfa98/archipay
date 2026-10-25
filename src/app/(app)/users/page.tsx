@@ -19,6 +19,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { UserSearch } from "@/features/users/components/user-search";
+import { USER_SEARCH_MIN_LENGTH } from "@/features/users/constants";
 import { UsersTable } from "@/features/users/components/users-table";
 import { listUsers } from "@/features/users/queries";
 import { requirePermission } from "@/lib/auth/dal";
@@ -52,7 +53,9 @@ async function UsersContent({ searchParams }: Pick<PageProps<"/users">, "searchP
 
   const { q } = await searchParams;
   // ?q=a&q=b menghasilkan array; cukup ambil yang pertama.
-  const search = (Array.isArray(q) ? q[0] : q)?.trim().slice(0, 100) || undefined;
+  const keyword = (Array.isArray(q) ? q[0] : q)?.trim().slice(0, 100) ?? "";
+  // Kurang dari 3 karakter dianggap tidak mencari (tampilkan semua).
+  const search = keyword.length >= USER_SEARCH_MIN_LENGTH ? keyword : undefined;
   const users = await listUsers(search);
 
   return (

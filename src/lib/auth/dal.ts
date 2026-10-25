@@ -124,7 +124,7 @@ export async function verifySession() {
 // error (ActionResult) daripada redirect:
 //
 //     const user = await verifySession();
-//     if (!can(user, "advance:create")) return { success: false, message: "Akses ditolak." };
+//     if (!can(user, "advance:disburse")) return { success: false, message: "Akses ditolak." };
 export async function requirePermission(permission: Permission) {
   const user = await verifySession();
   if (!can(user, permission)) redirect("/");

@@ -23,9 +23,14 @@ import type { Role } from "./roles";
 export const PERMISSIONS = [
   "advance:view-own", // melihat uang muka milik sendiri
   "advance:view-all", // melihat uang muka semua karyawan
-  "advance:create", // memberikan uang muka ke karyawan
+  "advance:disburse", // mencairkan uang muka langsung, tanpa persetujuan
+  "advance:propose", // mengusulkan pencairan, wajib disetujui pemegang advance:approve
+  "advance:approve", // menyetujui/menolak usulan & pengajuan pencairan
+  "advance:request", // mengajukan uang muka untuk diri sendiri, wajib disetujui
   "settlement:submit", // upload struk / laporan penggunaan uang
-  "settlement:verify", // memverifikasi struk & menyelesaikan selisih
+  "settlement:verify", // memverifikasi struk & mencatat pengembalian/penggantian selisih
+  "payroll:manage", // daftar potong gaji: ekspor & tandai sudah dipotong
+  "settings:manage", // ubah kebijakan uang muka & kategori biaya
   "user:manage", // tambah/nonaktifkan user & atur role
   "audit:view", // melihat audit log
 ] as const;
@@ -35,15 +40,20 @@ export type Permission = (typeof PERMISSIONS)[number];
 // Contoh pembagian akses; sesuaikan dengan SOP perusahaan.
 // `satisfies` memastikan setiap role terdaftar dan setiap permission valid.
 const ROLE_PERMISSIONS = {
-  OWNER: PERMISSIONS, // owner boleh semuanya
+  // Owner boleh semuanya, kecuali mengajukan uang muka untuk dirinya sendiri:
+  // dana perusahaan memang di tangannya, dan pengajuan Owner tidak bisa
+  // disetujui siapa pun (penyetuju tidak boleh penerimanya sendiri).
+  OWNER: PERMISSIONS.filter((permission) => permission !== "advance:request"),
   FINANCE: [
     "advance:view-own",
     "advance:view-all",
-    "advance:create",
+    "advance:propose", // FINANCE tidak bisa mencairkan tanpa persetujuan OWNER
+    "advance:request",
     "settlement:submit",
     "settlement:verify",
+    "payroll:manage",
   ],
-  EMPLOYEE: ["advance:view-own", "settlement:submit"],
+  EMPLOYEE: ["advance:view-own", "advance:request", "settlement:submit"],
 } satisfies Record<Role, readonly Permission[]>;
 
 // User dengan banyak role mendapat gabungan permission dari semua role-nya.

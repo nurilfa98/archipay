@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 export function Brand({ className }: { className?: string }) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+      <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-brand text-brand-foreground">
         <WalletIcon className="size-4" />
       </div>
       {/* Teks otomatis tersembunyi saat sidebar diciutkan ke mode ikon */}

@@ -22,6 +22,48 @@
       "when": 1792831796499,
       "tag": "0002_users_password_session",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792838682982,
+      "tag": "0003_advances_company_settings",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792903775519,
+      "tag": "0004_advance_monthly_number",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792908895727,
+      "tag": "0005_settlements_ledger",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792909368670,
+      "tag": "0006_settlement_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792911301936,
+      "tag": "0007_returns_reminders",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792916151359,
+      "tag": "0008_audit_logs_created_at",
+      "breakpoints": true
     }
   ]
 }

@@ -31,6 +31,42 @@ const envSchema = z.object({
   // agar `pnpm build` tidak gagal di mesin yang belum punya key.
   RESEND_API_KEY: optional(z.string().startsWith("re_", "RESEND_API_KEY harus diawali re_")),
   EMAIL_FROM: optional(z.string()),
+  // WhatsApp via Fonnte. Opsional dengan alasan yang sama seperti email:
+  // tanpa token, pesan hanya ditampilkan di terminal (lihat lib/whatsapp.ts).
+  FONNTE_TOKEN: optional(z.string()),
+  // Zona waktu perusahaan, dipakai untuk menghitung "hari kalender" (batas
+  // unggah nota berakhir pukul 23.59 waktu setempat) dan menampilkan tanggal.
+  // Diisi per deployment: Asia/Jakarta (WIB), Asia/Makassar (WITA), Asia/Jayapura (WIT).
+  APP_TIMEZONE: z
+    .string()
+    .default("Asia/Jakarta")
+    .refine(isValidTimeZone, "APP_TIMEZONE bukan zona waktu IANA yang valid, contoh: Asia/Jakarta"),
+  // Cloudflare R2 untuk foto nota (lihat lib/storage.ts). Opsional: saat
+  // development tanpa R2, file disimpan di folder .storage/ di proyek ini.
+  R2_ACCOUNT_ID: optional(z.string()),
+  R2_ACCESS_KEY_ID: optional(z.string()),
+  R2_SECRET_ACCESS_KEY: optional(z.string()),
+  R2_BUCKET: optional(z.string()),
+  // Kunci untuk endpoint pengingat harian /api/cron/reminders (lihat
+  // app/api/cron/reminders/route.ts). Tanpa kunci ini endpoint menolak semua request.
+  CRON_SECRET: optional(z.string().min(16, "CRON_SECRET minimal 16 karakter")),
 });
 
-export const env = envSchema.parse(process.env);
+function isValidTimeZone(timeZone: string) {
+  try {
+    new Intl.DateTimeFormat("id-ID", { timeZone });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export const env = envSchema
+  .refine(
+    (value) => {
+      const r2 = [value.R2_ACCOUNT_ID, value.R2_ACCESS_KEY_ID, value.R2_SECRET_ACCESS_KEY, value.R2_BUCKET];
+      return r2.every(Boolean) || !r2.some(Boolean);
+    },
+    "R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, dan R2_BUCKET harus diisi semua (atau dikosongkan semua)",
+  )
+  .parse(process.env);

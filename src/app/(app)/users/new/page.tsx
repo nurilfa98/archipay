@@ -17,7 +17,7 @@ export default function NewUserPage() {
     <>
       <PageHeader
         title="Tambah pengguna"
-        description="Akun dibuat dengan role Karyawan. Role dan rekening bank bisa diatur setelahnya."
+        description="Akun dibuat dengan role Karyawan. Nomor WhatsApp, role, dan rekening bank bisa diatur setelahnya."
       />
       <Card>
         <CardContent>

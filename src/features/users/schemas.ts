@@ -48,7 +48,8 @@ const bankAccountNumber = z
   .pipe(z.string().regex(/^\d{0,30}$/, "Nomor rekening hanya boleh berisi angka"))
   .transform((value) => value || null);
 
-export const createUserSchema = z.object({ fullName, email, phoneNumber });
+// Nomor WhatsApp tidak diminta saat tambah pengguna; diisi lewat edit.
+export const createUserSchema = z.object({ fullName, email });
 
 export const updateUserSchema = z
   .object({

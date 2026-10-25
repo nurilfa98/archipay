@@ -10,7 +10,9 @@ import {
   HandCoinsIcon,
   HouseIcon,
   ReceiptTextIcon,
+  SettingsIcon,
   UsersIcon,
+  WalletCardsIcon,
   type LucideIcon,
 } from "lucide-react";
 import type { Permission } from "@/lib/auth/permissions";
@@ -37,6 +39,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Uang Muka", href: "/advances", icon: HandCoinsIcon, permission: "advance:view-own" },
       { title: "Pertanggungjawaban", href: "/settlements", icon: ReceiptTextIcon, permission: "settlement:submit" },
+      { title: "Potong Gaji", href: "/payroll-deductions", icon: WalletCardsIcon, permission: "payroll:manage" },
     ],
   },
   {
@@ -44,6 +47,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { title: "Pengguna", href: "/users", icon: UsersIcon, permission: "user:manage" },
       { title: "Audit Log", href: "/audit", icon: FileClockIcon, permission: "audit:view" },
+      { title: "Pengaturan", href: "/settings", icon: SettingsIcon, permission: "settings:manage" },
     ],
   },
 ];

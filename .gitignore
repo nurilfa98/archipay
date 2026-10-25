@@ -22,6 +22,9 @@
 
 # misc
 .DS_Store
+
+# file nota saat development tanpa Cloudflare R2 (lib/storage.ts)
+/.storage/
 *.pem
 
 # debug

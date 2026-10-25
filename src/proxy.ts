@@ -22,11 +22,16 @@ import { getSession } from "@/lib/auth/session";
 // Halaman yang boleh dibuka tanpa login. Selain ini, semua wajib login.
 // Nanti endpoint webhook (misal /api/webhooks/...) juga perlu ditambahkan di sini.
 const PUBLIC_ROUTES = ["/login"];
+// Endpoint penjadwal (cron) tidak membawa cookie; diamankan dengan
+// CRON_SECRET di route-nya sendiri (app/api/cron/reminders/route.ts).
+const PUBLIC_PREFIXES = ["/api/cron/"];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (PUBLIC_ROUTES.includes(pathname)) return NextResponse.next();
+  if (PUBLIC_ROUTES.includes(pathname) || PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix))) {
+    return NextResponse.next();
+  }
 
   // Hanya membuka enkripsi cookie, tanpa query database.
   const { userId } = await getSession();

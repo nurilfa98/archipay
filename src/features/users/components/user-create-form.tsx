@@ -1,4 +1,5 @@
-// Form tambah pengguna: OWNER cukup mengisi nama, email, dan nomor WhatsApp.
+// Form tambah pengguna: OWNER cukup mengisi nama dan email. Nomor WhatsApp
+// dan rekening diisi belakangan lewat halaman edit pengguna.
 // Setelah berhasil, form diganti panel sukses yang memberi tahu apakah email
 // kredensial terkirim.
 //
@@ -61,16 +62,6 @@ function CreateForm({ onAddAnother }: { onAddAnother: () => void }) {
           description="Password sementara dikirim ke email ini."
           required
           error={fieldError("email")}
-        />
-        <TextField
-          name="phoneNumber"
-          label="Nomor WhatsApp"
-          type="tel"
-          inputMode="tel"
-          placeholder="0812-3456-7890"
-          description="Dipakai untuk notifikasi WhatsApp."
-          required
-          error={fieldError("phoneNumber")}
         />
 
         {error && !error.fieldErrors && (

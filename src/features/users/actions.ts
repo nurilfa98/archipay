@@ -52,7 +52,7 @@ const EMAIL_TAKEN = {
 
 export type CreateUserResult = { id: string; email: string; emailSent: boolean };
 
-// OWNER cukup mengisi nama, email, dan WhatsApp. Role awal EMPLOYEE.
+// OWNER cukup mengisi nama dan email. Role awal EMPLOYEE.
 // Password sementara dibuat sistem dan HANYA dikirim ke email user.
 export async function createUser(
   _prevState: ActionResult<CreateUserResult> | undefined,
@@ -64,7 +64,6 @@ export async function createUser(
   const parsed = createUserSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
-    phoneNumber: formData.get("phoneNumber"),
   });
   if (!parsed.success) return invalid(parsed.error);
 

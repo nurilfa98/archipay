@@ -1,20 +1,22 @@
 // Navbar di bagian atas konten.
 //
-//   [≡] | Judul halaman                                  [menu user]
+//   [≡] | Keuangan > Uang Muka                  [tema] [menu user]
 //
 // - [≡] (SidebarTrigger): di desktop menciutkan sidebar, di HP membuka drawer.
 // - `sticky top-0`: navbar tetap terlihat saat halaman di-scroll.
+// - [tema] (ThemeToggle): pilihan Terang / Gelap / Sistem.
 // - Menu user diterima lewat prop `userMenu` (slot) agar layout bisa
 //   membungkusnya dengan <Suspense>.
-// - PageTitle membaca URL (usePathname). Di halaman dengan segmen dinamis
-//   seperti /users/[id], URL baru diketahui saat request, jadi PageTitle
-//   wajib di dalam <Suspense>. Di halaman statis judulnya tetap ikut prerender.
+// - PageBreadcrumb membaca URL (usePathname). Di halaman dengan segmen dinamis
+//   seperti /users/[id], URL baru diketahui saat request, jadi breadcrumb
+//   wajib di dalam <Suspense>. Di halaman statis breadcrumb tetap ikut prerender.
 //   Referensi: https://nextjs.org/docs/messages/blocking-prerender-client-hook
 
 import { Suspense, type ReactNode } from "react";
 import { Separator } from "@/components/ui/separator";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { PageTitle } from "./page-title";
+import { PageBreadcrumb } from "./page-breadcrumb";
 
 export function AppHeader({ userMenu }: { userMenu: ReactNode }) {
   return (
@@ -22,9 +24,12 @@ export function AppHeader({ userMenu }: { userMenu: ReactNode }) {
       <SidebarTrigger className="-ml-1" />
       <Separator orientation="vertical" className="mr-2 data-vertical:h-4 data-vertical:self-center" />
       <Suspense>
-        <PageTitle />
+        <PageBreadcrumb />
       </Suspense>
-      <div className="ml-auto flex items-center gap-2">{userMenu}</div>
+      <div className="ml-auto flex items-center gap-1">
+        <ThemeToggle />
+        {userMenu}
+      </div>
     </header>
   );
 }
