@@ -153,7 +153,7 @@ function ConfirmButton({
           <AlertDialogFooter>
             <AlertDialogCancel disabled={pending}>Batal</AlertDialogCancel>
             <Button
-              variant={variant === "destructive" ? "destructive" : "default"}
+              variant={variant === "destructive" ? "destructive" : "brand"}
               disabled={pending}
               onClick={handleConfirm}
             >

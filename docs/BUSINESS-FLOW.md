@@ -1,0 +1,340 @@
+# Alur Bisnis ArchiPay
+
+Acuan untuk memahami cara kerja **Uang Muka** (kas bon operasional) dan
+**Pertanggungjawaban** (laporan penggunaan dana + nota) di ArchiPay: siapa
+melakukan apa, kapan, dan apa akibatnya. Dokumen ini menjelaskan aturan
+bisnis; struktur kode ada di [ARCHITECTURE.md](./ARCHITECTURE.md).
+
+Ditulis berdasarkan kode per 25 Oktober 2026. Bila aturan di kode berubah,
+perbarui dokumen ini juga. Sumber kebenaran aturan:
+
+| Aturan | File |
+|---|---|
+| Hak akses per role | `src/lib/auth/permissions.ts` |
+| Siapa boleh melakukan apa terhadap uang muka | `src/features/advances/service.ts` |
+| Siapa boleh melakukan apa terhadap pertanggungjawaban | `src/features/settlements/service.ts` |
+| Daftar & arti status | `src/features/advances/constants.ts` |
+| Pengingat otomatis | `src/features/reminders/run.ts` |
+
+---
+
+## 1. Istilah
+
+| Istilah | Arti |
+|---|---|
+| **Uang muka** (UM) | Dana operasional yang diserahkan kantor ke karyawan sebelum dipakai. Nomor: `UM-2026-10-0001`. |
+| **Pertanggungjawaban** (PJ) | Laporan karyawan berisi nota-nota pemakaian uang muka. Satu uang muka = satu laporan. Nomor: `PJ-2026-10-0001`. |
+| **Nota** | Satu baris biaya: tanggal, kategori, keterangan, nominal, dan foto/PDF bukti (atau alasan bila tanpa nota). |
+| **Saldo** | Uang kantor yang masih dipegang karyawan. Dihitung dari *ledger*, bukan disimpan sebagai angka. |
+| **Ledger** | Buku besar per uang muka (`advance_ledger_entries`). Setiap pergerakan uang adalah satu baris. |
+| **Sisa** | Saldo positif setelah verifikasi: karyawan wajib mengembalikan. |
+| **Penggantian** | Saldo negatif setelah verifikasi: karyawan nombok, kantor wajib mengganti. |
+| **Potong gaji** | Sisa yang tidak dikembalikan sampai batas waktu, dipotong dari gaji sesuai persetujuan karyawan. |
+
+---
+
+## 2. Peran & hak akses
+
+Satu user boleh punya lebih dari satu role; haknya digabung.
+
+| Kemampuan | Owner | Finance | Karyawan |
+|---|:---:|:---:|:---:|
+| Melihat uang muka milik sendiri | ✓ | ✓ | ✓ |
+| Melihat uang muka semua karyawan | ✓ | ✓ | |
+| **Mencairkan langsung** (tanpa persetujuan) | ✓ | | |
+| **Mengusulkan** uang muka untuk karyawan (perlu persetujuan Owner) | ✓¹ | ✓ | |
+| **Menyetujui / menolak** pengajuan & usulan | ✓ | | |
+| Mengajukan uang muka untuk diri sendiri | | ✓ | ✓ |
+| Mengunggah nota & mengirim pertanggungjawaban | ✓ | ✓ | ✓ |
+| Memverifikasi nota, mencatat pengembalian / penggantian | ✓ | ✓ | |
+| Potong Gaji (lihat daftar, ekspor Excel, tandai dipotong) | ✓ | ✓ | |
+| Pengguna, Pengaturan, Audit Log | ✓ | | |
+
+¹ Owner selalu memakai jalur "cair langsung", jadi praktis tidak pernah mengusulkan.
+
+### Aturan pemisahan tugas (berlaku untuk semua role)
+
+- Pemberi dan penerima dana harus orang berbeda.
+- Penerima dana tidak boleh menyetujui, mencairkan, atau memverifikasi uang mukanya sendiri, **termasuk bila ia Owner atau Finance**.
+- Pengusul tidak boleh menyetujui usulannya sendiri.
+- Tidak boleh menandai potong gaji untuk diri sendiri.
+- Owner tidak bisa mengajukan uang muka untuk dirinya sendiri. Dana perusahaan memang di tangannya, dan tidak ada orang lain yang berhak menyetujuinya.
+- Pengajuan/usulan hanya bisa dibuat bila ada **penyetuju yang sah**, yaitu Owner aktif yang bukan penerima dan bukan pengusulnya. Ini mencegah pengajuan macet selamanya, misalnya Finance mengusulkan untuk satu-satunya Owner.
+
+---
+
+## 3. Siklus status uang muka
+
+Status hanya disimpan di satu tempat: `advance_requests.status`. Status
+pertanggungjawaban adalah "tampilan" dari status uang muka yang sama.
+
+```mermaid
+stateDiagram-v2
+    [*] --> PENDING_APPROVAL: Karyawan/Finance mengajukan
+    [*] --> DISBURSED: Owner cair langsung
+    PENDING_APPROVAL --> APPROVED: Owner setuju
+    PENDING_APPROVAL --> REJECTED: Owner tolak
+    APPROVED --> DISBURSED: Dana diserahkan
+    PENDING_APPROVAL --> CANCELLED
+    APPROVED --> CANCELLED
+    DISBURSED --> CANCELLED
+    DISBURSED --> ACKNOWLEDGED: Karyawan konfirmasi terima
+    ACKNOWLEDGED --> SUBMITTED: Kirim nota
+    SUBMITTED --> REVISION_REQUESTED: Dikembalikan
+    REVISION_REQUESTED --> SUBMITTED: Kirim ulang
+    SUBMITTED --> CLOSED: Saldo 0
+    SUBMITTED --> RETURN_PENDING: Saldo > 0
+    SUBMITTED --> REIMBURSE_PENDING: Saldo < 0
+    RETURN_PENDING --> CLOSED: Sisa lunas (kembali / potong gaji)
+    REIMBURSE_PENDING --> CLOSED: Penggantian lunas
+```
+
+| Status | Label di aplikasi | Menunggu siapa |
+|---|---|---|
+| `PENDING_APPROVAL` | Menunggu persetujuan | Owner |
+| `APPROVED` | Disetujui, belum dicairkan | Owner/Finance menyerahkan dana |
+| `REJECTED` | Ditolak | (selesai) |
+| `DISBURSED` | Menunggu konfirmasi | Karyawan penerima |
+| `ACKNOWLEDGED` | Diterima karyawan (laporan: Draf) | Karyawan mengisi nota |
+| `SUBMITTED` | Nota menunggu verifikasi | Owner/Finance |
+| `REVISION_REQUESTED` | Nota perlu diperbaiki | Karyawan |
+| `RETURN_PENDING` | Sisa belum dikembalikan | Karyawan mengembalikan / potong gaji |
+| `REIMBURSE_PENDING` | Menunggu penggantian | Owner/Finance membayar |
+| `CLOSED` | Selesai | (selesai) |
+| `CANCELLED` | Dibatalkan | (selesai) |
+
+"Lewat batas" (nota atau pengembalian) **bukan** status. Ia dihitung dari
+tanggal batas setiap kali halaman dibuka, jadi selalu benar tanpa cron.
+
+---
+
+## 4. Memberikan uang muka
+
+Ada tiga jalur. Semuanya berakhir di status `DISBURSED`, lalu karyawan wajib
+mengonfirmasi.
+
+### 4.1 Owner mencairkan langsung (push)
+
+1. Owner membuka **Uang Muka → Pencairan uang muka**, memilih karyawan, mengisi nominal, keperluan, dan metode (Tunai/Transfer + nomor referensi opsional).
+2. Dana langsung tercatat **cair** (`DISBURSED`). Batas unggah nota mulai dihitung.
+3. Karyawan menerima WhatsApp untuk konfirmasi.
+
+### 4.2 Finance mengusulkan (push dengan persetujuan)
+
+1. Finance membuat usulan untuk karyawan → `PENDING_APPROVAL`. Penerima yang tidak punya penyetuju sah tidak muncul di daftar.
+2. Owner menerima WhatsApp, lalu **Setujui** (→ `APPROVED`) atau **Tolak** dengan alasan (→ `REJECTED`, Finance menerima WhatsApp).
+3. Setelah dana benar-benar diserahkan, Owner/Finance menekan **Catat pencairan** (→ `DISBURSED`). Batas unggah nota mulai dihitung dari saat ini.
+4. Karyawan menerima WhatsApp untuk konfirmasi.
+
+### 4.3 Karyawan mengajukan (pull)
+
+1. Karyawan membuka **Ajukan uang muka** → `PENDING_APPROVAL`. Penerimanya selalu dirinya sendiri.
+2. Owner menerima WhatsApp, lalu setuju atau tolak. Bila ditolak, karyawan menerima WhatsApp beserta alasannya.
+3. Owner/Finance menyerahkan dana lalu **Catat pencairan** (→ `DISBURSED`).
+
+Untuk metode Transfer, rekening tujuan diambil dari data rekening karyawan di
+menu Pengguna dan disimpan sebagai salinan saat pencairan.
+
+---
+
+## 5. Konfirmasi terima & persetujuan potong gaji
+
+Saat status `DISBURSED`, karyawan penerima membaca pernyataan lalu mencentang
+persetujuan:
+
+> Saya, {nama}, menyatakan telah menerima uang muka {nomor} sebesar {nominal}
+> untuk keperluan "{keperluan}". Saya akan mengunggah nota pertanggungjawaban
+> paling lambat {tanggal} pukul 23.59. Saya setuju bahwa sisa dana yang belum
+> saya kembalikan dalam {N} hari kalender setelah pertanggungjawaban
+> diverifikasi akan dipotong dari gaji saya sesuai ketentuan perusahaan.
+
+- Teks **persis** tersebut, waktu, dan alamat IP disimpan sebagai bukti persetujuan tertulis (dasar: PP 36/2021 tentang Pengupahan). Redaksinya perlu dicek konsultan HR/hukum perusahaan.
+- Setelah konfirmasi: status → `ACKNOWLEDGED`, ledger mencatat **Dana diterima** (+), dan laporan pertanggungjawaban berstatus **Draf** otomatis dibuat. Owner dan pencair dana menerima WhatsApp.
+- Bila dana tidak sesuai, karyawan bisa **Laporkan tidak sesuai** (sekali) dengan alasan. Owner dan pencair dana menerima WhatsApp. Karyawan tetap bisa mengonfirmasi nanti bila ternyata sesuai.
+
+### Pembatalan
+
+| Status | Siapa boleh membatalkan |
+|---|---|
+| `PENDING_APPROVAL` | Pengaju/pengusul (menarik pengajuan). Owner memakai "Tolak". |
+| `APPROVED` | Pengaju/pengusul, atau Owner (bukan penerima). |
+| `DISBURSED` | Pencair dana atau Owner (bukan penerima). Karyawan menerima WhatsApp. |
+| `ACKNOWLEDGED` dan seterusnya | Tidak bisa dibatalkan. Koreksi dilakukan lewat pertanggungjawaban. |
+
+Alasan pembatalan wajib (minimal 5 karakter).
+
+---
+
+## 6. Pertanggungjawaban
+
+### 6.1 Mengisi nota (karyawan penerima)
+
+- Nota bisa ditambah/dihapus selama status **Draf** (`ACKNOWLEDGED`) atau **Perlu diperbaiki** (`REVISION_REQUESTED`).
+- Setiap nota: tanggal (antara tanggal pencairan dan hari ini), kategori aktif, keterangan, nominal, dan foto/PDF maksimal 4 MB. Foto dikompres di HP sebelum diunggah.
+- **Tanpa nota** (parkir, ojek, dll) boleh untuk nominal ≤ batas di Pengaturan (bawaan Rp50.000 per item), dengan alasan wajib.
+- Maksimal 50 nota per laporan.
+
+### 6.2 Mengirim
+
+- **Kirim pertanggungjawaban** butuh minimal satu nota. Nomor `PJ-…` diberikan saat pertama kali dikirim.
+- Pengiriman yang melewati batas unggah nota **tetap diterima**, tetapi ditandai terlambat di WhatsApp ke Owner dan pencair dana.
+- Setelah dikirim, nota terkunci (→ `SUBMITTED`).
+
+### 6.3 Verifikasi (Owner/Finance, bukan penerima)
+
+- Setiap nota diputuskan **Setujui** atau **Tolak** (alasan wajib minimal 5 karakter). Nota yang ditolak bersifat final dan tidak dihitung.
+- **Selesaikan verifikasi**: nota yang disetujui dicatat ke ledger sebagai **Nota disetujui** (−), lalu hasilnya ditentukan dari saldo:
+
+| Saldo setelah verifikasi | Status | Artinya |
+|---|---|---|
+| = 0 | `CLOSED` | Selesai. |
+| > 0 | `RETURN_PENDING` | Karyawan wajib mengembalikan sisa paling lambat N hari (Pengaturan, bawaan 3 hari). |
+| < 0 | `REIMBURSE_PENDING` | Kantor wajib mengganti kekurangan. |
+
+- Alternatifnya, **Kembalikan untuk diperbaiki** dengan catatan (→ `REVISION_REQUESTED`). Keputusan per nota yang belum disimpan ikut dibuang. Karyawan memperbaiki lalu **Kirim ulang**.
+- Karyawan menerima WhatsApp untuk hasil verifikasi maupun permintaan perbaikan.
+
+---
+
+## 7. Saldo & ledger
+
+Saldo = jumlah seluruh baris ledger uang muka tersebut. Uang dihitung dalam
+rupiah bulat (tanpa desimal).
+
+| Jenis baris | Tanda | Dicatat saat |
+|---|:---:|---|
+| Dana diterima (`DISBURSEMENT`) | + | Karyawan mengonfirmasi terima |
+| Nota disetujui (`EXPENSE_APPROVED`) | − | Verifikasi selesai |
+| Sisa dana dikembalikan (`RETURN`) | − | Owner/Finance mencatat pengembalian |
+| Potong gaji (`PAYROLL_DEDUCTION`) | − | Owner/Finance menandai dipotong |
+| Penggantian dibayar (`REIMBURSEMENT`) | + | Owner/Finance mencatat penggantian |
+
+Contoh: dana Rp500.000, nota disetujui Rp420.000 → saldo +Rp80.000 →
+`RETURN_PENDING`. Karyawan mengembalikan Rp50.000 tunai, lalu Rp30.000 dipotong
+dari gaji → saldo 0 → `CLOSED`.
+
+---
+
+## 8. Pengembalian, penggantian & potong gaji
+
+### 8.1 Pengembalian sisa / penggantian kekurangan
+
+- Dicatat Owner/Finance (bukan penerima) **setelah uang benar-benar diterima/diserahkan**, dengan metode Tunai/Transfer.
+- Boleh dicicil. Nominal tidak boleh melebihi sisa saldo.
+- Saat saldo menjadi 0, status otomatis `CLOSED`. Karyawan menerima WhatsApp setiap kali ada pencatatan.
+
+### 8.2 Potong gaji (menu Potong Gaji)
+
+- Daftar **Belum dipotong** berisi uang muka `RETURN_PENDING` yang **sudah lewat batas pengembalian**.
+- **Ekspor Excel** (`potong-gaji-YYYY-MM-DD.xlsx`) untuk bagian penggajian. Bila daftar kosong, tidak ada file; yang muncul pemberitahuan.
+- Setelah potongan benar-benar diterapkan di penggajian, tekan **Tandai dipotong**: isi nominal (boleh sebagian) dan periode gaji.
+- Total potongan per periode maksimal **50% upah** (PP 36/2021). ArchiPay tidak menyimpan data gaji, jadi batas ini dicek bagian penggajian. Bila lebih, potong sebagian dan sisanya di periode berikutnya.
+- **Riwayat potongan** bisa difilter per tahun/bulan periode gaji.
+
+---
+
+## 9. Batas waktu & pengingat otomatis
+
+| Batas | Dihitung dari | Bawaan |
+|---|---|---|
+| Unggah nota | Saat dana dicairkan, berakhir pukul 23.59 hari ke-N (zona waktu perusahaan) | 3 hari kalender |
+| Pengembalian sisa | Saat pertanggungjawaban diverifikasi | 3 hari kalender |
+
+Nilai N diatur Owner di **Pengaturan** (1–60 hari). Batas disimpan per uang
+muka saat terjadi, jadi perubahan pengaturan tidak mengubah uang muka yang
+sudah berjalan.
+
+Pengingat WhatsApp dikirim oleh cron harian (`/api/cron/reminders`, pukul
+08.00 WIB). Setiap jenis hanya dikirim **sekali** per uang muka:
+
+| Pengingat | Kondisi | Penerima |
+|---|---|---|
+| Batas nota besok | Nota belum dikirim, batasnya besok | Karyawan |
+| Batas nota terlewati | Nota belum dikirim, batas lewat | Karyawan + Owner |
+| Batas pengembalian besok | Sisa belum lunas, batasnya besok | Karyawan |
+| Batas pengembalian terlewati | Sisa belum lunas, batas lewat (masuk daftar Potong Gaji) | Karyawan + Owner |
+
+---
+
+## 10. Notifikasi
+
+WhatsApp dikirim lewat Fonnte; email lewat Resend. Pengguna tanpa nomor
+WhatsApp dilewati. Saat development (token kosong), pesan hanya dicetak di
+terminal `pnpm dev`.
+
+| Kejadian | Penerima | Kanal |
+|---|---|---|
+| Pengajuan karyawan / usulan Finance baru | Penyetuju sah (Owner) | WhatsApp |
+| Pengajuan/usulan ditolak | Pengaju/pengusul | WhatsApp |
+| Dana dicairkan | Karyawan penerima | WhatsApp |
+| Uang muka cair dibatalkan | Karyawan penerima | WhatsApp |
+| Karyawan konfirmasi terima | Owner + pencair dana | WhatsApp |
+| Karyawan laporkan tidak sesuai | Owner + pencair dana | WhatsApp |
+| Pertanggungjawaban dikirim | Owner + pencair dana | WhatsApp |
+| Dikembalikan untuk diperbaiki | Karyawan | WhatsApp |
+| Verifikasi selesai | Karyawan | WhatsApp |
+| Pengembalian / penggantian / potong gaji dicatat | Karyawan | WhatsApp |
+| Pengingat batas waktu | Lihat bagian 9 | WhatsApp |
+| Akun dibuat / password di-reset | Pengguna | Email (password sementara) |
+
+Hasil setiap aksi simpan di aplikasi tampil sebagai toast (pojok kanan bawah,
+atau atas layar di HP).
+
+---
+
+## 11. Pengguna & akun
+
+- Akun Owner pertama dibuat lewat script `pnpm db:create-owner`. Pengguna lain dibuat Owner di menu **Pengguna** (nama + email); password sementara dikirim lewat email dan wajib diganti saat login pertama.
+- Nomor WhatsApp dan rekening bank diisi Owner di halaman edit pengguna. Tanpa nomor, pengguna tidak menerima WhatsApp; tanpa rekening, pencairan Transfer menampilkan peringatan.
+- **Reset password**: password sementara baru dikirim lewat email, dan pengguna keluar dari semua perangkat.
+- **Nonaktifkan**: pengguna tidak bisa login dan sesi berjalan langsung berhenti. Data dan riwayat tetap tersimpan. Owner tidak bisa menonaktifkan akun sendiri atau melepas role Owner dirinya.
+- Sesi login berlaku 8 jam. Login dikunci sementara setelah 5 kali gagal per email (atau 20 kali per IP) dalam 15 menit.
+
+---
+
+## 12. Pengaturan (Owner)
+
+| Pengaturan | Bawaan |
+|---|---|
+| Batas unggah nota | 3 hari |
+| Batas pengembalian sisa dana | 3 hari |
+| Batas biaya tanpa nota per item | Rp50.000 (isi 0 bila semua biaya wajib bernota) |
+| Kategori biaya | Transportasi, Konsumsi, ATK & Fotokopi, Parkir & Tol, Materai & Perizinan, Lain-lain |
+
+Kategori tidak bisa dihapus agar nota lama tetap utuh; kategori **nonaktif**
+tidak muncul lagi di form nota. Mengganti nama kategori ikut mengubah tampilan
+nota lama.
+
+---
+
+## 13. Audit log (Owner)
+
+Setiap perubahan penting (login, pengguna, uang muka, pertanggungjawaban,
+ledger, potong gaji, pengaturan) dicatat beserta pelaku, waktu, IP, nilai lama
+dan nilai baru. Bisa difilter per tahun, bulan, kategori, dan pelaku.
+
+---
+
+## 14. Perusahaan tanpa Finance
+
+Tidak perlu pengaturan khusus; cukup tidak ada user dengan role Finance. Owner
+memiliki semua hak Finance, sehingga alurnya menjadi:
+
+- **Owner → Karyawan:** Owner cair langsung → karyawan konfirmasi → karyawan kirim nota → Owner verifikasi → Owner catat pengembalian/penggantian, atau potong gaji.
+- **Karyawan → Owner:** karyawan mengajukan → Owner setuju → Owner serahkan dana & catat pencairan → langkah selanjutnya sama.
+
+Satu Owner memegang pencairan, verifikasi, dan pencatatan sekaligus. Ini wajar
+untuk usaha kecil karena dananya milik Owner sendiri, dan semua langkah tetap
+tercatat di Audit Log.
+
+---
+
+## 15. Catatan terbuka
+
+Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
+
+1. **Persetujuan belum diberitahukan.** Saat Owner menyetujui, belum ada WhatsApp ke pengusul (misal Finance yang perlu mencatat pencairan). Karyawan baru diberi tahu saat dana dicairkan.
+2. **Finance bisa memegang uang sekaligus mencatatnya.** Finance yang sama boleh mencairkan, memverifikasi, dan mencatat pengembalian untuk uang muka yang sama; pencatatan pengembalian hanya diberitahukan ke karyawan, bukan ke Owner.
+3. **Finance tidak menerima pengingat keterlambatan**, hanya karyawan dan Owner.
+4. **Nota yang tidak pernah dikirim tidak masuk Potong Gaji.** Daftar Potong Gaji hanya memuat sisa setelah verifikasi. Bila karyawan tidak pernah mengirim nota, uang muka tertahan di status menunggu nota; yang ada hanya pengingat "batas nota terlewati" ke karyawan dan Owner.
+5. **Pengajuan yang sudah terlanjur macet** (dibuat sebelum pengecekan penyetuju sah ditambahkan) tidak berubah otomatis; pengusulnya bisa membatalkan.

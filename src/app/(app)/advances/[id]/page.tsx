@@ -190,7 +190,7 @@ function SettlementCard({
       <CardContent className="flex flex-wrap items-center justify-between gap-3">
         <SettlementStatusBadge status={toSettlementStatus(advance.status)} />
         <Button
-          variant={fill ? "default" : "outline"}
+          variant={fill ? "brand" : "outline"}
           nativeButton={false}
           render={<Link href={`/settlements/${settlementId}`} />}
         >

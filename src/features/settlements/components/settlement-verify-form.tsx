@@ -105,7 +105,7 @@ export function SettlementVerifyForm({
                 <Button
                   type="button"
                   size="sm"
-                  variant={decision.approved === true ? "default" : "outline"}
+                  variant={decision.approved === true ? "brand" : "outline"}
                   aria-pressed={decision.approved === true}
                   onClick={() => update(item.id, { approved: true })}
                 >

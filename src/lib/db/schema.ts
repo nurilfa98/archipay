@@ -1,5 +1,5 @@
-// Schema Drizzle = versi TypeScript dari database/schema-draft.sql.
-// Dari file ini drizzle-kit membuat file migration (pnpm db:generate),
+// Schema Drizzle = sumber kebenaran struktur database. Dari file ini
+// drizzle-kit membuat file migration di database/migrations (pnpm db:generate),
 // dan Drizzle memberi tipe otomatis untuk setiap query.
 //
 // Referensi:

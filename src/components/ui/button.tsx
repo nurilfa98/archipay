@@ -8,8 +8,9 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default: "bg-primary text-primary-foreground hover:bg-primary/80",
-        // Warna aksen ArchiPay (indigo) untuk aksi yang ingin ditonjolkan
-        // tanpa menyaingi tombol utama, misal "Tambah nota".
+        // Warna aksen ArchiPay (indigo), dipakai sebagai varian BAWAAN semua
+        // tombol utama (lihat defaultVariants). "default" (slate gelap) tetap
+        // ada hanya bila perlu dipanggil eksplisit.
         brand: "bg-brand text-brand-foreground hover:bg-brand/85",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
@@ -46,7 +47,7 @@ const buttonVariants = cva(
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "brand",
       size: "default",
     },
   }
@@ -54,7 +55,7 @@ const buttonVariants = cva(
 
 function Button({
   className,
-  variant = "default",
+  variant = "brand",
   size = "default",
   ...props
 }: ButtonPrimitive.Props & VariantProps<typeof buttonVariants>) {

@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ArchiPay
 
-## Getting Started
+Project Financial Control & Petty Cash Management System. ArchiPay mencatat
+**uang muka** (kas bon operasional) yang diberikan kantor ke karyawan, beserta
+**pertanggungjawaban** nota, pengembalian sisa dana, penggantian kekurangan,
+dan **potong gaji** bila sisa dana tidak dikembalikan. Notifikasi dan
+pengingat dikirim lewat WhatsApp.
 
-First, run the development server:
+Satu deployment = satu perusahaan.
+
+## Teknologi
+
+- Next.js 16 (App Router, Cache Components), React 19, TypeScript
+- Tailwind CSS v4 + shadcn/ui (Base UI)
+- PostgreSQL + Drizzle ORM
+- iron-session (login berbasis cookie), zod (validasi)
+- Resend (email), Fonnte (WhatsApp), Cloudflare R2 (file nota)
+
+## Menjalankan di komputer sendiri
+
+Prasyarat: Node.js 20.9 atau lebih baru, pnpm 9, dan database PostgreSQL.
+
+1. Pasang dependensi:
+
+   ```bash
+   pnpm install
+   ```
+
+2. Salin `.env.example` menjadi `.env`, lalu isi minimal `DATABASE_URL` dan
+   `SESSION_SECRET` (cara generate ada di file tersebut).
+
+3. Buat tabel database dan akun Owner pertama:
+
+   ```bash
+   pnpm db:migrate
+   pnpm db:create-owner owner@perusahaan.com passwordRahasia "Nama Owner"
+   ```
+
+4. Jalankan aplikasi, lalu buka [http://localhost:3000](http://localhost:3000):
+
+   ```bash
+   pnpm dev
+   ```
+
+Saat development, layanan luar boleh dikosongkan:
+
+| Bila kosong | Yang terjadi |
+|---|---|
+| `RESEND_API_KEY` / `EMAIL_FROM` | Isi email (termasuk password sementara) dicetak di terminal `pnpm dev`. |
+| `FONNTE_TOKEN` | Pesan WhatsApp dicetak di terminal dengan awalan `[whatsapp:dev]`. |
+| `R2_*` | File nota disimpan di folder `.storage/` (tidak ikut git). |
+| `CRON_SECRET` | Endpoint pengingat menolak semua request. Isi bila ingin menguji pengingat. |
+
+Uji pengingat harian secara manual:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+curl -H "Authorization: Bearer <CRON_SECRET>" http://localhost:3000/api/cron/reminders
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Perintah
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Perintah | Fungsi |
+|---|---|
+| `pnpm dev` | Server development |
+| `pnpm build` / `pnpm start` | Build & jalankan versi production |
+| `pnpm typecheck` | Cek tipe TypeScript |
+| `pnpm lint` | Cek kode dengan ESLint |
+| `pnpm db:generate` | Buat file migration baru setelah mengubah `src/lib/db/schema.ts` |
+| `pnpm db:migrate` | Jalankan migration ke database |
+| `pnpm db:create-owner` | Buat akun Owner (sekaligus mengisi tabel role bila belum ada) |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Dokumentasi
 
-## Learn More
+- [docs/BUSINESS-FLOW.md](docs/BUSINESS-FLOW.md): alur bisnis, peran, status, aturan, dan notifikasi.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): struktur folder, alur data, keamanan, dan cara menangani uang di kode.
+- [docs/PRODUCTION-CHECKLIST.md](docs/PRODUCTION-CHECKLIST.md): yang perlu disiapkan sebelum deploy ke production.
+- [database/README.md](database/README.md): isi folder migration, cara mengubah struktur database, dan riwayat migration.
 
-To learn more about Next.js, take a look at the following resources:
+Proyek ini memakai Next.js 16 yang punya perubahan besar dibanding versi
+sebelumnya. Rujukan utama adalah dokumentasi versi terpasang di
+`node_modules/next/dist/docs/` (lihat `AGENTS.md`).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Ikuti [docs/PRODUCTION-CHECKLIST.md](docs/PRODUCTION-CHECKLIST.md). Jadwal
+pengingat harian untuk Vercel sudah ada di `vercel.json` (08.00 WIB).

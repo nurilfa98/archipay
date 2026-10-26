@@ -6,7 +6,7 @@ Next.js 16 (App Router) · React 19 · TypeScript · Tailwind v4 · Cache Compon
 
 ```
 archipay/
-├── database/                  # SQL draft, nanti diganti migration (drizzle-kit)
+├── database/migrations/       # migration SQL hasil drizzle-kit (lihat database/README.md)
 ├── docs/                      # dokumentasi seperti file ini
 ├── public/                    # file statis (logo, gambar)
 ├── src/
@@ -139,9 +139,12 @@ login) harus dibungkus `<Suspense>`, kalau tidak build akan error.
 
 ## 5. Uang
 
-- Kolom `DECIMAL(12,2)` dibaca sebagai string oleh driver Postgres.
-- Di kode, konversi ke integer satuan sen lalu hitung. Jangan pakai float.
-- Contoh: `features/settlements/service.ts`, `lib/format.ts`.
+- Nominal disimpan sebagai **`bigint` dalam rupiah bulat**, bukan desimal dan bukan sen. Kolomnya dibuat lewat helper `rupiah()` di `lib/db/schema.ts` (`bigint(name, { mode: "number" })`), sehingga di kode bertipe `number`. Aman sampai `Number.MAX_SAFE_INTEGER` (±9 kuadriliun).
+- Hitung uang hanya dengan bilangan bulat (tambah/kurang). Jangan pakai pecahan atau float: `0.1 + 0.2 !== 0.3`.
+- `SUM()` di PostgreSQL mengembalikan `numeric` yang dibaca driver sebagai string, jadi hasilnya dipetakan kembali dengan `.mapWith(Number)`. Contoh: `currentBalance` di `features/settlements/queries.ts`.
+- Saldo uang muka **tidak disimpan** sebagai angka, tetapi selalu dijumlahkan dari ledger `advance_ledger_entries` (tanda +/− ada di nominal). Lihat `features/settlements/ledger.ts` dan [BUSINESS-FLOW.md](./BUSINESS-FLOW.md#7-saldo--ledger).
+- Tampilan memakai `formatRupiah()` dari `lib/format.ts` ("Rp 500.000"). Input nominal di form menampilkan titik ribuan, lalu server membuang semua karakter selain angka sebelum validasi.
+- Contoh aturan perhitungan: `features/settlements/service.ts` (`settlementOutcome`, `summarizeBalance`).
 
 ## 6. Referensi
 

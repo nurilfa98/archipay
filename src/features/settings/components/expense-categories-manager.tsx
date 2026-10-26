@@ -32,7 +32,6 @@ export function ExpenseCategoriesManager({ categories }: { categories: ExpenseCa
       <div>
         <ActionDialog
           label="Tambah kategori"
-          variant="brand"
           title="Tambah kategori biaya"
           description="Kategori baru langsung bisa dipilih karyawan saat mengisi nota."
           confirmLabel="Simpan"

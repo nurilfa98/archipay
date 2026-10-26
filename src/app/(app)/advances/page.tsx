@@ -76,7 +76,7 @@ async function AdvanceHeaderActions() {
     <div className="flex flex-wrap gap-2">
       {request && (
         <Button
-          variant={push ? "outline" : "default"}
+          variant={push ? "outline" : "brand"}
           nativeButton={false}
           render={<Link href="/advances/request" />}
         >

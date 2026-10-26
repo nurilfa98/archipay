@@ -35,7 +35,7 @@ type FieldErrorOf = (name: string) => string | undefined;
 export function ActionDialog({
   label,
   icon,
-  variant = "default",
+  variant = "brand",
   disabled,
   title,
   description,
@@ -107,7 +107,7 @@ export function ActionDialog({
               <AlertDialogCancel disabled={pending}>Batal</AlertDialogCancel>
               <Button
                 type="submit"
-                variant={variant === "destructive" ? "destructive" : "default"}
+                variant={variant === "destructive" ? "destructive" : "brand"}
                 disabled={pending}
               >
                 {pending && <LoaderCircleIcon className="animate-spin" />}

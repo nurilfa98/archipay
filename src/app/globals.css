@@ -55,9 +55,9 @@
      Palet "Corporate Trust" (nilai = warna Tailwind v4 dalam oklch).
      Komponen shadcn membaca variabel di bawah, jadi cukup ubah di sini.
 
-     - primary   : slate-900 (tombol utama, badge default, checkbox)
-     - brand     : indigo-600, warna aksen ArchiPay (ikon kartu ringkasan,
-                   kotak "Perlu tindakan", logo, focus ring). Sengaja TIDAK
+     - primary   : slate-900 (badge default, checkbox)
+     - brand     : indigo-600, warna aksen ArchiPay (tombol utama, ikon kartu
+                   ringkasan, kotak "Perlu tindakan", logo, focus ring). Sengaja TIDAK
                    memakai --accent/--secondary: di shadcn keduanya adalah
                    latar hover menu & tombol ghost/secondary, sehingga kalau
                    diisi indigo semua hover akan berwarna ungu terang.
