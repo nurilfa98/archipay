@@ -48,26 +48,32 @@ const bankAccountNumber = z
   .pipe(z.string().regex(/^\d{0,30}$/, "Nomor rekening hanya boleh berisi angka"))
   .transform((value) => value || null);
 
-// Nomor WhatsApp tidak diminta saat tambah pengguna; diisi lewat edit.
+// Nomor WhatsApp tidak diminta saat tambah pengguna; diisi lewat profil
+// (menu Profil) oleh pengguna sendiri.
 export const createUserSchema = z.object({ fullName, email });
 
+// Nama bank dan nomor rekening harus diisi berpasangan.
+function bankPairRule(data: { bankName: string | null; bankAccountNumber: string | null }, ctx: z.RefinementCtx) {
+  if (data.bankAccountNumber && !data.bankName) {
+    ctx.addIssue({ code: "custom", path: ["bankName"], message: "Isi nama bank untuk nomor rekening ini" });
+  }
+  if (data.bankName && !data.bankAccountNumber) {
+    ctx.addIssue({ code: "custom", path: ["bankAccountNumber"], message: "Isi nomor rekening untuk bank ini" });
+  }
+}
+
+// Data profil yang boleh diisi pengguna sendiri (menu Profil), tanpa role.
+const profileShape = { fullName, email, phoneNumber, bankName, bankAccountNumber };
+
+export const profileSchema = z.object(profileShape).superRefine(bankPairRule);
+
+// Edit oleh OWNER: profil + role.
 export const updateUserSchema = z
   .object({
-    fullName,
-    email,
-    phoneNumber,
-    bankName,
-    bankAccountNumber,
+    ...profileShape,
     roles: z.array(z.enum(ROLES)).min(1, "Pilih minimal satu role"),
   })
-  .refine((data) => !data.bankAccountNumber || data.bankName, {
-    path: ["bankName"],
-    message: "Isi nama bank untuk nomor rekening ini",
-  })
-  .refine((data) => !data.bankName || data.bankAccountNumber, {
-    path: ["bankAccountNumber"],
-    message: "Isi nomor rekening untuk bank ini",
-  });
+  .superRefine(bankPairRule);
 
 // id user yang dikirim dari browser (event handler) juga wajib divalidasi.
 export const userIdSchema = z.string().min(1).max(36);

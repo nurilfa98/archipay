@@ -36,7 +36,7 @@ import { getClientIp } from "@/lib/request";
 import type { ActionResult } from "@/types/action-result";
 import { credentialsEmail } from "./emails";
 import { getUserDetail } from "./queries";
-import { createUserSchema, updateUserSchema, userIdSchema } from "./schemas";
+import { createUserSchema, profileSchema, updateUserSchema, userIdSchema } from "./schemas";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
 const NOT_FOUND = { success: false, message: "Pengguna tidak ditemukan." } as const;
@@ -189,6 +189,71 @@ export async function updateUser(
   }
 
   revalidateUsers();
+  return { success: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Profil sendiri (menu Profil)
+// ---------------------------------------------------------------------------
+
+// Pengguna melengkapi datanya sendiri: nomor WhatsApp, rekening, dan kontak.
+// Tidak butuh user:manage, dan hanya mengubah akun yang sedang login. Role
+// tidak ikut diubah di sini.
+export async function updateOwnProfile(
+  _prevState: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  const actor = await verifySession();
+
+  const parsed = profileSchema.safeParse({
+    fullName: formData.get("fullName"),
+    email: formData.get("email"),
+    phoneNumber: formData.get("phoneNumber"),
+    bankName: formData.get("bankName"),
+    bankAccountNumber: formData.get("bankAccountNumber"),
+  });
+  if (!parsed.success) return invalid(parsed.error);
+
+  const before = await getUserDetail(actor.id);
+  if (!before) return NOT_FOUND;
+
+  // Audit hanya mencatat field yang benar-benar berubah.
+  const profile = parsed.data;
+  const oldValues: Record<string, unknown> = {};
+  const newValues: Record<string, unknown> = {};
+  for (const key of Object.keys(profile) as (keyof typeof profile)[]) {
+    if (before[key] !== profile[key]) {
+      oldValues[key] = before[key];
+      newValues[key] = profile[key];
+    }
+  }
+
+  // Tidak ada yang berubah: tidak perlu menulis ke database maupun audit log.
+  if (Object.keys(newValues).length === 0) return { success: true, data: undefined };
+
+  try {
+    await db.transaction(async (tx) => {
+      await tx.update(users).set(profile).where(eq(users.id, actor.id));
+      await logAudit(
+        {
+          userId: actor.id,
+          action: "USER_UPDATED",
+          entityName: "users",
+          entityId: actor.id,
+          oldValues,
+          newValues,
+          ipAddress: await getClientIp(),
+        },
+        tx,
+      );
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) return EMAIL_TAKEN;
+    throw error;
+  }
+
+  // Nama di navbar ikut berubah, jadi seluruh layout (app) dimuat ulang.
+  revalidatePath("/", "layout");
   return { success: true, data: undefined };
 }
 
