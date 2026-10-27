@@ -45,7 +45,7 @@ export function credentialsEmail(input: CredentialsEmailInput): EmailMessage {
     <tr><td style="padding: 4px 12px 4px 0; color: #737373;">Password sementara</td>
       <td><code style="font-size: 16px; background: #f5f5f5; padding: 2px 6px; border-radius: 4px;">${escapeHtml(input.temporaryPassword)}</code></td></tr>
   </table>
-  <p><a href="${escapeHtml(loginUrl)}" style="display: inline-block; background: #171717; color: #ffffff; padding: 8px 16px; border-radius: 6px; text-decoration: none;">Masuk ke ArchiPay</a></p>
+  <p><a href="${escapeHtml(loginUrl)}" style="display: inline-block; background: #4f46e5; color: #ffffff; padding: 8px 16px; border-radius: 6px; text-decoration: none;">Masuk ke ArchiPay</a></p>
   <p>Setelah masuk, Anda akan diminta membuat password baru.<br />
   Jangan bagikan password ini kepada siapa pun, termasuk atasan atau admin.</p>
 </div>`;

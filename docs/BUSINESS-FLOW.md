@@ -178,6 +178,7 @@ Alasan pembatalan wajib (minimal 5 karakter).
 
 - **Kirim pertanggungjawaban** butuh minimal satu nota. Nomor `PJ-…` diberikan saat pertama kali dikirim.
 - Pengiriman yang melewati batas unggah nota **tetap diterima**, tetapi ditandai terlambat di WhatsApp ke Owner dan pencair dana.
+- Pengiriman terlambat **wajib menyertakan alasan keterlambatan** lewat dialog kirim. Alasan itu disimpan di laporan dan ditampilkan sebagai tanda seru (!) kuning di samping nomor transaksi, di daftar maupun di header detail. Kursor (atau tekan) di tanda seru untuk melihat alasannya.
 - Setelah dikirim, nota terkunci (→ `SUBMITTED`).
 
 ### 6.3 Verifikasi (Owner/Finance, bukan penerima)
@@ -240,7 +241,17 @@ dari gaji → saldo 0 → `CLOSED`.
 | Unggah nota | Saat dana dicairkan, berakhir pukul 23.59 hari ke-N (zona waktu perusahaan) | 3 hari kalender |
 | Pengembalian sisa | Saat pertanggungjawaban diverifikasi | 3 hari kalender |
 
-Nilai N diatur Owner di **Pengaturan** (1–60 hari). Batas disimpan per uang
+Nilai N diatur Owner di **Pengaturan** (1–60 hari).
+
+### Pembatasan uang muka tertunda
+
+Karyawan yang punya **uang muka tertunda** (sudah lewat batas unggah nota,
+belum dipertanggungjawabkan) tidak bisa menerima uang muka baru. Uang muka
+tertunda dihitung dari status *Menunggu konfirmasi*, *Diterima karyawan*, dan
+*Nota perlu diperbaiki*. Jumlah batasnya diatur Owner di Pengaturan (bawaan 2).
+
+- Berlaku untuk pengajuan sendiri (karyawan) maupun pencairan/usulan dari Owner atau Finance.
+- Setelah karyawan mengirim pertanggungjawaban, uang muka tersebut tidak lagi dihitung sebagai tertunda, sehingga karyawan bisa menerima uang muka lagi. Batas disimpan per uang
 muka saat terjadi, jadi perubahan pengaturan tidak mengubah uang muka yang
 sudah berjalan.
 
@@ -288,7 +299,7 @@ atau atas layar di HP).
 - Nomor WhatsApp dan rekening bank diisi Owner di halaman edit pengguna. Tanpa nomor, pengguna tidak menerima WhatsApp; tanpa rekening, pencairan Transfer menampilkan peringatan.
 - **Reset password**: password sementara baru dikirim lewat email, dan pengguna keluar dari semua perangkat.
 - **Nonaktifkan**: pengguna tidak bisa login dan sesi berjalan langsung berhenti. Data dan riwayat tetap tersimpan. Owner tidak bisa menonaktifkan akun sendiri atau melepas role Owner dirinya.
-- Sesi login berlaku 8 jam. Login dikunci sementara setelah 5 kali gagal per email (atau 20 kali per IP) dalam 15 menit.
+- Sesi login: dengan centang **"Ingat saya"** (14 hari), sesi bertahan di perangkat itu sampai 14 hari sejak login. Tanpa centang, sesi berakhir saat browser ditutup, dan paling lama 12 jam. Sesi tidak diperpanjang karena aktivitas. Sesi berakhir lebih cepat bila user logout, mengganti/mereset password, atau akunnya dinonaktifkan. Login dikunci sementara setelah 5 kali gagal per email (atau 20 kali per IP) dalam 15 menit.
 
 ---
 
@@ -299,6 +310,7 @@ atau atas layar di HP).
 | Batas unggah nota | 3 hari |
 | Batas pengembalian sisa dana | 3 hari |
 | Batas biaya tanpa nota per item | Rp50.000 (isi 0 bila semua biaya wajib bernota) |
+| Batas uang muka tertunda | 2 uang muka (1–10) |
 | Kategori biaya | Transportasi, Konsumsi, ATK & Fotokopi, Parkir & Tol, Materai & Perizinan, Lain-lain |
 
 Kategori tidak bisa dihapus agar nota lama tetap utuh; kategori **nonaktif**
@@ -336,5 +348,5 @@ Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 1. **Persetujuan belum diberitahukan.** Saat Owner menyetujui, belum ada WhatsApp ke pengusul (misal Finance yang perlu mencatat pencairan). Karyawan baru diberi tahu saat dana dicairkan.
 2. **Finance bisa memegang uang sekaligus mencatatnya.** Finance yang sama boleh mencairkan, memverifikasi, dan mencatat pengembalian untuk uang muka yang sama; pencatatan pengembalian hanya diberitahukan ke karyawan, bukan ke Owner.
 3. **Finance tidak menerima pengingat keterlambatan**, hanya karyawan dan Owner.
-4. **Nota yang tidak pernah dikirim tidak masuk Potong Gaji.** Daftar Potong Gaji hanya memuat sisa setelah verifikasi. Bila karyawan tidak pernah mengirim nota, uang muka tertahan di status menunggu nota; yang ada hanya pengingat "batas nota terlewati" ke karyawan dan Owner.
+4. **Nota yang tidak pernah dikirim tidak masuk Potong Gaji.** Daftar Potong Gaji hanya memuat sisa setelah verifikasi. Untuk mencegahnya, karyawan dibatasi menerima uang muka baru bila jumlah uang muka tertundanya sudah mencapai batas di Pengaturan (lihat bagian 9). Uang muka yang sudah terlanjur tertunda tetap harus ditagih manual.
 5. **Pengajuan yang sudah terlanjur macet** (dibuat sebelum pengecekan penyetuju sah ditambahkan) tidak berubah otomatis; pengusulnya bisa membatalkan.

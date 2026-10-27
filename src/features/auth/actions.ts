@@ -90,7 +90,9 @@ export async function login(
     entityId: user.id,
     ipAddress: ip,
   });
-  await createSession(user.id, user.sessionVersion);
+  // Checkbox "Ingat saya" di login-form.tsx: value="1" bila dicentang.
+  const rememberMe = formData.get("rememberMe") === "1";
+  await createSession(user.id, user.sessionVersion, rememberMe);
   clearClientCache();
 
   // 5. Pindah halaman. redirect() bekerja dengan melempar error khusus, jadi
@@ -160,7 +162,8 @@ export async function changePassword(
   });
 
   // 5. Perangkat ini tetap login dengan session versi baru.
-  await createSession(account.id, sessionVersion);
+  // Pilihan "Ingat saya" dari sesi sebelumnya dipertahankan.
+  await createSession(account.id, sessionVersion, session.rememberMe);
   clearClientCache();
   redirect("/");
 }

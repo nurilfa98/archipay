@@ -157,6 +157,9 @@ export const companySettings = pgTable(
     returnDueDays: integer("return_due_days").notNull().default(3),
     // Nominal maksimal per item pengeluaran tanpa nota (parkir, ojek, dll).
     noReceiptMaxAmount: rupiah("no_receipt_max_amount").notNull().default(50_000),
+    // Jumlah uang muka yang sudah lewat batas unggah nota tetapi belum
+    // dipertanggungjawabkan. Mencapai angka ini, karyawan tidak bisa menerima uang muka baru.
+    maxOverdueAdvances: integer("max_overdue_advances").notNull().default(2),
     updatedAt: timestamptz("updated_at")
       .notNull()
       .defaultNow()
@@ -168,6 +171,7 @@ export const companySettings = pgTable(
     check("company_settings_settlement_due_days", sql`${t.settlementDueDays} between 1 and 60`),
     check("company_settings_return_due_days", sql`${t.returnDueDays} between 1 and 60`),
     check("company_settings_no_receipt_max", sql`${t.noReceiptMaxAmount} >= 0`),
+    check("company_settings_max_overdue", sql`${t.maxOverdueAdvances} between 1 and 10`),
   ],
 );
 
@@ -304,6 +308,8 @@ export const settlements = pgTable(
     // Catatan "kembalikan untuk diperbaiki" yang sedang berlaku. Riwayat
     // lengkapnya ada di audit log.
     revisionNote: varchar("revision_note", { length: 500 }),
+    // Alasan pengiriman yang melewati batas unggah nota. Null bila tepat waktu.
+    lateReason: varchar("late_reason", { length: 500 }),
     revisionRequestedById: userRef("revision_requested_by_id"),
     revisionRequestedAt: timestamptz("revision_requested_at"),
 

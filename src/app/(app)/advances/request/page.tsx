@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdvanceCreateForm } from "@/features/advances/components/advance-create-form";
-import { getActiveRecipient } from "@/features/advances/queries";
+import { countOverdueAdvances, getActiveRecipient } from "@/features/advances/queries";
 import { getCompanySettings } from "@/features/settings/queries";
 import { requirePermission } from "@/lib/auth/dal";
 
@@ -49,6 +49,7 @@ async function RequestAdvanceContent() {
   const [self, settings] = await Promise.all([getActiveRecipient(user.id), getCompanySettings()]);
   // verifySession sudah memastikan user aktif; ini hanya pengaman tipe.
   if (!self) redirect("/login");
+  const overdueCounts = await countOverdueAdvances([self.id]);
 
   return (
     <AdvanceCreateForm
@@ -56,6 +57,8 @@ async function RequestAdvanceContent() {
       self={self}
       settlementDueDays={settings.settlementDueDays}
       returnDueDays={settings.returnDueDays}
+      overdueCounts={overdueCounts}
+      maxOverdueAdvances={settings.maxOverdueAdvances}
     />
   );
 }

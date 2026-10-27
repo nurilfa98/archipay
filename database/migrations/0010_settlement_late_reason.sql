@@ -1,0 +1,1 @@
+ALTER TABLE "settlements" ADD COLUMN "late_reason" varchar(500);

@@ -52,6 +52,7 @@ const returnOverdue = sql<boolean>`coalesce(${advanceRequests.status} = 'RETURN_
 export type SettlementListItem = {
   id: string;
   number: string | null; // null = draf, belum pernah dikirim
+  lateReason: string | null; // alasan kalau dikirim melewati batas unggah nota
   status: SettlementStatus;
   advanceId: string;
   advanceNumber: string;
@@ -72,6 +73,7 @@ export type SettlementListItem = {
 const listColumns = {
   id: settlements.id,
   number: settlements.number,
+  lateReason: settlements.lateReason,
   advanceStatus: advanceRequests.status,
   advanceId: advanceRequests.id,
   advanceNumber: advanceRequests.number,
@@ -257,6 +259,7 @@ export type SettlementDetail = {
   submittedAt: Date | null;
   // true bila dikirim (terakhir) setelah batas unggah nota.
   submittedLate: boolean;
+  lateReason: string | null;
   revisionNote: string | null;
   revisionRequestedByName: string | null;
   revisionRequestedAt: Date | null;
@@ -291,6 +294,7 @@ export async function getSettlementDetail(id: string): Promise<SettlementDetail 
       returnDueDays: advanceRequests.returnDueDays,
       submittedAt: settlements.submittedAt,
       submittedLate: sql<boolean>`coalesce(${settlements.submittedAt} > ${advanceRequests.settlementDueAt}, false)`,
+      lateReason: settlements.lateReason,
       revisionNote: settlements.revisionNote,
       revisionRequestedByName: revisionBy.fullName,
       revisionRequestedAt: settlements.revisionRequestedAt,

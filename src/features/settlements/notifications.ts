@@ -17,19 +17,29 @@ type SettlementSummary = {
 
 type Person = { fullName: string; phoneNumber: string | null };
 
-// Karyawan mengirim laporan → OWNER & pencair dana.
+// Karyawan mengirim laporan → OWNER & pencair dana. Bila terlambat, pesan
+// menyertakan nomor transaksi, alasan keterlambatan, dan link ke laporannya.
 export function notifySubmitted(
-  settlement: SettlementSummary & { itemTotal: number; itemCount: number; late: boolean },
+  settlement: SettlementSummary & {
+    itemTotal: number;
+    itemCount: number;
+    late: boolean;
+    lateReason: string | null;
+  },
   recipientName: string,
   contacts: Person[],
 ) {
+  const lateInfo = settlement.late
+    ? ` (_melewati batas unggah nota_)\n` +
+      `Alasan keterlambatan: ${settlement.lateReason ?? "-"}\n`
+    : "";
   return send(
     contacts,
     (contact) =>
       `Halo ${contact.fullName},\n\n` +
       `${recipientName} mengirim pertanggungjawaban *${settlement.number}* untuk uang muka ` +
-      `${settlement.advanceNumber}: ${settlement.itemCount} nota, total *${formatRupiah(settlement.itemTotal)}*` +
-      `${settlement.late ? " (_melewati batas unggah nota_)" : ""}.\n\n` +
+      `${settlement.advanceNumber}: ${settlement.itemCount} nota, total *${formatRupiah(settlement.itemTotal)}*.` +
+      `${lateInfo}\n` +
       `Mohon diverifikasi:\n${link(settlement.id)}`,
   );
 }

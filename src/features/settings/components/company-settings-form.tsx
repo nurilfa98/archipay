@@ -51,6 +51,16 @@ export function CompanySettingsForm({ settings }: { settings: CompanySettings })
           />
         </div>
 
+        <DaysField
+          name="maxOverdueAdvances"
+          label="Batas uang muka tertunda"
+          max={10}
+          unit="uang muka"
+          defaultValue={settings.maxOverdueAdvances}
+          description="Karyawan yang sudah mencapai jumlah ini (lewat batas unggah nota, belum dipertanggungjawabkan) tidak bisa menerima uang muka baru."
+          error={fieldError("maxOverdueAdvances")}
+        />
+
         <Field data-invalid={!!fieldError("noReceiptMaxAmount")}>
           <FieldLabel htmlFor="noReceiptMaxAmount">Batas biaya tanpa nota (per item)</FieldLabel>
           <div className="relative max-w-60">
@@ -89,12 +99,16 @@ function DaysField({
   defaultValue,
   description,
   error,
+  max = 60,
+  unit = "hari",
 }: {
   name: string;
   label: string;
   defaultValue: number;
   description: string;
   error?: string;
+  max?: number;
+  unit?: string;
 }) {
   return (
     <Field data-invalid={!!error}>
@@ -106,13 +120,13 @@ function DaysField({
           type="number"
           inputMode="numeric"
           min={1}
-          max={60}
+          max={max}
           defaultValue={defaultValue}
           className="w-24 tabular-nums"
           aria-invalid={!!error}
           required
         />
-        <span className="text-sm text-muted-foreground">hari</span>
+        <span className="text-sm text-muted-foreground">{unit}</span>
       </div>
       <FieldDescription>{description}</FieldDescription>
       <FieldError>{error}</FieldError>

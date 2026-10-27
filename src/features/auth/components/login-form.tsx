@@ -20,6 +20,7 @@
 import { LoaderCircleIcon } from "lucide-react";
 import { useActionState, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { login } from "@/features/auth/actions";
@@ -66,6 +67,15 @@ export function LoginForm() {
             aria-invalid={!!passwordError}
           />
           <FieldError>{passwordError}</FieldError>
+        </Field>
+
+        {/* Sesi 14 hari bila dicentang; tanpa centang, sesi berakhir saat browser
+            ditutup (atau setelah 12 jam). Server membaca value="1". */}
+        <Field orientation="horizontal">
+          <Checkbox id="rememberMe" name="rememberMe" value="1" />
+          <FieldLabel htmlFor="rememberMe" className="font-normal">
+            Ingat saya 
+          </FieldLabel>
         </Field>
 
         {/* Error umum (email/password salah, rate limit). role="alert"

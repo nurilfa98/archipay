@@ -39,6 +39,7 @@ import {
   SettlementItemsTable,
   type SettlementItemRow,
 } from "@/features/settlements/components/settlement-items-table";
+import { LateReasonIndicator } from "@/features/settlements/components/late-reason-indicator";
 import { SettlementStatusBadge } from "@/features/settlements/components/settlement-status-badge";
 import { SettlementSubmitButton } from "@/features/settlements/components/settlement-submit-button";
 import { SettlementVerifyForm } from "@/features/settlements/components/settlement-verify-form";
@@ -108,7 +109,12 @@ async function SettlementDetailContent({ id }: { id: string }) {
   return (
     <>
       <PageHeader
-        title={title}
+        title={
+          <span className="flex items-center gap-2">
+            {title}
+            <LateReasonIndicator reason={settlement.lateReason} />
+          </span>
+        }
         description={`${settlement.advanceNumber} · ${settlement.purpose}`}
         action={<SettlementStatusBadge status={settlement.status} />}
       />
@@ -200,6 +206,7 @@ async function SettlementDetailContent({ id }: { id: string }) {
                     itemTotal={itemTotal}
                     advanceAmount={settlement.advanceAmount}
                     isResubmission={settlement.advanceStatus === "REVISION_REQUESTED"}
+                    isLate={settlement.settlementDueAtPassed}
                   />
                 </div>
               </>

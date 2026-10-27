@@ -13,14 +13,19 @@
 // - node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md
 
 import "server-only";
-import { and, asc, desc, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
 import { can } from "@/lib/auth/permissions";
 import { isRole, type Role } from "@/lib/auth/roles";
 import { db } from "@/lib/db";
 import { advanceRequests, roles, userRoles, users } from "@/lib/db/schema";
-import { ADVANCE_STATUS, type AdvanceStatus, type DisbursementMethod } from "./constants";
+import {
+  ADVANCE_STATUS,
+  AWAITING_RECEIPT_STATUSES,
+  type AdvanceStatus,
+  type DisbursementMethod,
+} from "./constants";
 
 export type AdvanceListItem = {
   id: string;
@@ -288,4 +293,25 @@ export async function listApprovers(): Promise<Contact[]> {
   return [...people.values()]
     .filter((person) => can(person, "advance:approve"))
     .map(({ id, fullName, phoneNumber }) => ({ id, fullName, phoneNumber }));
+}
+
+// Uang muka yang sudah lewat batas unggah nota tetapi nota belum dikirim (atau
+// dikembalikan untuk diperbaiki), dihitung per penerima. Status yang dihitung
+// sama dengan pengingat "batas nota terlewati" (AWAITING_RECEIPT_STATUSES).
+// Dikembalikan sebagai objek biasa agar bisa dikirim ke Client Component.
+export async function countOverdueAdvances(recipientIds: string[]): Promise<Record<string, number>> {
+  if (recipientIds.length === 0) return {};
+  await io();
+  const rows = await db
+    .select({ recipientId: advanceRequests.recipientId, count: sql<number>`count(*)::int` })
+    .from(advanceRequests)
+    .where(
+      and(
+        inArray(advanceRequests.recipientId, recipientIds),
+        inArray(advanceRequests.status, [...AWAITING_RECEIPT_STATUSES]),
+        lt(advanceRequests.settlementDueAt, sql`now()`),
+      ),
+    )
+    .groupBy(advanceRequests.recipientId);
+  return Object.fromEntries(rows.map((row) => [row.recipientId, row.count]));
 }

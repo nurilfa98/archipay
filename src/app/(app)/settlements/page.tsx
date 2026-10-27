@@ -92,6 +92,7 @@ function toRow(settlement: SettlementListItem): SettlementRow {
   return {
     id: settlement.id,
     numberLabel: settlement.number ?? "Draf",
+    lateReason: settlement.lateReason,
     advanceNumber: settlement.advanceNumber,
     purpose: settlement.purpose,
     recipientName: settlement.recipientName,

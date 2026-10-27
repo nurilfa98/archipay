@@ -30,11 +30,13 @@ import {
 import type { SettlementFilters } from "@/features/settlements/schemas";
 import { formatRupiah, MONTH_NAMES } from "@/lib/format";
 import { cn } from "@/lib/utils";
+import { LateReasonIndicator } from "./late-reason-indicator";
 import { SettlementStatusBadge } from "./settlement-status-badge";
 
 export type SettlementRow = {
   id: string;
   numberLabel: string; // "PJ-2026-10-0001" atau "Draf"
+  lateReason: string | null; // alasan keterlambatan, null bila tepat waktu
   advanceNumber: string;
   purpose: string;
   recipientName: string;
@@ -54,15 +56,18 @@ const numberColumn = column.accessor("numberLabel", {
   sortFn: "text",
   meta: { className: "w-32 whitespace-nowrap" },
   cell: ({ row }) => (
-    <Link
-      href={`/settlements/${row.original.id}`}
-      className={cn(
-        "font-medium after:absolute after:inset-0 hover:underline",
-        row.original.status === "DRAFT" && "text-muted-foreground",
-      )}
-    >
-      {row.original.numberLabel}
-    </Link>
+    <span className="flex items-center gap-1.5">
+      <Link
+        href={`/settlements/${row.original.id}`}
+        className={cn(
+          "font-medium after:absolute after:inset-0 hover:underline",
+          row.original.status === "DRAFT" && "text-muted-foreground",
+        )}
+      >
+        {row.original.numberLabel}
+      </Link>
+      <LateReasonIndicator reason={row.original.lateReason} />
+    </span>
   ),
 });
 

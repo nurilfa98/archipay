@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdvanceCreateForm } from "@/features/advances/components/advance-create-form";
-import { listApprovers, listRecipientOptions } from "@/features/advances/queries";
+import { countOverdueAdvances, listApprovers, listRecipientOptions } from "@/features/advances/queries";
 import { eligibleApprovers } from "@/features/advances/service";
 import { getCompanySettings } from "@/features/settings/queries";
 import { verifySession } from "@/lib/auth/dal";
@@ -67,12 +67,18 @@ async function NewAdvanceContent() {
         (option) => eligibleApprovers(approvers, { recipientId: option.id, createdById: user.id }).length > 0,
       );
 
+  // Penerima yang sudah mencapai batas uang muka tertunda tetap tampil, tetapi
+  // form menolak mencatat uang muka baru untuk mereka (dan Server Action mengecek ulang).
+  const overdueCounts = await countOverdueAdvances(recipients.map((recipient) => recipient.id));
+
   return (
     <AdvanceCreateForm
       recipients={recipients}
       mode={direct ? "direct" : "propose"}
       settlementDueDays={settings.settlementDueDays}
       returnDueDays={settings.returnDueDays}
+      overdueCounts={overdueCounts}
+      maxOverdueAdvances={settings.maxOverdueAdvances}
     />
   );
 }

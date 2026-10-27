@@ -64,6 +64,20 @@
       "when": 1792916151359,
       "tag": "0008_audit_logs_created_at",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793072455542,
+      "tag": "0009_max_overdue_advances",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793073768550,
+      "tag": "0010_settlement_late_reason",
+      "breakpoints": true
     }
   ]
 }

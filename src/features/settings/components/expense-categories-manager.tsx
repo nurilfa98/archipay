@@ -4,7 +4,7 @@
 
 "use client";
 
-import { PencilIcon, ToggleLeftIcon, ToggleRightIcon } from "lucide-react";
+import { CheckIcon, PencilIcon, XIcon } from "lucide-react";
 import { ToneBadge } from "@/components/tone-badge";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -82,16 +82,16 @@ export function ExpenseCategoriesManager({ categories }: { categories: ExpenseCa
                     </ActionDialog>
                     <ActionDialog
                       label={category.isActive ? "Nonaktifkan" : "Aktifkan"}
-                      // Ikon & warna mengikuti status saat ini: on (hijau) = Aktif,
-                      // off (abu-abu) = Nonaktif.
+                      // Ikon & warna mengikuti status saat ini: ceklis hijau = Aktif,
+                      // X merah = Nonaktif.
                       icon={
                         category.isActive ? (
-                          <ToggleRightIcon className="size-[18px]" />
+                          <CheckIcon className="size-[18px]" />
                         ) : (
-                          <ToggleLeftIcon className="size-[18px]" />
+                          <XIcon className="size-[18px]" />
                         )
                       }
-                      variant={category.isActive ? "success" : "pending"}
+                      variant={category.isActive ? "success" : "destructive"}
                       title={category.isActive ? `Nonaktifkan "${category.name}"?` : `Aktifkan "${category.name}"?`}
                       description={
                         category.isActive

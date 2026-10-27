@@ -46,6 +46,13 @@ export const settlementItemSchema = z
     message: "Jelaskan kenapa tidak ada nota (minimal 5 karakter)",
   });
 
+// Alasan keterlambatan wajib diisi bila pertanggungjawaban dikirim melewati batas unggah nota.
+export const lateReasonSchema = z
+  .string()
+  .trim()
+  .min(5, "Tuliskan alasan keterlambatan, minimal 5 karakter")
+  .max(500, "Alasan maksimal 500 karakter");
+
 export const revisionNoteSchema = z
   .string()
   .trim()

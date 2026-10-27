@@ -28,9 +28,21 @@ import { env } from "@/lib/env";
 export type SessionData = {
   userId: string;
   sessionVersion: number;
+  // Batas waktu absolut (epoch ms). Diperiksa di getSession, bukan hanya
+  // mengandalkan masa berlaku cookie, karena session cookie tidak punya Max-Age.
+  expiresAt: number;
+  // true = dibuat dengan "Ingat saya" (cookie bertahan 14 hari).
+  rememberMe: boolean;
 };
 
-const SESSION_TTL_SECONDS = 60 * 60 * 8; // 8 jam, kira-kira satu hari kerja
+const DAY_MS = 24 * 60 * 60 * 1000;
+// "Ingat saya": cookie bertahan 14 hari. Tanpa itu: session cookie (hilang saat
+// browser ditutup) dengan batas absolut 12 jam.
+const REMEMBER_ME_MS = 14 * DAY_MS;
+const SHORT_SESSION_MS = 12 * 60 * 60 * 1000;
+
+// Masa berlaku segel & cookie untuk sesi "Ingat saya". Harus >= REMEMBER_ME_MS.
+const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60;
 
 const sessionOptions: SessionOptions = {
   cookieName: "archipay_session",
@@ -50,7 +62,7 @@ const sessionOptions: SessionOptions = {
 };
 
 // Bisa dipanggil dari Server Component, Server Action, atau Route Handler.
-// Hasilnya Partial<SessionData>: userId bisa undefined kalau belum login.
+// userId undefined kalau belum login atau sesi sudah lewat batas waktunya.
 export async function getSession() {
   const cookieStore = await cookies();
 
@@ -73,19 +85,39 @@ export async function getSession() {
   //   (bagian "Random values and timestamps")
   await io();
 
-  return getIronSession<SessionData>(cookieStore, sessionOptions);
+  const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
+  // Sesi yang sudah lewat batas absolutnya, atau dibuat sebelum batas ini ada
+  // (tidak punya expiresAt), dianggap belum login. Akibatnya setelah deploy
+  // ini semua user perlu login sekali lagi.
+  const expired = !session.expiresAt || Date.now() > session.expiresAt;
+  return {
+    userId: expired ? undefined : session.userId,
+    sessionVersion: expired ? undefined : session.sessionVersion,
+    rememberMe: !expired && session.rememberMe === true,
+  };
 }
 
 // createSession & destroySession menulis cookie. Next.js hanya mengizinkan
 // menulis cookie di Server Action atau Route Handler, bukan saat render page.
-export async function createSession(userId: string, sessionVersion: number) {
-  const session = await getSession();
+//
+// rememberMe = true: cookie bertahan 14 hari (Max-Age).
+// rememberMe = false: session cookie. iron-session menganggap "maxAge: undefined"
+// sebagai ttl 0 (segel tanpa batas), jadi batas waktunya dijaga oleh expiresAt.
+export async function createSession(userId: string, sessionVersion: number, rememberMe: boolean) {
+  await io();
+  const options: SessionOptions = rememberMe
+    ? sessionOptions
+    : { ...sessionOptions, cookieOptions: { ...sessionOptions.cookieOptions, maxAge: undefined } };
+  const session = await getIronSession<SessionData>(await cookies(), options);
   session.userId = userId;
   session.sessionVersion = sessionVersion;
+  session.rememberMe = rememberMe;
+  session.expiresAt = Date.now() + (rememberMe ? REMEMBER_ME_MS : SHORT_SESSION_MS);
   await session.save();
 }
 
 export async function destroySession() {
-  const session = await getSession();
+  await io();
+  const session = await getIronSession<SessionData>(await cookies(), sessionOptions);
   session.destroy();
 }

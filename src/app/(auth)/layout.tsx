@@ -8,6 +8,7 @@
 // (bagian "Route groups" → "Opting specific segments into a layout")
 
 import { Brand } from "@/components/layout/brand";
+import { COMPANY_NAME, COPYRIGHT_YEAR } from "@/lib/brand";
 
 export default function AuthLayout({ children }: LayoutProps<"/">) {
   return (
@@ -15,6 +16,9 @@ export default function AuthLayout({ children }: LayoutProps<"/">) {
       <div className="flex w-full max-w-sm flex-col gap-6">
         <Brand className="self-center" />
         {children}
+        <p className="text-center text-xs text-muted-foreground">
+          © {COPYRIGHT_YEAR} {COMPANY_NAME}.
+        </p>
       </div>
     </div>
   );

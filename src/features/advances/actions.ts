@@ -47,6 +47,7 @@ import {
   notifyRejected,
 } from "./notifications";
 import {
+  countOverdueAdvances,
   getActiveRecipient,
   getAdvanceDetail,
   getOwnerContacts,
@@ -110,6 +111,16 @@ export async function createAdvance(
   }
   const recipient = await getActiveRecipient(input.recipientId);
   if (!recipient) return fieldError("recipientId", "Karyawan tidak ditemukan atau sudah nonaktif");
+
+  // Karyawan yang masih punya uang muka tertunda (lewat batas unggah nota, belum
+  // dipertanggungjawabkan) sampai batas di Pengaturan tidak boleh menerima uang muka baru.
+  const { maxOverdueAdvances } = await getCompanySettings();
+  const overdue = (await countOverdueAdvances([recipient.id]))[recipient.id] ?? 0;
+  if (overdue >= maxOverdueAdvances) {
+    return isRequest
+      ? { success: false, message: overdueMessage(overdue, maxOverdueAdvances, true) }
+      : fieldError("recipientId", overdueMessage(overdue, maxOverdueAdvances, false, recipient.fullName));
+  }
 
   // Tanpa penyetuju sah, pengajuan/usulan akan menunggu selamanya (misal
   // FINANCE mengusulkan untuk satu-satunya OWNER).
@@ -507,6 +518,14 @@ function invalid(error: z.ZodError) {
     message: "Periksa kembali isian Anda.",
     fieldErrors: z.flattenError(error).fieldErrors as Record<string, string[]>,
   };
+}
+
+// Pesan saat uang muka baru ditolak karena terlalu banyak yang tertunda.
+// "self" = karyawan yang mengajukan sendiri (sapaan "Anda").
+function overdueMessage(overdue: number, limit: number, self: boolean, name = "") {
+  const who = self ? "Anda masih" : `${name} masih`;
+  const next = self ? "Kirimkan pertanggungjawaban" : "Pertanggungjawaban";
+  return `${who} memiliki ${overdue} uang muka yang belum dipertanggungjawabkan melewati batas unggah nota (batas: ${limit}). ${next} dulu sebelum menerima uang muka baru.`;
 }
 
 function fieldError(field: string, message: string) {

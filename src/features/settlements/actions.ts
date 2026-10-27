@@ -62,6 +62,7 @@ import { getSettlementDetail, listSettlementItems, type SettlementDetail } from 
 import { detectReceiptType, hashFile } from "./receipt-file";
 import {
   balancePaymentSchema,
+  lateReasonSchema,
   revisionNoteSchema,
   settlementIdSchema,
   settlementItemSchema,
@@ -253,7 +254,7 @@ export async function removeSettlementItem(settlementId: string, itemId: string)
 // ---------------------------------------------------------------------------
 
 // Nomor PJ diberikan saat pengiriman PERTAMA. Setelah dikirim, nota terkunci.
-export async function submitSettlement(settlementId: string): Promise<ActionResult> {
+export async function submitSettlement(settlementId: string, lateReason: string): Promise<ActionResult> {
   const loaded = await loadSettlement(settlementId);
   if (!loaded.success) return loaded;
   const { actor, settlement } = loaded.data;
@@ -264,6 +265,16 @@ export async function submitSettlement(settlementId: string): Promise<ActionResu
   }
 
   const submittedAt = new Date();
+  const late = !!settlement.settlementDueAt && submittedAt > settlement.settlementDueAt;
+  // Pengiriman terlambat wajib menyertakan alasan; alasan tepat waktu diabaikan.
+  let lateReasonText: string | null = null;
+  if (late) {
+    const parsedReason = lateReasonSchema.safeParse(lateReason);
+    if (!parsedReason.success) {
+      return fieldError("lateReason", parsedReason.error.issues[0]?.message ?? "Alasan keterlambatan wajib diisi");
+    }
+    lateReasonText = parsedReason.data;
+  }
   const ip = await getClientIp();
   const number = await db.transaction(async (tx) => {
     const [updated] = await tx
@@ -283,7 +294,7 @@ export async function submitSettlement(settlementId: string): Promise<ActionResu
       : await nextDocumentNumber(tx, SETTLEMENT_NUMBER_PREFIX, submittedAt);
     await tx
       .update(settlements)
-      .set({ ...documentNumber, submittedAt, revisionNote: null })
+      .set({ ...documentNumber, submittedAt, revisionNote: null, lateReason: lateReasonText })
       .where(eq(settlements.id, settlement.id));
 
     await logAudit(
@@ -298,6 +309,7 @@ export async function submitSettlement(settlementId: string): Promise<ActionResu
           number: documentNumber?.number ?? settlement.number,
           itemCount: items.length,
           itemTotal: sum(items),
+          lateReason: lateReasonText,
         },
         ipAddress: ip,
       },
@@ -307,11 +319,18 @@ export async function submitSettlement(settlementId: string): Promise<ActionResu
   });
   if (!number) return STALE;
 
-  const late = !!settlement.settlementDueAt && submittedAt > settlement.settlementDueAt;
   after(async () => {
     const contacts = await getOwnerContacts([settlement.disbursedById]);
     await notifySubmitted(
-      { id: settlement.id, number, advanceNumber: settlement.advanceNumber, itemTotal: sum(items), itemCount: items.length, late },
+      {
+        id: settlement.id,
+        number,
+        advanceNumber: settlement.advanceNumber,
+        itemTotal: sum(items),
+        itemCount: items.length,
+        late,
+        lateReason: lateReasonText,
+      },
       settlement.recipientName,
       // Penerima tidak perlu diberi tahu tentang laporannya sendiri.
       contacts.filter((contact) => contact.id !== settlement.recipientId),

@@ -48,6 +48,7 @@ export async function updateCompanySettings(
   const parsed = companySettingsSchema.safeParse({
     settlementDueDays: formData.get("settlementDueDays"),
     returnDueDays: formData.get("returnDueDays"),
+    maxOverdueAdvances: formData.get("maxOverdueAdvances"),
     noReceiptMaxAmount: formData.get("noReceiptMaxAmount") ?? "",
   });
   if (!parsed.success) return invalid(parsed.error);

@@ -11,6 +11,7 @@ export type CompanySettings = {
   settlementDueDays: number;
   returnDueDays: number;
   noReceiptMaxAmount: number;
+  maxOverdueAdvances: number;
 };
 
 export async function getCompanySettings(): Promise<CompanySettings> {
@@ -20,6 +21,7 @@ export async function getCompanySettings(): Promise<CompanySettings> {
       settlementDueDays: companySettings.settlementDueDays,
       returnDueDays: companySettings.returnDueDays,
       noReceiptMaxAmount: companySettings.noReceiptMaxAmount,
+      maxOverdueAdvances: companySettings.maxOverdueAdvances,
     })
     .from(companySettings)
     .where(eq(companySettings.id, 1))

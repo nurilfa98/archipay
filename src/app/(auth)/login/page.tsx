@@ -27,7 +27,7 @@ export default function LoginPage() {
         </CardContent>
       </Card>
       <p className="px-6 text-center text-xs text-muted-foreground">
-        Lupa password atau belum punya akun? Hubungi Owner atau tim Finance.
+        Lupa password atau belum punya akun? Hubungi Owner.
       </p>
     </>
   );

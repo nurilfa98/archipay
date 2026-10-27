@@ -13,6 +13,13 @@ const days = (label: string) =>
 export const companySettingsSchema = z.object({
   settlementDueDays: days("Batas unggah nota"),
   returnDueDays: days("Batas pengembalian"),
+  // Berapa uang muka yang boleh tertunda (lewat batas unggah nota, belum
+  // dipertanggungjawabkan) sebelum karyawan tidak bisa menerima uang muka baru.
+  maxOverdueAdvances: z.coerce
+    .number("Batas uang muka tertunda harus berupa angka")
+    .int("Batas uang muka tertunda harus bilangan bulat")
+    .min(1, "Batas uang muka tertunda minimal 1")
+    .max(10, "Batas uang muka tertunda maksimal 10"),
   // "50.000" → 50000. 0 = biaya tanpa nota tidak diizinkan.
   noReceiptMaxAmount: z
     .string()

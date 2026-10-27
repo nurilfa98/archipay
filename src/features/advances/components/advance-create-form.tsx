@@ -57,6 +57,9 @@ type Mode = "direct" | "propose" | "request";
 type AdvanceCreateFormProps = {
   settlementDueDays: number;
   returnDueDays: number;
+  // Jumlah uang muka tertunda per karyawan (id → jumlah) dan batasnya (Pengaturan).
+  overdueCounts: Record<string, number>;
+  maxOverdueAdvances: number;
 } & (
   | { mode: "direct" | "propose"; recipients: RecipientOption[] }
   | { mode: "request"; self: RecipientOption }
@@ -71,6 +74,9 @@ export function AdvanceCreateForm(props: AdvanceCreateFormProps) {
 
   const recipient = props.mode === "request" ? props.self : selected;
   const amount = Number(amountDigits || 0);
+  // Penerima yang sudah mencapai batas uang muka tertunda tidak bisa menerima uang muka baru.
+  const overdue = recipient ? (props.overdueCounts[recipient.id] ?? 0) : 0;
+  const blocked = overdue >= props.maxOverdueAdvances;
 
   const error = state && !state.success ? state : undefined;
   const fieldError = (name: string) => error?.fieldErrors?.[name]?.[0];
@@ -226,6 +232,18 @@ export function AdvanceCreateForm(props: AdvanceCreateFormProps) {
           </Field>
         )}
 
+        {blocked && recipient && (
+          <Alert variant="destructive">
+            <CircleAlertIcon />
+            <AlertTitle>Belum bisa menerima uang muka baru</AlertTitle>
+            <AlertDescription>
+              {props.mode === "request"
+                ? `Anda masih memiliki ${overdue} uang muka yang belum dipertanggungjawabkan melewati batas unggah nota (batas: ${props.maxOverdueAdvances}). Kirimkan pertanggungjawaban dulu.`
+                : `${recipient.fullName} masih memiliki ${overdue} uang muka yang belum dipertanggungjawabkan melewati batas unggah nota (batas: ${props.maxOverdueAdvances}). Minta pertanggungjawabannya dulu.`}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <Alert>
           <InfoIcon />
           <AlertTitle>{INFO_TITLES[mode]}</AlertTitle>
@@ -237,7 +255,7 @@ export function AdvanceCreateForm(props: AdvanceCreateFormProps) {
         </Alert>
 
         <Field orientation="horizontal">
-          <Button type="submit" disabled={pending}>
+          <Button type="submit" disabled={pending || blocked}>
             {pending && <LoaderCircleIcon className="animate-spin" />}
             {submitLabel(mode, amount, pending)}
           </Button>
