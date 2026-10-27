@@ -41,11 +41,20 @@ export const isLocalStorage = !r2;
 // key contoh: "receipts/<advanceId>/<itemId>.jpg". Hanya dibuat oleh server.
 export async function putObject(key: string, body: Uint8Array<ArrayBuffer>, contentType: string) {
   if (r2) {
-    const response = await r2.client.fetch(objectUrl(key), {
+    // Jangan pakai r2.client.fetch(url, init): aws4fetch selalu memanggil fetch
+    // dengan objek Request, body-nya berubah jadi stream di Next.js (fetch yang
+    // di-patch), dan panjang body hilang. R2 lalu menolak PUT dengan 411 (Length
+    // Required), terutama pada file dari kamera HP. Di sini hanya tanda tangan
+    // yang dibuat aws4fetch; PUT dikirim langsung dengan body Uint8Array dan
+    // Content-Length eksplisit.
+    const signed = await r2.client.sign(objectUrl(key), {
       method: "PUT",
       body,
       headers: { "content-type": contentType },
     });
+    const headers = new Headers(signed.headers);
+    headers.set("content-length", String(body.byteLength));
+    const response = await fetch(signed.url, { method: "PUT", headers, body });
     if (!response.ok) throw new Error(`Gagal mengunggah ke R2 (${response.status})`);
     return;
   }
