@@ -57,6 +57,10 @@ const FIELDS: Record<string, { label: string; format?: Formatter }> = {
   wasTemporary: { label: "Password sementara" },
   isActive: { label: "Aktif" },
   recipientName: { label: "Penerima" },
+  projectName: { label: "Project" },
+  client: { label: "Klien" },
+  contractValue: { label: "Nilai kontrak", format: rupiah },
+  icon: { label: "Ikon" },
   purpose: { label: "Keperluan" },
   type: { label: "Jenis", format: label(LEDGER_ENTRY_LABELS) },
   amount: { label: "Nominal", format: rupiah },
@@ -99,7 +103,7 @@ const FIELDS: Record<string, { label: string; format?: Formatter }> = {
 
 // ID internal & hash file tidak berarti bagi pembaca; datanya sudah
 // terwakili field lain (misal recipientName).
-const HIDDEN_FIELDS = new Set(["itemId", "recipientId", "disbursedById", "categoryId", "fileHash"]);
+const HIDDEN_FIELDS = new Set(["itemId", "recipientId", "disbursedById", "categoryId", "fileHash", "projectId"]);
 
 const FIELD_ORDER = Object.keys(FIELDS);
 

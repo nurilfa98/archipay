@@ -1,5 +1,5 @@
 // Halaman /profile: pengguna melengkapi datanya sendiri (nomor WhatsApp, rekening
-// bank, dan kontak). Dibuka dari menu user di navbar. Tidak ada di sidebar, dan
+// bank, dan kontak). Dibuka dari menu user di header. Tidak ada di kotak menu, dan
 // tidak butuh permission khusus, karena hanya menyentuh akun yang sedang login.
 //
 // Owner cukup mengundang pengguna (nama & email); sisa datanya diisi sendiri.

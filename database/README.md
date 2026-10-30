@@ -55,3 +55,4 @@ Lokasi folder diatur di `drizzle.config.ts` (`out: "./database/migrations"`).
 | `0006_settlement_drafts` | *Manual:* membuat draf pertanggungjawaban untuk uang muka yang sudah dikonfirmasi sebelum draf dibuat otomatis. |
 | `0007_returns_reminders` | Kolom `method`, `reference`, `payroll_period` di ledger + tabel `reminder_logs`. |
 | `0008_audit_logs_created_at` | Index `created_at` di `audit_logs` (filter Audit Log). |
+| `0011_projects` | Tabel `projects` + kolom `advance_requests.project_id` (boleh kosong untuk uang muka lama, "Tanpa project"). Wajib diisi oleh aplikasi untuk uang muka baru. |

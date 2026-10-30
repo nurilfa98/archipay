@@ -13,11 +13,13 @@ import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
 import type { AdvanceStatus } from "@/features/advances/constants";
+import { projectCondition } from "@/features/projects/queries";
 import { db } from "@/lib/db";
 import {
   advanceLedgerEntries,
   advanceRequests,
   expenseCategories,
+  projects,
   settlementItems,
   settlements,
   users,
@@ -110,6 +112,8 @@ function toListItem({
 // jadi tidak ikut bila tahun dipilih.
 export async function listSettlements(filter: {
   recipientId?: string;
+  // id project, atau NO_PROJECT untuk uang muka lama tanpa project.
+  project?: string;
   advanceStatuses?: readonly AdvanceStatus[];
   year?: number;
   month?: number;
@@ -124,6 +128,7 @@ export async function listSettlements(filter: {
     .where(
       and(
         filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
+        projectCondition(filter.project),
         filter.advanceStatuses ? inArray(advanceRequests.status, [...filter.advanceStatuses]) : undefined,
         filter.year ? eq(settlements.periodYear, filter.year) : undefined,
         filter.month ? eq(settlements.periodMonth, filter.month) : undefined,
@@ -134,7 +139,7 @@ export async function listSettlements(filter: {
   return rows.map(toListItem);
 }
 
-export async function listSettlementYears(filter: { recipientId?: string }): Promise<number[]> {
+export async function listSettlementYears(filter: { recipientId?: string; project?: string }): Promise<number[]> {
   await io();
   const rows = await db
     .selectDistinct({ year: settlements.periodYear })
@@ -144,6 +149,7 @@ export async function listSettlementYears(filter: { recipientId?: string }): Pro
       and(
         isNotNull(settlements.periodYear),
         filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
+        projectCondition(filter.project),
       ),
     )
     .orderBy(desc(settlements.periodYear));
@@ -186,6 +192,8 @@ const TODO_KIND_FOR_VERIFIER: Partial<Record<string, SettlementTodo["kind"]>> = 
 export async function listSettlementTodos(viewer: {
   id: string;
   canVerify: boolean;
+  // Batasi ke satu project (id, atau NO_PROJECT). Kosong = semua project.
+  project?: string;
 }): Promise<SettlementTodo[]> {
   await io();
   const columns = {
@@ -210,6 +218,7 @@ export async function listSettlementTodos(viewer: {
     .where(
       and(
         eq(advanceRequests.recipientId, viewer.id),
+        projectCondition(viewer.project),
         inArray(advanceRequests.status, Object.keys(TODO_KIND_FOR_RECIPIENT)),
       ),
     )
@@ -225,6 +234,7 @@ export async function listSettlementTodos(viewer: {
           and(
             inArray(advanceRequests.status, Object.keys(TODO_KIND_FOR_VERIFIER)),
             ne(advanceRequests.recipientId, viewer.id),
+            projectCondition(viewer.project),
           ),
         )
         .orderBy(asc(settlements.submittedAt))
@@ -242,6 +252,8 @@ export async function listSettlementTodos(viewer: {
 
 export type SettlementDetail = {
   id: string;
+  projectId: string | null; // null = uang muka lama, belum punya project
+  projectName: string | null;
   number: string | null;
   status: SettlementStatus;
   advanceStatus: AdvanceStatus;
@@ -279,6 +291,8 @@ export async function getSettlementDetail(id: string): Promise<SettlementDetail 
   const [row] = await db
     .select({
       id: settlements.id,
+      projectId: advanceRequests.projectId,
+      projectName: projects.name,
       number: settlements.number,
       advanceStatus: advanceRequests.status,
       advanceId: advanceRequests.id,
@@ -308,6 +322,7 @@ export async function getSettlementDetail(id: string): Promise<SettlementDetail 
     .from(settlements)
     .innerJoin(advanceRequests, eq(settlements.advanceId, advanceRequests.id))
     .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
+    .leftJoin(projects, eq(advanceRequests.projectId, projects.id))
     .leftJoin(revisionBy, eq(settlements.revisionRequestedById, revisionBy.id))
     .leftJoin(verifiedBy, eq(settlements.verifiedById, verifiedBy.id))
     .where(eq(settlements.id, id))

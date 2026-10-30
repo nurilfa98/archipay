@@ -10,7 +10,7 @@
 //   (bagian "With Cache Components" → "Without generateStaticParams")
 // - node_modules/next/dist/docs/01-app/03-api-reference/04-functions/not-found.md
 
-import { ArrowLeftIcon, ArrowRightIcon, CircleAlertIcon } from "lucide-react";
+import { ArrowRightIcon, CircleAlertIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -26,6 +26,10 @@ import { AdvanceStatusBadge } from "@/features/advances/components/advance-statu
 import { DISBURSEMENT_METHOD_LABELS, isAwaitingReceipts } from "@/features/advances/constants";
 import { getAdvanceDetail, type AdvanceDetail } from "@/features/advances/queries";
 import { buildAcknowledgmentText, getAvailableActions } from "@/features/advances/service";
+import { NO_PROJECT } from "@/features/projects/constants";
+import { AssignProjectDialog } from "@/features/projects/components/assign-project-dialog";
+import { BackToList } from "@/features/projects/components/back-to-list";
+import { listActiveProjects } from "@/features/projects/queries";
 import { SettlementStatusBadge } from "@/features/settlements/components/settlement-status-badge";
 import { EDITABLE_ADVANCE_STATUSES, toSettlementStatus } from "@/features/settlements/constants";
 import { getSettlementRefByAdvance } from "@/features/settlements/queries";
@@ -41,19 +45,11 @@ export const metadata: Metadata = {
 
 export default function AdvanceDetailPage({ params }: PageProps<"/advances/[id]">) {
   return (
-    <>
-      <div>
-        <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/advances" />}>
-          <ArrowLeftIcon />
-          Daftar uang muka
-        </Button>
-      </div>
-      <Suspense fallback={<AdvanceDetailSkeleton />}>
-        {params.then(({ id }) => (
-          <AdvanceDetailContent id={id} />
-        ))}
-      </Suspense>
-    </>
+    <Suspense fallback={<AdvanceDetailSkeleton />}>
+      {params.then(({ id }) => (
+        <AdvanceDetailContent id={id} />
+      ))}
+    </Suspense>
   );
 }
 
@@ -72,8 +68,18 @@ async function AdvanceDetailContent({ id }: { id: string }) {
   const number = advance.number;
   const amount = formatRupiah(advance.amount);
 
+  // Uang muka lama (sebelum ada project) bisa ditetapkan projectnya oleh Owner
+  // selama belum berakhir.
+  const canAssignProject =
+    !advance.projectId && can(viewer, "project:manage") && !isFinished(advance.status);
+  const assignableProjects = canAssignProject ? await listActiveProjects() : null;
+
   return (
     <>
+      <BackToList
+        href={`/advances?project=${advance.projectId ?? NO_PROJECT}`}
+        label={advance.projectName ? `Uang muka ${advance.projectName}` : "Daftar uang muka"}
+      />
       <PageHeader
         title={number}
         description={advance.purpose}
@@ -139,7 +145,7 @@ async function AdvanceDetailContent({ id }: { id: string }) {
           <CardTitle>Rincian</CardTitle>
         </CardHeader>
         <CardContent>
-          <AdvanceDetails advance={advance} />
+          <AdvanceDetails advance={advance} assignableProjects={assignableProjects} />
         </CardContent>
       </Card>
 
@@ -242,7 +248,14 @@ function StatusAlert({ advance, isRecipient }: { advance: AdvanceDetail; isRecip
   return null;
 }
 
-function AdvanceDetails({ advance }: { advance: AdvanceDetail }) {
+function AdvanceDetails({
+  advance,
+  assignableProjects,
+}: {
+  advance: AdvanceDetail;
+  // Diisi hanya bila viewer boleh menetapkan project untuk uang muka lama ini.
+  assignableProjects: { id: string; name: string }[] | null;
+}) {
   const isTransfer = advance.disbursementMethod === "TRANSFER";
   // Batas nota terlewati selama nota belum dikirim. Pengingat & tindak
   // lanjutnya dibangun di irisan pengingat & tenggat.
@@ -250,6 +263,14 @@ function AdvanceDetails({ advance }: { advance: AdvanceDetail }) {
 
   return (
     <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+      <Item label="Project">
+        {advance.projectName ?? <span className="text-muted-foreground">Tanpa project</span>}
+        {assignableProjects && (
+          <span className="mt-1 block">
+            <AssignProjectDialog advanceId={advance.id} projects={assignableProjects} />
+          </span>
+        )}
+      </Item>
       <Item label="Penerima">
         {advance.recipientName}
         <span className="block text-muted-foreground">{advance.recipientEmail}</span>
@@ -310,9 +331,15 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+// Uang muka yang sudah berakhir tidak bisa lagi dipindahkan antar project.
+function isFinished(status: AdvanceDetail["status"]) {
+  return status === "CLOSED" || status === "REJECTED" || status === "CANCELLED";
+}
+
 function AdvanceDetailSkeleton() {
   return (
     <>
+      <BackToList href="/projects" label="Daftar project" />
       <Skeleton className="h-12 w-64" />
       <Skeleton className="h-64 w-full" />
     </>

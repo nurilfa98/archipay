@@ -5,7 +5,7 @@ Acuan untuk memahami cara kerja **Uang Muka** (kas bon operasional) dan
 melakukan apa, kapan, dan apa akibatnya. Dokumen ini menjelaskan aturan
 bisnis; struktur kode ada di [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-Ditulis berdasarkan kode per 25 Oktober 2026. Bila aturan di kode berubah,
+Ditulis berdasarkan kode per 30 Oktober 2026. Bila aturan di kode berubah,
 perbarui dokumen ini juga. Sumber kebenaran aturan:
 
 | Aturan | File |
@@ -15,6 +15,7 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 | Siapa boleh melakukan apa terhadap pertanggungjawaban | `src/features/settlements/service.ts` |
 | Daftar & arti status | `src/features/advances/constants.ts` |
 | Pengingat otomatis | `src/features/reminders/run.ts` |
+| Project (kartu pilihan, kelola, menetapkan project) | `src/features/projects/` |
 
 ---
 
@@ -22,6 +23,7 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 
 | Istilah | Arti |
 |---|---|
+| **Project** | Pengelompok uang muka, mis. "Renovasi Gedung A". Uang muka selalu diajukan di dalam satu project. Dikelola Owner (lihat bagian 15). |
 | **Uang muka** (UM) | Dana operasional yang diserahkan kantor ke karyawan sebelum dipakai. Nomor: `UM-2026-10-0001`. |
 | **Pertanggungjawaban** (PJ) | Laporan karyawan berisi nota-nota pemakaian uang muka. Satu uang muka = satu laporan. Nomor: `PJ-2026-10-0001`. |
 | **Nota** | Satu baris biaya: tanggal, kategori, keterangan, nominal, dan foto/PDF bukti (atau alasan bila tanpa nota). |
@@ -47,6 +49,8 @@ Satu user boleh punya lebih dari satu role; haknya digabung.
 | Mengajukan uang muka untuk diri sendiri | | ✓ | ✓ |
 | Mengunggah nota & mengirim pertanggungjawaban | ✓ | ✓ | ✓ |
 | Memverifikasi nota, mencatat pengembalian / penggantian | ✓ | ✓ | |
+| Memilih project aktif saat mengajukan/mencairkan uang muka | ✓ | ✓ | ✓ |
+| Mengelola project (tambah, ubah, nilai kontrak, tandai selesai) | ✓ | | |
 | Potong Gaji (lihat daftar, ekspor Excel, tandai dipotong) | ✓ | ✓ | |
 | Pengguna, Pengaturan, Audit Log | ✓ | | |
 
@@ -109,6 +113,28 @@ tanggal batas setiap kali halaman dibuka, jadi selalu benar tanpa cron.
 ---
 
 ## 4. Memberikan uang muka
+
+### 4.0 Navigasi & pilih project dulu (semua role)
+
+Aplikasi tidak memakai sidebar. Setelah login, halaman `/` menampilkan
+**kotak menu** (ikon) dengan **kolom pencarian**. Menu yang tampil sesuai role:
+Beranda, Project, Potong Gaji, Pengguna, Audit Log, Pengaturan. Header di
+setiap halaman berisi logo (kembali ke kotak menu), breadcrumb, dan menu
+user. Konten dibatasi container di tengah layar.
+
+**Uang Muka** dan **Pertanggungjawaban** bukan menu. Keduanya dibuka dari
+**kartu project** di menu **Project**, sehingga selalu terikat ke satu project
+(alamat `/advances?project=<id>` dan `/settlements?project=<id>`). Membuka
+alamat itu tanpa project yang valid kembali ke `/projects`.
+
+- **Kartu project:** klik kartu = **detail project**. Badge **Uang Muka** dan **Pertanggungjawaban** di kartu langsung membuka daftarnya (dengan angka hitungan bila ada).
+- **Isi kartu per role:** Owner melihat **nilai kontrak dan pengeluaran** (dengan batang pemakaian nilai kontrak). Finance dan karyawan hanya melihat hitungan uang muka (karyawan miliknya sendiri), **tanpa angka kontrak/keuntungan**.
+- **Status:** pojok kanan bawah kartu menampilkan status project (**Aktif** / **Selesai**) sebagai informasi. Status diubah Owner di **halaman detail project** (Tandai selesai / Aktifkan lagi, dengan konfirmasi).
+- **Daftar & pencarian:** semua project tampil dalam satu daftar, **terbaru dulu** (project baru di kiri atas; "Tanpa project" paling akhir). Kolom pencarian mencari **nama project atau klien**, langsung saat mengetik sejak huruf pertama, tanpa Enter (disaring di browser).
+- Pita **"Anda sedang di project X"** selalu tampil di atas daftar uang muka / pertanggungjawaban, dengan tombol **Ganti project** (kembali ke `/projects`).
+- Tombol **Ajukan uang muka** / **Catat pencairan** / **Usulkan pencairan** hanya ada di dalam project yang berstatus Aktif. Form tidak meminta project lagi; project terbawa dari halaman sebelumnya dan tampil di pita atas form.
+- Server Action mengecek ulang: uang muka baru wajib punya project dan project-nya harus Aktif.
+- Project Selesai dan **"Tanpa project"** (uang muka lama sebelum fitur project) muncul di bagian "Project selesai & lainnya". Untuk Finance/karyawan hanya bila mereka punya uang muka di dalamnya; Owner melihat semua project.
 
 Ada tiga jalur. Semuanya berakhir di status `DISBURSED`, lalu karyawan wajib
 mengonfirmasi.
@@ -341,7 +367,52 @@ tercatat di Audit Log.
 
 ---
 
-## 15. Catatan terbuka
+## 15. Project
+
+Menu **Project** (semua role) berisi kartu project: nama, klien (opsional),
+ikon, dan status. Owner menambah project dari tombol **Tambah project** (halaman `/projects/new`), dan
+melihat **nilai kontrak** (opsional, hanya terlihat Owner) serta pengeluaran.
+
+**Detail project** (klik kartu): identitas project dan kartu akses Uang Muka &
+Pertanggungjawaban (dengan rincian hitungan). Khusus Owner: tombol **Ubah
+project** (halaman `/projects/[id]/edit`: nama, klien, nilai kontrak, ikon), **Tandai selesai / Aktifkan
+lagi**, **PDF**, ringkasan keuangan project, dan pengeluaran per kategori.
+
+- **Aktif / Selesai.** Project Selesai tidak bisa dipilih untuk uang muka baru. Uang muka yang sudah berjalan di dalamnya tetap berjalan, dan daftarnya tetap bisa dibuka. Bisa diaktifkan lagi.
+- **Tidak ada hapus**, agar uang muka lama tetap punya induk. Nama project harus unik.
+- **Warna kartu otomatis** dari id project (selalu sama untuk project yang sama), ikon dipilih Owner.
+- **Uang muka lama** (dibuat sebelum fitur project) masuk "Tanpa project". Owner bisa **menetapkan project** dari halaman detail uang muka, selama uang muka itu belum Selesai/Ditolak/Dibatalkan dan belum punya project. Setelah ditetapkan tidak bisa dipindah lagi. Dicatat di Audit Log.
+- Semua perubahan project tercatat di Audit Log (kategori **Project**).
+
+### Beranda Owner
+
+Beranda ada di menu **Beranda** (`/beranda`). Hanya Owner yang melihat angka keuangan project. Finance dan karyawan tetap
+melihat ringkasan uang muka seperti sebelumnya.
+
+- **Pengeluaran** = nota yang **disetujui** saat verifikasi (ledger `EXPENSE_APPROVED`). Nota yang menunggu verifikasi atau ditolak tidak dihitung.
+- **Keuntungan** = nilai kontrak − pengeluaran, dan margin = keuntungan ÷ nilai kontrak. Hanya dihitung untuk project yang nilai kontraknya diisi. Project **Aktif** ditandai *sementara*, project **Selesai** *final*.
+- **Dana beredar** = uang muka yang sudah cair tetapi nota belum diverifikasi. Ini bukan pengeluaran, jadi ditampilkan terpisah.
+- **Kartu ringkasan:** nilai kontrak, pengeluaran, keuntungan (+ margin), dan dana beredar.
+- **Perlu perhatian:** project yang pengeluarannya melebihi nilai kontrak atau sudah ≥ 80%, uang muka lewat batas nota, menunggu persetujuan, nota menunggu verifikasi, sisa dana belum dikembalikan, project aktif tanpa nilai kontrak, dan uang muka berjalan tanpa project.
+- **Keuangan per project:** nilai kontrak, pengeluaran (dengan batang pemakaian nilai kontrak: biru < 80%, kuning ≥ 80%, merah > 100%), keuntungan, dan dana beredar. Nama project membuka detail project.
+- **Grafik:** pengeluaran per kategori (semua project) dan per bulan untuk 6 bulan terakhir menurut tanggal di nota.
+
+### Laporan PDF per project
+
+Tombol **PDF** di tabel "Keuangan per project" (Beranda Owner) dan di detail project mengunduh laporan
+satu project. Hanya Owner. PDF dibuat saat diminta dengan data terbaru, tidak
+disimpan. Isinya (A4, foto nota tidak disertakan):
+
+1. **Ringkasan:** nilai kontrak, pengeluaran, keuntungan dan margin (*sementara* / *final*), dana beredar, uang muka dicairkan, dan jumlah nota.
+2. **Pengeluaran per kategori:** jumlah nota, total, dan porsinya.
+3. **Per karyawan:** jumlah uang muka, total dicairkan, dan pengeluaran yang disetujui.
+4. **Daftar nota yang disetujui:** tanggal nota, nomor pertanggungjawaban, karyawan, kategori, keterangan (biaya tanpa nota diberi tanda), dan jumlah.
+
+Kartu "Tanpa project" tidak punya PDF karena tidak punya nilai kontrak.
+
+---
+
+## 16. Catatan terbuka
 
 Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 
@@ -350,3 +421,4 @@ Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 3. **Finance tidak menerima pengingat keterlambatan**, hanya karyawan dan Owner.
 4. **Nota yang tidak pernah dikirim tidak masuk Potong Gaji.** Daftar Potong Gaji hanya memuat sisa setelah verifikasi. Untuk mencegahnya, karyawan dibatasi menerima uang muka baru bila jumlah uang muka tertundanya sudah mencapai batas di Pengaturan (lihat bagian 9). Uang muka yang sudah terlanjur tertunda tetap harus ditagih manual.
 5. **Pengajuan yang sudah terlanjur macet** (dibuat sebelum pengecekan penyetuju sah ditambahkan) tidak berubah otomatis; pengusulnya bisa membatalkan.
+6. **Notifikasi WhatsApp belum menyebut project.** Pesan pengajuan, pencairan, dan pengingat belum memuat nama project.

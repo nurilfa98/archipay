@@ -1,7 +1,7 @@
 // Root layout: membungkus SELURUH halaman (login maupun halaman setelah login).
 // Isinya hanya hal global: <html>, font, CSS, dan provider yang dipakai di mana-mana
 // (tema terang/gelap, tooltip, toast).
-// Layout khusus (sidebar, navbar) ada di route group masing-masing:
+// Layout khusus (header) ada di route group masing-masing:
 // - src/app/(auth)/layout.tsx → halaman login
 // - src/app/(app)/layout.tsx  → halaman setelah login
 //
@@ -43,7 +43,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="flex min-h-full flex-col">
         <ThemeProvider>
-          {/* Dibutuhkan tooltip menu sidebar saat sidebar diciutkan (mode ikon) */}
+          {/* Dibutuhkan komponen yang memakai tooltip (misal tombol ikon) */}
           <TooltipProvider>{children}</TooltipProvider>
           {/* Toast hasil simpan data, tampil di pojok kanan bawah. Dipanggil lewat
               notify.* (src/lib/notify.ts). Diletakkan di root agar tetap tampil

@@ -55,6 +55,8 @@ import { formatRupiah } from "@/lib/format";
 type Mode = "direct" | "propose" | "request";
 
 type AdvanceCreateFormProps = {
+  // Project yang dipilih di halaman Uang Muka; tidak dipilih lagi di form ini.
+  projectId: string;
   settlementDueDays: number;
   returnDueDays: number;
   // Jumlah uang muka tertunda per karyawan (id → jumlah) dan batasnya (Pengaturan).
@@ -106,6 +108,7 @@ export function AdvanceCreateForm(props: AdvanceCreateFormProps) {
   return (
     <form onSubmit={handleSubmit} className="max-w-xl">
       <input type="hidden" name="kind" value={mode === "request" ? "request" : "push"} />
+      <input type="hidden" name="projectId" value={props.projectId} />
       <FieldGroup>
         {props.mode !== "request" && (
           <Field data-invalid={!!fieldError("recipientId")}>
@@ -259,7 +262,11 @@ export function AdvanceCreateForm(props: AdvanceCreateFormProps) {
             {pending && <LoaderCircleIcon className="animate-spin" />}
             {submitLabel(mode, amount, pending)}
           </Button>
-          <Button variant="outline" nativeButton={false} render={<Link href="/advances" />}>
+          <Button
+            variant="outline"
+            nativeButton={false}
+            render={<Link href={`/advances?project=${props.projectId}`} />}
+          >
             Batal
           </Button>
         </Field>

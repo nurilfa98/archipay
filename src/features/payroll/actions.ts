@@ -91,6 +91,7 @@ export async function recordPayrollDeduction(settlementId: string, formData: For
   revalidatePath("/payroll-deductions");
   revalidatePath("/settlements", "layout");
   revalidatePath("/advances", "layout");
-  revalidatePath("/");
+  revalidatePath("/beranda");
+  revalidatePath("/projects", "layout");
   return { success: true, data: undefined };
 }

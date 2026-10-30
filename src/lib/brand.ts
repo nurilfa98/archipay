@@ -1,4 +1,4 @@
-// Identitas produk dan perusahaan. Dipakai di login, sidebar, dan footer
+// Identitas produk dan perusahaan. Dipakai di login, header, dan footer
 // copyright. Untuk produk baru dari Realitech Solutions, cukup ganti
 // PRODUCT_NAME dan PRODUCT_TAGLINE; nama perusahaan dan copyright tetap sama.
 

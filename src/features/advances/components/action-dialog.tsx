@@ -35,6 +35,8 @@ type FieldErrorOf = (name: string) => string | undefined;
 export function ActionDialog({
   label,
   icon,
+  showLabel,
+  size,
   variant = "brand",
   disabled,
   title,
@@ -46,7 +48,10 @@ export function ActionDialog({
 }: {
   label: string;
   // Diisi → tombol pemicu hanya berupa ikon; `label` menjadi aria-label & tooltip.
+  // Dengan `showLabel`, ikon dan label tampil bersama.
   icon?: ReactNode;
+  showLabel?: boolean;
+  size?: ComponentProps<typeof Button>["size"];
   variant?: ComponentProps<typeof Button>["variant"];
   disabled?: boolean;
   title: string;
@@ -61,6 +66,7 @@ export function ActionDialog({
   const [error, setError] = useState<Extract<ActionResult, { success: false }> | null>(null);
 
   const fieldError: FieldErrorOf = (name) => error?.fieldErrors?.[name]?.[0];
+  const iconOnly = !!icon && !showLabel;
 
   function handleOpenChange(next: boolean) {
     if (pending) return;
@@ -87,13 +93,20 @@ export function ActionDialog({
     <>
       <Button
         variant={variant}
-        size={icon ? "icon" : "default"}
-        aria-label={icon ? label : undefined}
-        title={icon ? label : undefined}
+        size={size ?? (iconOnly ? "icon" : "default")}
+        aria-label={iconOnly ? label : undefined}
+        title={iconOnly ? label : undefined}
         disabled={disabled}
         onClick={() => handleOpenChange(true)}
       >
-        {icon ?? label}
+        {iconOnly ? (
+          icon
+        ) : (
+          <>
+            {icon}
+            {label}
+          </>
+        )}
       </Button>
       <AlertDialog open={open} onOpenChange={handleOpenChange}>
         <AlertDialogContent>

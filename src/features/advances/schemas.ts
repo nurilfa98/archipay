@@ -28,6 +28,7 @@ const amount = z
   );
 
 export const createAdvanceSchema = z.object({
+  projectId: z.string().min(1, "Pilih project dulu di halaman Uang Muka").max(36),
   recipientId: z.string().min(1, "Pilih karyawan penerima").max(36),
   amount,
   purpose: z

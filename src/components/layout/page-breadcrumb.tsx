@@ -1,10 +1,9 @@
-// Breadcrumb di navbar, diambil otomatis dari nav-config.ts berdasarkan URL
-// yang sedang dibuka: "Grup menu > Menu", misalnya "Keuangan > Uang Muka".
+// Breadcrumb di header, diambil otomatis dari nav-config.ts berdasarkan URL
+// yang sedang dibuka: "Menu > Project > Uang Muka".
 //
-// - Nama grup hanya teks (grup tidak punya halaman sendiri).
-// - Di sub-halaman (misal /advances/123) nama menu menjadi link untuk
+// - "Menu" selalu kembali ke kotak menu di /.
+// - Di sub-halaman (misal /projects/123) nama menu menjadi link untuk
 //   kembali ke daftarnya.
-// - Beranda cukup "Beranda", tanpa grup "Utama".
 //
 // Referensi: https://ui.shadcn.com/docs/components/breadcrumb
 
@@ -20,34 +19,57 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { isNavActive, NAV_GROUPS } from "./nav-config";
+import { matchesPath, MENU_ITEMS, SUB_PAGES } from "./nav-config";
+
+type Crumb = { title: string; href: string };
+
+function trailOf(pathname: string): Crumb[] {
+  const menu = MENU_ITEMS.find((item) => matchesPath(pathname, item.href));
+  if (menu) return [menu];
+  const sub = SUB_PAGES.find((page) => matchesPath(pathname, page.href));
+  if (!sub) return [];
+  const parent = MENU_ITEMS.find((item) => item.href === sub.parent);
+  return parent ? [parent, sub] : [sub];
+}
 
 export function PageBreadcrumb() {
   const pathname = usePathname();
-  const group = NAV_GROUPS.find((g) => g.items.some((i) => isNavActive(pathname, i.href)));
-  const item = group?.items.find((i) => isNavActive(pathname, i.href));
-
-  if (!group || !item) return <span className="truncate text-sm font-medium">ArchiPay</span>;
+  if (pathname === "/") return null;
+  const trail = trailOf(pathname);
 
   return (
     <Breadcrumb className="min-w-0">
       <BreadcrumbList className="flex-nowrap">
-        {item.href !== "/" && (
-          <>
-            <BreadcrumbItem>{group.label}</BreadcrumbItem>
-            <BreadcrumbSeparator />
-          </>
-        )}
-        <BreadcrumbItem className="min-w-0">
-          {pathname === item.href ? (
-            <BreadcrumbPage className="truncate font-medium">{item.title}</BreadcrumbPage>
-          ) : (
-            <BreadcrumbLink className="truncate" render={<Link href={item.href} />}>
-              {item.title}
-            </BreadcrumbLink>
-          )}
+        <BreadcrumbItem className="hidden sm:inline-flex">
+          <BreadcrumbLink render={<Link href="/" />}>Menu</BreadcrumbLink>
         </BreadcrumbItem>
+        {trail.map((crumb, index) => (
+          <CrumbItem
+            key={crumb.href}
+            crumb={crumb}
+            // Item terakhir yang URL-nya persis = halaman ini (bukan link).
+            current={index === trail.length - 1 && pathname === crumb.href}
+            first={index === 0}
+          />
+        ))}
       </BreadcrumbList>
     </Breadcrumb>
+  );
+}
+
+function CrumbItem({ crumb, current, first }: { crumb: Crumb; current: boolean; first: boolean }) {
+  return (
+    <>
+      <BreadcrumbSeparator className={first ? "hidden sm:inline-flex" : undefined} />
+      <BreadcrumbItem className="min-w-0">
+        {current ? (
+          <BreadcrumbPage className="truncate font-medium">{crumb.title}</BreadcrumbPage>
+        ) : (
+          <BreadcrumbLink className="truncate" render={<Link href={crumb.href} />}>
+            {crumb.title}
+          </BreadcrumbLink>
+        )}
+      </BreadcrumbItem>
+    </>
   );
 }

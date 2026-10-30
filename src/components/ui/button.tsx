@@ -12,6 +12,11 @@ const buttonVariants = cva(
         // tombol utama (lihat defaultVariants). "default" (slate gelap) tetap
         // ada hanya bila perlu dipanggil eksplisit.
         brand: "bg-brand text-brand-foreground hover:bg-brand/85",
+        // Garis tepi + teks warna brand, latar transparan. Untuk aksi yang perlu
+        // menonjol tetapi tidak boleh tertukar dengan badge status, misal
+        // "Tandai selesai" / "Aktifkan lagi" project.
+        "brand-outline":
+          "border-brand bg-transparent text-brand hover:bg-brand/10 focus-visible:border-brand focus-visible:ring-brand/30 dark:hover:bg-brand/20",
         outline:
           "border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50",
         secondary:

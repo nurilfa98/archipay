@@ -1,17 +1,22 @@
 // Layout untuk SEMUA halaman setelah login (route group "(app)").
-// Setiap page.tsx di dalam folder (app)/ otomatis memakai sidebar + navbar ini,
-// sehingga page fitur cukup berisi UI khusus halamannya saja.
+// Setiap page.tsx di dalam folder (app)/ otomatis memakai header ini, sehingga
+// page fitur cukup berisi UI khusus halamannya saja.
 //
-//   ┌──────────┬──────────────────────────────┐
-//   │ Sidebar  │ Navbar (AppHeader)           │
-//   │ (menu)   ├──────────────────────────────┤
-//   │          │ {children} = page.tsx        │
-//   └──────────┴──────────────────────────────┘
+//   ┌──────────────────────────────────────────────┐
+//   │      Header (logo, breadcrumb, user)         │
+//   ├──────────────────────────────────────────────┤
+//   │      ┌──────────────────────────────┐        │
+//   │      │ {children} = page.tsx        │        │
+//   │      └──────────────────────────────┘        │
+//   └──────────────────────────────────────────────┘
+//
+// Tidak ada sidebar: menu tampil sebagai kotak ikon di halaman /. Konten
+// dibatasi container (max-w-6xl) agar berada di tengah layar lebar.
 //
 // Kenapa bagian user dibungkus <Suspense>?
 // Dengan cacheComponents: true, komponen yang membaca cookie wajib berada di
-// dalam <Suspense>. Hasilnya, kerangka (logo, navbar, konten) tampil instan
-// dan hanya menu + avatar yang menyusul.
+// dalam <Suspense>. Hasilnya, kerangka (logo, header, konten) tampil instan
+// dan hanya avatar yang menyusul.
 //
 // Catatan keamanan: layout TIDAK dirender ulang saat pindah halaman, jadi
 // pengecekan di layout tidak cukup untuk melindungi data. Setiap page/action
@@ -25,53 +30,31 @@
 
 import { Suspense } from "react";
 import { AppHeader } from "@/components/layout/app-header";
-import { AppSidebar } from "@/components/layout/app-sidebar";
-import { NavMain, NavMainSkeleton } from "@/components/layout/nav-main";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import {
-  UserMenu,
-  UserMenuSkeleton,
-} from "@/features/auth/components/user-menu";
+import { MenuFab } from "@/components/layout/menu-fab";
+import { UserMenu, UserMenuSkeleton } from "@/features/auth/components/user-menu";
 import { verifySession } from "@/lib/auth/dal";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
-    <SidebarProvider>
-      <AppSidebar
-        nav={
-          <Suspense fallback={<NavMainSkeleton />}>
-            <SidebarNav />
+    <div className="flex min-h-svh flex-col">
+      <AppHeader
+        userMenu={
+          <Suspense fallback={<UserMenuSkeleton />}>
+            <HeaderUserMenu />
           </Suspense>
         }
       />
-      <SidebarInset>
-        <AppHeader
-          userMenu={
-            <Suspense fallback={<UserMenuSkeleton />}>
-              <HeaderUserMenu />
-            </Suspense>
-          }
-        />
-        <div className="flex flex-1 flex-col gap-4 p-4">{children}</div>
-      </SidebarInset>
-    </SidebarProvider>
+      {/* pb-24: ruang di bawah konten agar tidak tertutup tombol menu mengambang. */}
+      <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 pt-6 pb-24">{children}</main>
+      <Suspense>
+        <MenuFab />
+      </Suspense>
+    </div>
   );
 }
 
-// Dua komponen di bawah sama-sama memanggil verifySession(), tapi query ke
-// database hanya terjadi sekali per request berkat 'use cache: private' di DAL.
 // Kalau session tidak valid (misal user dinonaktifkan), user diarahkan ke /login.
-
-async function SidebarNav() {
-  const user = await verifySession();
-  return <NavMain roles={user.roles} />;
-}
-
 async function HeaderUserMenu() {
   const user = await verifySession();
-  return (
-    <UserMenu
-      user={{ fullName: user.fullName, email: user.email, roles: user.roles }}
-    />
-  );
+  return <UserMenu user={{ fullName: user.fullName, email: user.email, roles: user.roles }} />;
 }

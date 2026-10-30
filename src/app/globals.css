@@ -137,6 +137,25 @@
   --sidebar-ring: oklch(67.3% 0.182 276.935);
 }
 
+/* Warna per project (features/projects/color.ts hanya mengisi --project-hue).
+   Kecerahan & kepekatan tetap, jadi semua warna project selaras di mode
+   terang maupun gelap. --project-chroma: 0 membuatnya abu-abu (kartu
+   "Tanpa project"). */
+.project-accent {
+  --project-chroma: 1;
+  --project-soft: oklch(96.5% calc(0.035 * var(--project-chroma)) var(--project-hue));
+  --project-border: oklch(88% calc(0.07 * var(--project-chroma)) var(--project-hue));
+  --project-strong: oklch(55% calc(0.17 * var(--project-chroma)) var(--project-hue));
+  --project-on: oklch(100% 0 0);
+}
+
+.dark .project-accent {
+  --project-soft: oklch(27% calc(0.05 * var(--project-chroma)) var(--project-hue));
+  --project-border: oklch(38% calc(0.08 * var(--project-chroma)) var(--project-hue));
+  --project-strong: oklch(76% calc(0.14 * var(--project-chroma)) var(--project-hue));
+  --project-on: oklch(20% 0.03 var(--project-hue));
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

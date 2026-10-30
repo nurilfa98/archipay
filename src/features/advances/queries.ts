@@ -19,7 +19,8 @@ import { io } from "next/cache";
 import { can } from "@/lib/auth/permissions";
 import { isRole, type Role } from "@/lib/auth/roles";
 import { db } from "@/lib/db";
-import { advanceRequests, roles, userRoles, users } from "@/lib/db/schema";
+import { advanceRequests, projects, roles, userRoles, users } from "@/lib/db/schema";
+import { projectCondition } from "@/features/projects/queries";
 import {
   ADVANCE_STATUS,
   AWAITING_RECEIPT_STATUSES,
@@ -47,6 +48,8 @@ export type AdvanceListItem = {
 };
 
 export type AdvanceDetail = AdvanceListItem & {
+  projectId: string | null; // null = uang muka lama, belum punya project
+  projectName: string | null;
   recipientEmail: string;
   createdByName: string;
   decidedByName: string | null;
@@ -102,6 +105,8 @@ function withTypes<T extends { status: string; disbursementMethod: string }>(row
 // disaring per status); daftar riwayat dibatasi agar halaman tetap ringan.
 export async function listAdvances(filter: {
   recipientId?: string;
+  // id project, atau NO_PROJECT untuk uang muka lama tanpa project.
+  project?: string;
   statuses?: readonly AdvanceStatus[];
   year?: number;
   month?: number;
@@ -115,6 +120,7 @@ export async function listAdvances(filter: {
     .where(
       and(
         filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
+        projectCondition(filter.project),
         filter.statuses ? inArray(advanceRequests.status, [...filter.statuses]) : undefined,
         filter.year ? eq(advanceRequests.periodYear, filter.year) : undefined,
         filter.month ? eq(advanceRequests.periodMonth, filter.month) : undefined,
@@ -127,12 +133,17 @@ export async function listAdvances(filter: {
 }
 
 // Tahun yang punya uang muka, terbaru dulu. Untuk pilihan filter Tahun.
-export async function listAdvanceYears(filter: { recipientId?: string }): Promise<number[]> {
+export async function listAdvanceYears(filter: { recipientId?: string; project?: string }): Promise<number[]> {
   await io();
   const rows = await db
     .selectDistinct({ year: advanceRequests.periodYear })
     .from(advanceRequests)
-    .where(filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined)
+    .where(
+      and(
+        filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
+        projectCondition(filter.project),
+      ),
+    )
     .orderBy(desc(advanceRequests.periodYear));
   return rows.map((row) => row.year);
 }
@@ -178,6 +189,8 @@ export async function getAdvanceDetail(id: string): Promise<AdvanceDetail | null
   const [row] = await db
     .select({
       ...listColumns,
+      projectId: advanceRequests.projectId,
+      projectName: projects.name,
       recipientEmail: recipient.email,
       createdByName: createdBy.fullName,
       decidedByName: decidedBy.fullName,
@@ -200,6 +213,7 @@ export async function getAdvanceDetail(id: string): Promise<AdvanceDetail | null
     .from(advanceRequests)
     .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
     .innerJoin(createdBy, eq(advanceRequests.createdById, createdBy.id))
+    .leftJoin(projects, eq(advanceRequests.projectId, projects.id))
     .leftJoin(decidedBy, eq(advanceRequests.decidedById, decidedBy.id))
     .leftJoin(disbursedBy, eq(advanceRequests.disbursedById, disbursedBy.id))
     .leftJoin(cancelledBy, eq(advanceRequests.cancelledById, cancelledBy.id))

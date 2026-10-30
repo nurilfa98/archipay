@@ -175,6 +175,36 @@ export const companySettings = pgTable(
   ],
 );
 
+// Project: wadah untuk mengelompokkan uang muka (dan pertanggungjawabannya).
+// Dibuat dan dikelola OWNER. Project tidak dihapus, hanya ditandai Selesai,
+// agar uang muka lama tetap punya induk. Warna kartu dibuat otomatis dari id
+// (features/projects/color.ts), jadi tidak disimpan.
+export const projects = pgTable(
+  "projects",
+  {
+    id: id(),
+    name: varchar("name", { length: 120 }).notNull().unique(),
+    client: varchar("client", { length: 120 }),
+    // Kunci ikon (features/projects/constants.ts → PROJECT_ICONS).
+    icon: varchar("icon", { length: 30 }).notNull().default("building"),
+    // Nilai kontrak ("nominal gelondongan"), hanya terlihat OWNER. Kosong
+    // bila belum diisi.
+    contractValue: rupiah("contract_value"),
+    // ACTIVE / COMPLETED. Project COMPLETED tidak bisa dipilih untuk uang muka baru.
+    status: varchar("status", { length: 20 }).notNull().default("ACTIVE"),
+    createdById: userRef("created_by_id").notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamptz("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    check("projects_status", sql`${t.status} in ('ACTIVE', 'COMPLETED')`),
+    check("projects_contract_value_positive", sql`${t.contractValue} is null or ${t.contractValue} > 0`),
+  ],
+);
+
 // Uang muka. Satu baris = satu kali pemberian dana ke satu karyawan.
 // Alur status ada di features/advances/constants.ts.
 //
@@ -193,6 +223,9 @@ export const advanceRequests = pgTable(
     periodYear: smallint("period_year").notNull(),
     periodMonth: smallint("period_month").notNull(),
     recipientId: userRef("recipient_id").notNull(),
+    // Project induk. Wajib untuk uang muka baru (dicek Server Action); kosong
+    // hanya untuk uang muka lama sebelum fitur project ada ("Tanpa project").
+    projectId: varchar("project_id", { length: 36 }).references(() => projects.id),
     amount: rupiah("amount").notNull(),
     purpose: varchar("purpose", { length: 500 }).notNull(),
     disbursementMethod: varchar("disbursement_method", { length: 20 }).notNull(),
@@ -251,6 +284,7 @@ export const advanceRequests = pgTable(
     index("advance_requests_recipient_idx").on(t.recipientId, t.createdAt),
     index("advance_requests_status_idx").on(t.status, t.createdAt),
     index("advance_requests_period_idx").on(t.periodYear, t.periodMonth),
+    index("advance_requests_project_idx").on(t.projectId, t.createdAt),
   ],
 );
 

@@ -14,14 +14,13 @@
 // - node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/dynamic-routes.md
 // - node_modules/next/dist/docs/01-app/03-api-reference/04-functions/not-found.md
 
-import { ArrowLeftIcon, CircleAlertIcon, CircleCheckIcon, InfoIcon } from "lucide-react";
+import { CircleAlertIcon, CircleCheckIcon, InfoIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -33,6 +32,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { NO_PROJECT } from "@/features/projects/constants";
+import { BackToList } from "@/features/projects/components/back-to-list";
 import { SettlementBalanceAction } from "@/features/settlements/components/settlement-balance-action";
 import { SettlementItemForm } from "@/features/settlements/components/settlement-item-form";
 import {
@@ -67,19 +68,11 @@ export const metadata: Metadata = {
 
 export default function SettlementDetailPage({ params }: PageProps<"/settlements/[id]">) {
   return (
-    <>
-      <div>
-        <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/settlements" />}>
-          <ArrowLeftIcon />
-          Daftar pertanggungjawaban
-        </Button>
-      </div>
-      <Suspense fallback={<SettlementDetailSkeleton />}>
-        {params.then(({ id }) => (
-          <SettlementDetailContent id={id} />
-        ))}
-      </Suspense>
-    </>
+    <Suspense fallback={<SettlementDetailSkeleton />}>
+      {params.then(({ id }) => (
+        <SettlementDetailContent id={id} />
+      ))}
+    </Suspense>
   );
 }
 
@@ -108,6 +101,12 @@ async function SettlementDetailContent({ id }: { id: string }) {
 
   return (
     <>
+      <BackToList
+        href={`/settlements?project=${settlement.projectId ?? NO_PROJECT}`}
+        label={
+          settlement.projectName ? `Pertanggungjawaban ${settlement.projectName}` : "Daftar pertanggungjawaban"
+        }
+      />
       <PageHeader
         title={
           <span className="flex items-center gap-2">
@@ -115,7 +114,7 @@ async function SettlementDetailContent({ id }: { id: string }) {
             <LateReasonIndicator reason={settlement.lateReason} />
           </span>
         }
-        description={`${settlement.advanceNumber} · ${settlement.purpose}`}
+        description={`${settlement.projectName ? `${settlement.projectName} · ` : ""}${settlement.advanceNumber} · ${settlement.purpose}`}
         action={<SettlementStatusBadge status={settlement.status} />}
       />
 
@@ -468,6 +467,7 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
 function SettlementDetailSkeleton() {
   return (
     <>
+      <BackToList href="/projects" label="Daftar project" />
       <Skeleton className="h-12 w-64" />
       <Skeleton className="h-40 w-full" />
       <Skeleton className="h-64 w-full" />

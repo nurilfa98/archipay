@@ -652,5 +652,6 @@ function revalidateSettlements() {
   revalidatePath("/settlements", "layout");
   revalidatePath("/advances", "layout");
   revalidatePath("/payroll-deductions");
-  revalidatePath("/");
+  revalidatePath("/beranda");
+  revalidatePath("/projects", "layout");
 }

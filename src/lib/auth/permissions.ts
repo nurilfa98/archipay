@@ -10,7 +10,7 @@
 // ROLE_PERMISSIONS di bawah, tanpa mencari-cari pengecekan di seluruh kode.
 //
 // File ini tidak memakai `server-only` karena Client Component juga memakainya
-// (misalnya sidebar menyembunyikan menu). Menyembunyikan menu hanya soal
+// (misalnya kotak menu menyembunyikan menu). Menyembunyikan menu hanya soal
 // tampilan; pengaman sebenarnya tetap requirePermission() di server.
 //
 // Referensi:
@@ -30,6 +30,7 @@ export const PERMISSIONS = [
   "settlement:submit", // upload struk / laporan penggunaan uang
   "settlement:verify", // memverifikasi struk & mencatat pengembalian/penggantian selisih
   "payroll:manage", // daftar potong gaji: ekspor & tandai sudah dipotong
+  "project:manage", // kelola project: nilai kontrak, status, menetapkan project uang muka lama
   "settings:manage", // ubah kebijakan uang muka & kategori biaya
   "user:manage", // tambah/nonaktifkan user & atur role
   "audit:view", // melihat audit log

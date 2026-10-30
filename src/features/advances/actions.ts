@@ -36,6 +36,7 @@ import { nextDocumentNumber } from "@/lib/document-number";
 import { formatRupiah } from "@/lib/format";
 import { getClientIp } from "@/lib/request";
 import type { ActionResult } from "@/types/action-result";
+import { getActiveProject } from "@/features/projects/queries";
 import { getCompanySettings } from "@/features/settings/queries";
 import { ADVANCE_NUMBER_PREFIX, type AdvanceStatus, type DisbursementMethod } from "./constants";
 import {
@@ -95,6 +96,7 @@ export async function createAdvance(
   if (!allowed) return FORBIDDEN;
 
   const parsed = createAdvanceSchema.safeParse({
+    projectId: formData.get("projectId") ?? "",
     recipientId: isRequest ? actor.id : (formData.get("recipientId") ?? ""),
     amount: formData.get("amount") ?? "",
     purpose: formData.get("purpose") ?? "",
@@ -105,6 +107,12 @@ export async function createAdvance(
   });
   if (!parsed.success) return invalid(parsed.error);
   const input = parsed.data;
+
+  // Uang muka baru wajib masuk ke project yang masih aktif.
+  const project = await getActiveProject(input.projectId);
+  if (!project) {
+    return { success: false, message: "Project tidak ditemukan atau sudah selesai. Pilih project lagi di halaman Uang Muka." };
+  }
 
   if (!isRequest && input.recipientId === actor.id) {
     return fieldError("recipientId", "Pemberi dan penerima dana harus orang berbeda");
@@ -148,6 +156,7 @@ export async function createAdvance(
       .values({
         ...documentNumber,
         createdAt,
+        projectId: project.id,
         recipientId: recipient.id,
         amount: input.amount,
         purpose: input.purpose,
@@ -164,7 +173,7 @@ export async function createAdvance(
         action: direct ? "ADVANCE_DISBURSED" : isRequest ? "ADVANCE_REQUESTED" : "ADVANCE_PROPOSED",
         entityName: "advance_requests",
         entityId: row.id,
-        newValues: { ...input, ...disbursement, status, recipientName: recipient.fullName },
+        newValues: { ...input, ...disbursement, status, recipientName: recipient.fullName, projectName: project.name },
         ipAddress: ip,
       },
       tx,
@@ -541,5 +550,6 @@ function reasonError(error: z.ZodError) {
 function revalidateAdvances() {
   revalidatePath("/advances", "layout");
   revalidatePath("/settlements", "layout");
-  revalidatePath("/");
+  revalidatePath("/beranda");
+  revalidatePath("/projects", "layout");
 }

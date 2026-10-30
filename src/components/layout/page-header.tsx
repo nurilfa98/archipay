@@ -1,7 +1,7 @@
 // Judul + deskripsi di bagian atas setiap halaman, supaya tampilannya seragam.
 //
 // Komponen ini statis (tidak membaca cookie/database), jadi ikut dirender saat
-// build dan ikut di-prefetch. Saat link di sidebar diklik, judul halaman
+// build dan ikut di-prefetch. Saat link menu diklik, judul halaman
 // langsung muncul tanpa menunggu server.
 
 // `action` (opsional) = tombol di kanan judul, misalnya "Tambah pengguna".

@@ -5,12 +5,13 @@
 import type { Tone } from "@/components/tone-badge";
 import type { AuditAction } from "@/lib/audit";
 
-export const AUDIT_CATEGORIES = ["AUTH", "USER", "ADVANCE", "SETTLEMENT", "SETTINGS"] as const;
+export const AUDIT_CATEGORIES = ["AUTH", "USER", "PROJECT", "ADVANCE", "SETTLEMENT", "SETTINGS"] as const;
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
 export const AUDIT_CATEGORY_LABELS: Record<AuditCategory, string> = {
   AUTH: "Login & akun",
   USER: "Pengguna",
+  PROJECT: "Project",
   ADVANCE: "Uang muka",
   SETTLEMENT: "Pertanggungjawaban",
   SETTINGS: "Pengaturan",
@@ -39,6 +40,9 @@ export const AUDIT_ACTIONS = {
   ADVANCE_CANCELLED: { label: "Batalkan uang muka", category: "ADVANCE", tone: "danger" },
   ADVANCE_ACKNOWLEDGED: { label: "Konfirmasi terima dana", category: "ADVANCE", tone: "success" },
   ADVANCE_DISPUTED: { label: "Laporkan dana belum diterima", category: "ADVANCE", tone: "warning" },
+  ADVANCE_PROJECT_ASSIGNED: { label: "Tetapkan project uang muka", category: "ADVANCE", tone: "active" },
+  PROJECT_CREATED: { label: "Tambah project", category: "PROJECT", tone: "success" },
+  PROJECT_UPDATED: { label: "Ubah project", category: "PROJECT", tone: "active" },
   SETTLEMENT_ITEM_ADDED: { label: "Tambah nota", category: "SETTLEMENT", tone: "pending" },
   SETTLEMENT_ITEM_REMOVED: { label: "Hapus nota", category: "SETTLEMENT", tone: "warning" },
   SETTLEMENT_SUBMITTED: { label: "Kirim pertanggungjawaban", category: "SETTLEMENT", tone: "active" },
