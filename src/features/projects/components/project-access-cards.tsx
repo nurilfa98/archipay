@@ -86,7 +86,7 @@ function AccessCard({
   return (
     <Link
       href={href}
-      className="group flex flex-col gap-3 rounded-xl bg-card p-4 text-sm ring-1 ring-foreground/10 outline-none transition-shadow hover:ring-2 hover:ring-(--project-strong) focus-visible:ring-2 focus-visible:ring-(--project-strong)"
+      className="group flex flex-col gap-3 rounded-xl bg-card p-4 text-sm ring-1 ring-(--project-border) outline-none transition-shadow hover:ring-2 hover:ring-(--project-strong) focus-visible:ring-2 focus-visible:ring-(--project-strong)"
     >
       <div className="flex items-center gap-3">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-(--project-soft) text-(--project-strong)">

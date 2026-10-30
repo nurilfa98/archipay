@@ -380,7 +380,7 @@ lagi**, **PDF**, ringkasan keuangan project, dan pengeluaran per kategori.
 
 - **Aktif / Selesai.** Project Selesai tidak bisa dipilih untuk uang muka baru. Uang muka yang sudah berjalan di dalamnya tetap berjalan, dan daftarnya tetap bisa dibuka. Bisa diaktifkan lagi.
 - **Tidak ada hapus**, agar uang muka lama tetap punya induk. Nama project harus unik.
-- **Warna kartu otomatis** dari id project (selalu sama untuk project yang sama), ikon dipilih Owner.
+- **Warna mengikuti ikon.** Setiap ikon punya satu warna tetap (12 ikon, 12 warna). Mengganti ikon otomatis mengganti warna kartu, border, dan pita project. Ikon dipilih Owner di form project; pilihan ikonnya tampil dengan warnanya masing-masing.
 - **Uang muka lama** (dibuat sebelum fitur project) masuk "Tanpa project". Owner bisa **menetapkan project** dari halaman detail uang muka, selama uang muka itu belum Selesai/Ditolak/Dibatalkan dan belum punya project. Setelah ditetapkan tidak bisa dipindah lagi. Dicatat di Audit Log.
 - Semua perubahan project tercatat di Audit Log (kategori **Project**).
 

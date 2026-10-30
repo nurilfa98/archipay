@@ -13,7 +13,7 @@ import { ProjectIcon } from "./project-icon";
 export function ProjectBanner({ project }: { project: ProjectInfo | null }) {
   return (
     <div
-      style={projectAccentStyle(project?.id ?? null)}
+      style={projectAccentStyle(project?.icon ?? null)}
       className="project-accent flex flex-col gap-3 rounded-lg border border-(--project-border) bg-(--project-soft) p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4"
     >
       <div className="flex min-w-0 flex-1 items-center gap-3">

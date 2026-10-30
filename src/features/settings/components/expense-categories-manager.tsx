@@ -1,11 +1,11 @@
-// Kelola kategori biaya (OWNER): tambah, ganti nama, aktif/nonaktif.
+// Kelola kategori biaya (OWNER): tambah, ganti nama (ikon pensil), dan
+// aktif/nonaktif lewat saklar di kolom Status (category-active-switch.tsx).
 // Kategori tidak bisa dihapus agar nota lama tetap utuh; kategori nonaktif
 // tidak muncul lagi di form nota.
 
 "use client";
 
-import { CheckIcon, PencilIcon, XIcon } from "lucide-react";
-import { ToneBadge } from "@/components/tone-badge";
+import { PencilIcon } from "lucide-react";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
@@ -17,12 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ActionDialog } from "@/features/advances/components/action-dialog";
-import {
-  createExpenseCategory,
-  renameExpenseCategory,
-  setExpenseCategoryActive,
-} from "@/features/settings/actions";
+import { createExpenseCategory, renameExpenseCategory } from "@/features/settings/actions";
 import type { ExpenseCategoryWithUsage } from "@/features/settings/queries";
+import { CategoryActiveSwitch } from "./category-active-switch";
 
 const nameOf = (formData: FormData) => String(formData.get("name") ?? "");
 
@@ -49,7 +46,7 @@ export function ExpenseCategoriesManager({ categories }: { categories: ExpenseCa
               <TableHead>Nama</TableHead>
               <TableHead className="text-right">Dipakai</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead className="w-28 text-center">Aksi</TableHead>
+              <TableHead className="w-20 text-center">Aksi</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -60,11 +57,7 @@ export function ExpenseCategoriesManager({ categories }: { categories: ExpenseCa
                   {category.usageCount} nota
                 </TableCell>
                 <TableCell>
-                  {category.isActive ? (
-                    <ToneBadge tone="success">Aktif</ToneBadge>
-                  ) : (
-                    <ToneBadge tone="pending">Nonaktif</ToneBadge>
-                  )}
+                  <CategoryActiveSwitch id={category.id} name={category.name} isActive={category.isActive} />
                 </TableCell>
                 <TableCell>
                   <div className="flex justify-center gap-1">
@@ -80,28 +73,6 @@ export function ExpenseCategoriesManager({ categories }: { categories: ExpenseCa
                     >
                       {(fieldError) => <NameField defaultValue={category.name} error={fieldError("name")} />}
                     </ActionDialog>
-                    <ActionDialog
-                      label={category.isActive ? "Nonaktifkan" : "Aktifkan"}
-                      // Ikon & warna mengikuti status saat ini: ceklis hijau = Aktif,
-                      // X merah = Nonaktif.
-                      icon={
-                        category.isActive ? (
-                          <CheckIcon className="size-[18px]" />
-                        ) : (
-                          <XIcon className="size-[18px]" />
-                        )
-                      }
-                      variant={category.isActive ? "success" : "destructive"}
-                      title={category.isActive ? `Nonaktifkan "${category.name}"?` : `Aktifkan "${category.name}"?`}
-                      description={
-                        category.isActive
-                          ? "Kategori tidak bisa dipilih lagi untuk nota baru. Nota lama tetap memakai kategori ini."
-                          : "Kategori bisa dipilih lagi saat mengisi nota."
-                      }
-                      confirmLabel={category.isActive ? "Nonaktifkan" : "Aktifkan"}
-                      successMessage={category.isActive ? "Kategori dinonaktifkan." : "Kategori diaktifkan."}
-                      onConfirm={() => setExpenseCategoryActive(category.id, !category.isActive)}
-                    />
                   </div>
                 </TableCell>
               </TableRow>

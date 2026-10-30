@@ -137,7 +137,8 @@
   --sidebar-ring: oklch(67.3% 0.182 276.935);
 }
 
-/* Warna per project (features/projects/color.ts hanya mengisi --project-hue).
+/* Warna per project, ditentukan ikonnya (features/projects/color.ts hanya
+   mengisi --project-hue).
    Kecerahan & kepekatan tetap, jadi semua warna project selaras di mode
    terang maupun gelap. --project-chroma: 0 membuatnya abu-abu (kartu
    "Tanpa project"). */

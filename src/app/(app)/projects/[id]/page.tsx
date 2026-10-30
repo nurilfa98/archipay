@@ -73,7 +73,7 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
   const active = card.status === "ACTIVE";
 
   return (
-    <div style={projectAccentStyle(id)} className="project-accent flex flex-col gap-6">
+    <div style={projectAccentStyle(card.icon)} className="project-accent flex flex-col gap-6">
       <div className="flex flex-col gap-4 rounded-xl border border-(--project-border) bg-(--project-soft) p-4 sm:flex-row sm:items-center sm:p-5">
         <div className="flex min-w-0 flex-1 items-center gap-4">
           <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-(--project-strong) text-(--project-on)">

@@ -27,8 +27,9 @@ const buttonVariants = cva(
         // (misal pensil di sebelah tombol aktif/nonaktifkan kategori).
         edit:
           "bg-orange-500/10 text-orange-600 hover:bg-orange-500/20 focus-visible:border-orange-500/40 focus-visible:ring-orange-500/20 dark:bg-orange-500/20 dark:text-orange-400 dark:hover:bg-orange-500/30",
-        // Warna sama dengan ToneBadge "success" / "pending" (components/tone-badge.tsx),
-        // misal tombol on/off kategori yang mengikuti status Aktif/Nonaktif.
+        // Warna sama dengan ToneBadge "success" / "pending" (components/tone-badge.tsx).
+        // Hindari untuk tombol aksi yang bersebelahan dengan badge status,
+        // agar aksi tidak terbaca sebagai status.
         success:
           "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:hover:bg-emerald-950",
         pending:

@@ -114,7 +114,7 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
 
 function ProjectName({ project }: { project: ProjectFinanceRow }) {
   return (
-    <div style={projectAccentStyle(project.id)} className="project-accent flex min-w-0 items-center gap-3">
+    <div style={projectAccentStyle(project.id ? project.icon : null)} className="project-accent flex min-w-0 items-center gap-3">
       <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--project-strong) text-(--project-on)">
         <ProjectIcon name={project.icon} className="size-4" />
       </div>

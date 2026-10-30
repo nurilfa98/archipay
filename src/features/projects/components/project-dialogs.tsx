@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { ActionDialog } from "@/features/advances/components/action-dialog";
 import { setProjectStatus } from "@/features/projects/actions";
 import { MAX_CONTRACT_DIGITS, PROJECT_ICONS, type ProjectIconKey, type ProjectStatus } from "@/features/projects/constants";
+import { projectAccentStyle } from "./project-accent";
 import { ProjectIcon } from "./project-icon";
 
 export type EditableProject = {
@@ -113,9 +114,15 @@ export function ProjectFields({
 
       <FieldSet data-invalid={!!fieldError("icon")}>
         <FieldLegend variant="label">Ikon</FieldLegend>
+        <FieldDescription>Warna kartu project mengikuti ikon yang dipilih.</FieldDescription>
         <div className="grid grid-cols-6 gap-2">
           {PROJECT_ICONS.map((key) => (
-            <label key={key} className="cursor-pointer" title={key}>
+            <label
+              key={key}
+              className="project-accent cursor-pointer"
+              style={projectAccentStyle(key)}
+              title={key}
+            >
               <input
                 type="radio"
                 name="icon"
@@ -123,7 +130,7 @@ export function ProjectFields({
                 defaultChecked={(project?.icon ?? PROJECT_ICONS[0]) === key}
                 className="peer sr-only"
               />
-              <span className="flex aspect-square w-full items-center justify-center rounded-md border text-muted-foreground transition-colors hover:bg-muted peer-checked:border-brand peer-checked:bg-brand/10 peer-checked:text-brand peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
+              <span className="flex aspect-square w-full items-center justify-center rounded-md border border-(--project-border) text-(--project-strong) transition-colors hover:bg-(--project-soft) peer-checked:border-(--project-strong) peer-checked:bg-(--project-strong) peer-checked:text-(--project-on) peer-focus-visible:ring-2 peer-focus-visible:ring-ring">
                 <ProjectIcon name={key} className="size-5" />
               </span>
               <span className="sr-only">{key}</span>

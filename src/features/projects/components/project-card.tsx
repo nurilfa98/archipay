@@ -46,8 +46,8 @@ export function ProjectCard({
 
   return (
     <article
-      style={projectAccentStyle(card.id)}
-      className="project-accent group relative flex flex-col overflow-hidden rounded-xl bg-card text-sm ring-1 ring-foreground/10 transition-shadow focus-within:ring-2 focus-within:ring-(--project-strong) hover:ring-2 hover:ring-(--project-strong)"
+      style={projectAccentStyle(card.id ? card.icon : null)}
+      className="project-accent group relative flex flex-col overflow-hidden rounded-xl bg-card text-sm ring-1 ring-(--project-border) transition-shadow focus-within:ring-2 focus-within:ring-(--project-strong) hover:ring-2 hover:ring-(--project-strong)"
     >
       <div className="flex items-center gap-3 border-b border-(--project-border) bg-(--project-soft) p-4">
         <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-(--project-strong) text-(--project-on)">
