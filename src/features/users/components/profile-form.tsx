@@ -6,7 +6,8 @@
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
-import { startTransition, useActionState, useEffect, type FormEvent } from "react";
+import { startTransition, useActionState, type FormEvent } from "react";
+import { useActionResult } from "@/hooks/use-action-result";
 import { Button } from "@/components/ui/button";
 import { Field, FieldGroup } from "@/components/ui/field";
 import { updateOwnProfile } from "@/features/users/actions";
@@ -22,10 +23,10 @@ export function ProfileForm({ user }: { user: UserDetail }) {
   const error = state && !state.success ? state : undefined;
   const fieldError = (name: string) => error?.fieldErrors?.[name]?.[0];
 
-  useEffect(() => {
-    if (state?.success) notify.success("Profil disimpan.");
-    else if (state && !state.fieldErrors) notify.error(state.message);
-  }, [state]);
+  useActionResult(state, (result) => {
+    if (result.success) notify.success("Profil disimpan.");
+    else if (!result.fieldErrors) notify.error(result.message);
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

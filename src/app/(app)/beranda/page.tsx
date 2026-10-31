@@ -30,7 +30,7 @@ const RECENT_LIMIT = 5;
 export default function BerandaPage() {
   return (
     <>
-      <PageHeader title="Selamat datang di ArchiPay" description="Ringkasan uang muka." />
+      <PageHeader title="Beranda" description="Ringkasan uang muka." />
       <Suspense fallback={<DashboardSkeleton />}>
         <DashboardContent />
       </Suspense>

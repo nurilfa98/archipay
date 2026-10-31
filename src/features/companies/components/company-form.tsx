@@ -16,7 +16,8 @@
 import { LoaderCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, type FormEvent } from "react";
+import { startTransition, useActionState, type FormEvent } from "react";
+import { useActionResult } from "@/hooks/use-action-result";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,24 +34,23 @@ export function CompanyCreateForm() {
   const [state, formAction, pending] = useActionState(createCompany, undefined);
   const fieldError = (name: string) => (state && !state.success ? state.fieldErrors?.[name]?.[0] : undefined);
 
-  useEffect(() => {
-    if (!state) return;
-    if (!state.success) {
-      if (!state.fieldErrors) notify.error(state.message);
+  useActionResult(state, (result) => {
+    if (!result.success) {
+      if (!result.fieldErrors) notify.error(result.message);
       return;
     }
-    if (state.data.emailSent) {
-      notify.success(`Password sementara Owner sudah dikirim ke ${state.data.ownerEmail}.`, {
+    if (result.data.emailSent) {
+      notify.success(`Password sementara Owner sudah dikirim ke ${result.data.ownerEmail}.`, {
         title: "Company berhasil dibuat",
       });
     } else {
       notify.warning(
-        `Buka company ini, lalu di menu Pengguna tekan "Reset password" pada akun Owner untuk mengirim ulang password ke ${state.data.ownerEmail}.`,
+        `Buka company ini, lalu di menu Pengguna tekan "Reset password" pada akun Owner untuk mengirim ulang password ke ${result.data.ownerEmail}.`,
         { title: "Company dibuat, tetapi email Owner gagal dikirim", timeout: 10000 },
       );
     }
-    router.push(`/companies/${state.data.id}`);
-  }, [state, router]);
+    router.push(`/companies/${result.data.id}`);
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,10 +97,10 @@ export function CompanyEditForm({ company }: CompanyFormProps) {
   const [state, formAction, pending] = useActionState(updateCompany, undefined);
   const fieldError = (name: string) => (state && !state.success ? state.fieldErrors?.[name]?.[0] : undefined);
 
-  useEffect(() => {
-    if (state?.success) notify.success("Data company disimpan.");
-    else if (state && !state.fieldErrors) notify.error(state.message);
-  }, [state]);
+  useActionResult(state, (result) => {
+    if (result.success) notify.success("Data company disimpan.");
+    else if (!result.fieldErrors) notify.error(result.message);
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

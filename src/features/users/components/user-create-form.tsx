@@ -19,7 +19,8 @@
 import { LoaderCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useEffect, useState, type FormEvent } from "react";
+import { startTransition, useActionState, useState, type FormEvent } from "react";
+import { useActionResult } from "@/hooks/use-action-result";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
@@ -42,15 +43,14 @@ function CreateForm({ roles, onCreated }: { roles: AssignableRole[]; onCreated: 
   const error = state && !state.success ? state : undefined;
   const fieldError = (name: string) => error?.fieldErrors?.[name]?.[0];
 
-  useEffect(() => {
-    if (!state) return;
-    if (!state.success) {
-      if (!state.fieldErrors) notify.error(state.message);
+  useActionResult(state, (result) => {
+    if (!result.success) {
+      if (!result.fieldErrors) notify.error(result.message);
       return;
     }
-    showCreatedToast(state.data, () => router.push(`/users/${state.data.id}`));
+    showCreatedToast(result.data, () => router.push(`/users/${result.data.id}`));
     onCreated();
-  }, [state, router, onCreated]);
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

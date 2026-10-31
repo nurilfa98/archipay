@@ -1,10 +1,12 @@
 // Pembantu form langganan: useActionState + toast hasil simpan, sama seperti
 // form Pengaturan (company-settings-form.tsx). onSubmit + startTransition
-// dipakai agar isian tidak dikosongkan React saat validasi gagal.
+// dipakai agar isian tidak dikosongkan React saat validasi gagal. Toast lewat
+// useActionResult agar tidak muncul lagi saat kembali ke halaman ini.
 
 "use client";
 
-import { startTransition, useActionState, useEffect, type FormEvent } from "react";
+import { startTransition, useActionState, type FormEvent } from "react";
+import { useActionResult } from "@/hooks/use-action-result";
 import { notify } from "@/lib/notify";
 import type { ActionResult } from "@/types/action-result";
 
@@ -16,14 +18,12 @@ export function useFormAction(
   const [state, formAction, pending] = useActionState(action, undefined);
   const error = state && !state.success ? state : undefined;
 
-  useEffect(() => {
-    if (state?.success) {
+  useActionResult(state, (result) => {
+    if (result.success) {
       notify.success(successMessage);
       onSuccess?.();
-    } else if (state && !state.fieldErrors) notify.error(state.message);
-    // onSuccess sengaja tidak masuk dependency: cukup bereaksi pada hasil baru.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, successMessage]);
+    } else if (!result.fieldErrors) notify.error(result.message);
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

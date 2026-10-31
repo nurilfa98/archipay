@@ -13,7 +13,8 @@
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
-import { startTransition, useActionState, useEffect, type FormEvent } from "react";
+import { startTransition, useActionState, type FormEvent } from "react";
+import { useActionResult } from "@/hooks/use-action-result";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,10 +40,10 @@ export function UserEditForm({ user, roles }: { user: UserDetail; roles: Assigna
   const error = state && !state.success ? state : undefined;
   const fieldError = (name: string) => error?.fieldErrors?.[name]?.[0];
 
-  useEffect(() => {
-    if (state?.success) notify.success("Perubahan disimpan.");
-    else if (state && !state.fieldErrors) notify.error(state.message);
-  }, [state]);
+  useActionResult(state, (result) => {
+    if (result.success) notify.success("Perubahan disimpan.");
+    else if (!result.fieldErrors) notify.error(result.message);
+  });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

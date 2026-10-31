@@ -37,7 +37,7 @@ export default function MenuPage() {
 
 async function Greeting() {
   const user = await verifyAccount();
-  return `Halo, ${user.fullName.split(" ")[0]}`;
+  return `Selamat datang di ArchiPay, ${user.fullName.split(" ")[0]}`;
 }
 
 async function Menu() {
