@@ -78,7 +78,7 @@ export default function SettlementDetailPage({ params }: PageProps<"/settlements
 
 async function SettlementDetailContent({ id }: { id: string }) {
   const viewer = await requirePermission("advance:view-own");
-  const settlement = await getSettlementDetail(id);
+  const settlement = await getSettlementDetail(viewer.company.id, id);
   if (!settlement) notFound();
 
   const isRecipient = settlement.recipientId === viewer.id;
@@ -88,8 +88,8 @@ async function SettlementDetailContent({ id }: { id: string }) {
   const actions = getSettlementActions({ ...settlement, itemCount: items.length }, viewer);
   const verified = !!settlement.verifiedAt;
   const [categories, settings, ledger] = await Promise.all([
-    actions.edit ? listExpenseCategories() : [],
-    actions.edit ? getCompanySettings() : null,
+    actions.edit ? listExpenseCategories(viewer.company.id) : [],
+    actions.edit ? getCompanySettings(viewer.company.id) : null,
     verified ? listLedgerEntries(settlement.advanceId) : [],
   ]);
 

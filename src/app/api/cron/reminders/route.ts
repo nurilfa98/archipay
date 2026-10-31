@@ -1,5 +1,8 @@
-// GET /api/cron/reminders: menjalankan pengingat WhatsApp harian
-// (features/reminders/run.ts). Dipanggil penjadwal, bukan oleh user.
+// GET /api/cron/reminders: menjalankan pengingat harian, dipanggil
+// penjadwal (bukan oleh user):
+// - pengingat uang muka lewat WhatsApp (features/reminders/run.ts)
+// - pengingat masa aktif langganan H-3/H-1 ke Owner lewat WhatsApp & email
+//   (features/subscriptions/reminders.ts)
 //
 // Keamanan: wajib header `Authorization: Bearer <CRON_SECRET>`. Vercel Cron
 // mengirim header ini otomatis bila env CRON_SECRET diisi (jadwal di
@@ -15,6 +18,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runReminders } from "@/features/reminders/run";
+import { sendSubscriptionReminders } from "@/features/subscriptions/reminders";
 import { env } from "@/lib/env";
 
 export async function GET(request: Request) {
@@ -26,7 +30,8 @@ export async function GET(request: Request) {
   }
 
   const sent = await runReminders();
-  return NextResponse.json({ ok: true, sent }, { headers: { "Cache-Control": "no-store" } });
+  const subscriptionReminders = await sendSubscriptionReminders();
+  return NextResponse.json({ ok: true, sent, subscriptionReminders }, { headers: { "Cache-Control": "no-store" } });
 }
 
 // Perbandingan waktu-konstan agar secret tidak bisa ditebak dari lama respons.

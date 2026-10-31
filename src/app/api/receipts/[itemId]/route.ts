@@ -24,7 +24,8 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/receipts/[i
   const user = await getCurrentUser();
   if (!user || user.mustChangePassword) return new NextResponse("Unauthorized", { status: 401 });
 
-  const receipt = itemId.length <= 36 ? await getReceiptFile(itemId) : null;
+  // Hanya nota milik company yang sedang dibuka.
+  const receipt = user.company && itemId.length <= 36 ? await getReceiptFile(user.company.id, itemId) : null;
   // Tidak berhak = "tidak ditemukan", agar keberadaan file tidak bocor.
   const allowed = receipt && (receipt.recipientId === user.id || can(user, "advance:view-all"));
   if (!allowed || !receipt.fileKey) return new NextResponse("Not found", { status: 404 });

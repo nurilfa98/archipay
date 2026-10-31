@@ -12,7 +12,7 @@ import { and, eq, isNull, notInArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
-import { verifySession } from "@/lib/auth/dal";
+import { verifySession, type CompanyUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { db, isUniqueViolation } from "@/lib/db";
 import { advanceRequests, projects } from "@/lib/db/schema";
@@ -57,10 +57,11 @@ export async function createProject(formData: FormData): Promise<ActionResult> {
     await db.transaction(async (tx) => {
       const [created] = await tx
         .insert(projects)
-        .values({ ...parsed.data, createdById: actor.id })
+        .values({ ...parsed.data, companyId: actor.company.id, createdById: actor.id })
         .returning({ id: projects.id });
       await logAudit(
         {
+          companyId: actor.company.id,
           userId: actor.id,
           action: "PROJECT_CREATED",
           entityName: "projects",
@@ -89,7 +90,7 @@ export async function updateProject(projectId: string, formData: FormData): Prom
   const parsed = parseForm(formData);
   if (!parsed.success) return invalid(parsed.error);
 
-  return applyUpdate(actor.id, id.data, parsed.data);
+  return applyUpdate(actor, id.data, parsed.data);
 }
 
 export async function setProjectStatus(projectId: string, status: ProjectStatus): Promise<ActionResult> {
@@ -100,11 +101,11 @@ export async function setProjectStatus(projectId: string, status: ProjectStatus)
   const parsedStatus = projectStatusSchema.safeParse(status);
   if (!id.success || !parsedStatus.success) return NOT_FOUND;
 
-  return applyUpdate(actor.id, id.data, { status: parsedStatus.data });
+  return applyUpdate(actor, id.data, { status: parsedStatus.data });
 }
 
 async function applyUpdate(
-  actorId: string,
+  actor: CompanyUser,
   projectId: string,
   values: Partial<{
     name: string;
@@ -126,7 +127,7 @@ async function applyUpdate(
           status: projects.status,
         })
         .from(projects)
-        .where(eq(projects.id, projectId))
+        .where(and(eq(projects.id, projectId), eq(projects.companyId, actor.company.id)))
         .limit(1);
       if (!before) return false;
 
@@ -139,7 +140,8 @@ async function applyUpdate(
       await tx.update(projects).set(values).where(eq(projects.id, projectId));
       await logAudit(
         {
-          userId: actorId,
+          companyId: actor.company.id,
+          userId: actor.id,
           action: "PROJECT_UPDATED",
           entityName: "projects",
           entityId: projectId,
@@ -177,7 +179,7 @@ export async function assignAdvanceProject(advanceId: string, projectId: string)
   if (!advance.success) return { success: false, message: "Uang muka tidak ditemukan." };
   if (!projectParsed.success) return { success: false, message: "Pilih project." };
 
-  const project = await getActiveProject(projectParsed.data);
+  const project = await getActiveProject(actor.company.id, projectParsed.data);
   if (!project) return { success: false, message: "Project tidak ditemukan atau sudah selesai." };
 
   const ip = await getClientIp();
@@ -188,6 +190,7 @@ export async function assignAdvanceProject(advanceId: string, projectId: string)
       .where(
         and(
           eq(advanceRequests.id, advance.data),
+          eq(advanceRequests.companyId, actor.company.id),
           isNull(advanceRequests.projectId),
           notInArray(advanceRequests.status, ["CLOSED", "REJECTED", "CANCELLED"]),
         ),
@@ -197,6 +200,7 @@ export async function assignAdvanceProject(advanceId: string, projectId: string)
 
     await logAudit(
       {
+        companyId: actor.company.id,
         userId: actor.id,
         action: "ADVANCE_PROJECT_ASSIGNED",
         entityName: "advance_requests",

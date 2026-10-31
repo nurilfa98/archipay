@@ -12,7 +12,7 @@
 import "server-only";
 import { eq, sql } from "drizzle-orm";
 import { logAudit, type AuditAction } from "@/lib/audit";
-import type { CurrentUser } from "@/lib/auth/dal";
+import type { CompanyUser } from "@/lib/auth/dal";
 import { db } from "@/lib/db";
 import { advanceLedgerEntries, advanceRequests } from "@/lib/db/schema";
 import { getClientIp } from "@/lib/request";
@@ -26,7 +26,7 @@ export type BalanceEntryResult =
   | { ok: false; reason: "EXCEEDS"; outstanding: number };
 
 export async function postBalanceEntry(input: {
-  actor: CurrentUser;
+  actor: CompanyUser;
   advanceId: string;
   settlementId: string;
   type: BalanceEntryType;
@@ -58,6 +58,7 @@ export async function postBalanceEntry(input: {
 
     const signed = input.type === "REIMBURSEMENT" ? input.amount : -input.amount;
     await tx.insert(advanceLedgerEntries).values({
+      companyId: input.actor.company.id,
       advanceId: input.advanceId,
       type: input.type,
       amount: signed,
@@ -75,6 +76,7 @@ export async function postBalanceEntry(input: {
 
     await logAudit(
       {
+        companyId: input.actor.company.id,
         userId: input.actor.id,
         action: input.audit,
         entityName: "settlements",

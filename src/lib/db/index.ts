@@ -32,3 +32,13 @@ export function isUniqueViolation(error: unknown) {
   const code = (e: unknown) => (e as { code?: unknown } | null)?.code;
   return code(error) === "23505" || code((error as { cause?: unknown } | null)?.cause) === "23505";
 }
+
+// Nama constraint yang dilanggar (postgres.js: `constraint_name`), untuk
+// membedakan misalnya "nama company sudah ada" dan "email sudah dipakai" dalam
+// satu transaksi. Null bila bukan unique violation.
+export function violatedConstraint(error: unknown): string | null {
+  if (!isUniqueViolation(error)) return null;
+  const name = (e: unknown) => (e as { constraint_name?: unknown } | null)?.constraint_name;
+  const value = name(error) ?? name((error as { cause?: unknown } | null)?.cause);
+  return typeof value === "string" ? value : null;
+}

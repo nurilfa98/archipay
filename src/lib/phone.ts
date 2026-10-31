@@ -16,8 +16,25 @@ export function normalizeIndonesianPhone(input: string) {
   return /^628\d{7,12}$/.test(normalized) ? normalized : null;
 }
 
-// "6281234567890" → "+62 812-3456-7890" (hanya untuk tampilan)
+// Tampilan nomor: format lokal, strip tiap 4 digit agar mudah dibaca
+// (mengikuti SakuDagang): "6285714325506" → "0857-1432-5506". Dipakai di
+// tabel, detail, dan sebagai nilai awal input.
 export function formatPhone(phone: string) {
-  const local = phone.slice(2);
-  return `+62 ${local.slice(0, 3)}-${local.slice(3, 7)}-${local.slice(7)}`;
+  const local = phone.startsWith("62") ? `0${phone.slice(2)}` : phone;
+  return groupDigits(local, 4);
+}
+
+// Format sambil mengetik (components/phone-input.tsx): hanya angka, strip
+// otomatis tiap 4 digit, maksimal 13 digit (0 + 12). Pengguna tidak perlu
+// mengetik strip sendiri; server tetap membaca angkanya saja.
+export function formatPhoneInput(raw: string) {
+  const digits = raw.replace(/\D/g, "").slice(0, 13);
+  return groupDigits(digits, 4);
+}
+
+// "085714325506" → "0857-1432-5506"; sisa digit menempel di kelompok terakhir.
+export function groupDigits(digits: string, size: number, separator = "-") {
+  const groups: string[] = [];
+  for (let index = 0; index < digits.length; index += size) groups.push(digits.slice(index, index + size));
+  return groups.join(separator);
 }

@@ -92,11 +92,12 @@ export default function AdvancesPage({ searchParams }: PageProps<"/advances">) {
 // - FINANCE        : Ajukan untuk saya (pull) + Usulkan pencairan (push)
 // - Karyawan       : Ajukan uang muka (pull)
 async function AdvanceHeaderActions({ searchParams }: Pick<PageProps<"/advances">, "searchParams">) {
-  const scope = await resolveProjectScope(readProjectParam(await searchParams));
+  const user = await verifySession();
+  const companyId = user.company.id;
+  const scope = await resolveProjectScope(companyId, readProjectParam(await searchParams));
   if (scope.kind !== "project" || scope.project.status !== "ACTIVE") return null;
   const projectId = scope.project.id;
 
-  const user = await verifySession();
   const direct = can(user, "advance:disburse");
   const push = direct || can(user, "advance:propose");
   const request = can(user, "advance:request");
@@ -108,8 +109,8 @@ async function AdvanceHeaderActions({ searchParams }: Pick<PageProps<"/advances"
   let blocked: { overdue: number; limit: number } | null = null;
   if (request) {
     const [overdueCounts, { maxOverdueAdvances }] = await Promise.all([
-      countOverdueAdvances([user.id]),
-      getCompanySettings(),
+      countOverdueAdvances(companyId, [user.id]),
+      getCompanySettings(companyId),
     ]);
     const overdue = overdueCounts[user.id] ?? 0;
     if (overdue >= maxOverdueAdvances) blocked = { overdue, limit: maxOverdueAdvances };
@@ -144,8 +145,9 @@ async function AdvanceHeaderActions({ searchParams }: Pick<PageProps<"/advances"
 // kerangka halaman tetap statis. Filter riwayat: ?project=&year=&month=&status=
 async function AdvancesContent({ searchParams }: Pick<PageProps<"/advances">, "searchParams">) {
   const user = await requirePermission("advance:view-own");
+  const companyId = user.company.id;
   const params = await searchParams;
-  const scope = await resolveProjectScope(readProjectParam(params));
+  const scope = await resolveProjectScope(companyId, readProjectParam(params));
 
   // Uang muka selalu dibuka dari kartu project; tanpa project yang valid
   // kembali ke halaman Project.
@@ -159,11 +161,13 @@ async function AdvancesContent({ searchParams }: Pick<PageProps<"/advances">, "s
   const [open, history, years] = await Promise.all([
     // "Perlu tindakan" tidak ikut filter periode: tugas yang tertunda selalu tampil.
     listAdvances({
+      companyId,
       recipientId,
       project: projectFilter,
       statuses: ["PENDING_APPROVAL", "APPROVED", "DISBURSED"],
     }),
     listAdvances({
+      companyId,
       recipientId,
       project: projectFilter,
       year: filters.year,
@@ -171,7 +175,7 @@ async function AdvancesContent({ searchParams }: Pick<PageProps<"/advances">, "s
       statuses: filters.status ? [filters.status] : undefined,
       limit: HISTORY_LIMIT,
     }),
-    listAdvanceYears({ recipientId, project: projectFilter }),
+    listAdvanceYears({ companyId, recipientId, project: projectFilter }),
   ]);
   // Tahun dari URL tetap muncul di pilihan walau belum ada datanya.
   const yearOptions =

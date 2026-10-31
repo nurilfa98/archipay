@@ -57,9 +57,12 @@ export type AuditAction =
   | "PAYROLL_DEDUCTION_RECORDED"
   | "SETTINGS_UPDATED"
   | "EXPENSE_CATEGORY_CREATED"
-  | "EXPENSE_CATEGORY_UPDATED";
+  | "EXPENSE_CATEGORY_UPDATED"
+  | "SUBSCRIPTION_PAYMENT_CLAIMED";
 
 type AuditEntry = {
+  // Company tempat kejadian (halaman Audit Log menyaring per company).
+  companyId: string | null;
   userId: string | null; // pelaku
   action: AuditAction;
   entityName: string; // nama tabel yang terdampak, misal "users"

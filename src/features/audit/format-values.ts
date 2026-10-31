@@ -34,6 +34,8 @@ const label =
 const LOGIN_FAILED_REASONS: Record<string, string> = {
   WRONG_PASSWORD: "Password salah",
   INACTIVE: "Akun nonaktif",
+  COMPANY_INACTIVE: "Company nonaktif",
+  SUBSCRIPTION_LOCKED: "Langganan company terkunci",
 };
 
 // Urutan di sini = urutan tampil. Field yang tidak terdaftar tetap
@@ -64,6 +66,7 @@ const FIELDS: Record<string, { label: string; format?: Formatter }> = {
   purpose: { label: "Keperluan" },
   type: { label: "Jenis", format: label(LEDGER_ENTRY_LABELS) },
   amount: { label: "Nominal", format: rupiah },
+  plan: { label: "Paket langganan" },
   disbursementMethod: { label: "Metode pencairan", format: label(DISBURSEMENT_METHOD_LABELS) },
   method: { label: "Metode", format: label(LEDGER_METHOD_LABELS) },
   destinationBankName: { label: "Bank tujuan" },

@@ -36,9 +36,9 @@ const COLUMNS = [
 export async function GET() {
   const user = await getCurrentUser();
   if (!user || user.mustChangePassword) return new NextResponse("Unauthorized", { status: 401 });
-  if (!can(user, "payroll:view")) return new NextResponse("Forbidden", { status: 403 });
+  if (!can(user, "payroll:view") || !user.company) return new NextResponse("Forbidden", { status: 403 });
 
-  const candidates = await listPayrollCandidates();
+  const candidates = await listPayrollCandidates(user.company.id);
   if (candidates.length === 0) {
     return new NextResponse("Belum ada sisa uang muka yang perlu dipotong dari gaji.", {
       status: 409,

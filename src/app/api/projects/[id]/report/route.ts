@@ -22,11 +22,11 @@ const PRIVATE_HEADERS = { "Cache-Control": "private, no-store", "X-Content-Type-
 export async function GET(_request: Request, ctx: RouteContext<"/api/projects/[id]/report">) {
   const user = await getCurrentUser();
   if (!user || user.mustChangePassword) return new NextResponse("Unauthorized", { status: 401 });
-  if (!can(user, "project:manage")) return new NextResponse("Forbidden", { status: 403 });
+  if (!can(user, "project:manage") || !user.company) return new NextResponse("Forbidden", { status: 403 });
 
   const { id } = await ctx.params;
   const parsedId = projectIdSchema.safeParse(id);
-  const report = parsedId.success ? await getProjectReport(parsedId.data) : null;
+  const report = parsedId.success ? await getProjectReport(user.company.id, parsedId.data) : null;
   if (!report) return new NextResponse("Project tidak ditemukan.", { status: 404, headers: PRIVATE_HEADERS });
 
   const now = new Date();

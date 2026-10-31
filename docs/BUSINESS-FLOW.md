@@ -5,7 +5,7 @@ Acuan untuk memahami cara kerja **Uang Muka** (kas bon operasional) dan
 melakukan apa, kapan, dan apa akibatnya. Dokumen ini menjelaskan aturan
 bisnis; struktur kode ada di [ARCHITECTURE.md](./ARCHITECTURE.md).
 
-Ditulis berdasarkan kode per 30 Oktober 2026. Bila aturan di kode berubah,
+Ditulis berdasarkan kode per 31 Oktober 2026. Bila aturan di kode berubah,
 perbarui dokumen ini juga. Sumber kebenaran aturan:
 
 | Aturan | File |
@@ -16,6 +16,7 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 | Daftar & arti status | `src/features/advances/constants.ts` |
 | Pengingat otomatis | `src/features/reminders/run.ts` |
 | Project (kartu pilihan, kelola, menetapkan project) | `src/features/projects/` |
+| Company (klien), masuk company untuk Superadmin | `src/features/companies/`, `src/lib/auth/dal.ts` |
 
 ---
 
@@ -23,6 +24,7 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 
 | Istilah | Arti |
 |---|---|
+| **Company** | Klien ArchiPay (perusahaan pengguna). Semua data (pengguna, project, uang muka, pengaturan, audit log) milik satu company dan tidak terlihat company lain. Dibuat Superadmin (lihat bagian 16). |
 | **Project** | Pengelompok uang muka, mis. "Renovasi Gedung A". Uang muka selalu diajukan di dalam satu project. Dikelola Owner (lihat bagian 15). |
 | **Uang muka** (UM) | Dana operasional yang diserahkan kantor ke karyawan sebelum dipakai. Nomor: `UM-2026-10-0001`. |
 | **Pertanggungjawaban** (PJ) | Laporan karyawan berisi nota-nota pemakaian uang muka. Satu uang muka = satu laporan. Nomor: `PJ-2026-10-0001`. |
@@ -38,7 +40,9 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 ## 2. Peran & hak akses
 
 Satu user boleh punya lebih dari satu role; haknya digabung. Urutan
-pendaftaran akun: **Superadmin → Owner → karyawan** (Finance & Karyawan).
+pendaftaran akun: **Superadmin → Company + Owner → karyawan** (Finance &
+Karyawan). Owner, Finance, dan Karyawan selalu milik satu company; Superadmin
+tidak terikat company mana pun.
 
 | Kemampuan | Superadmin | Owner | Finance | Karyawan |
 |---|:---:|:---:|:---:|:---:|
@@ -57,13 +61,17 @@ pendaftaran akun: **Superadmin → Owner → karyawan** (Finance & Karyawan).
 | Pengguna: kelola akun Finance & Karyawan | ✓ | ✓ | | |
 | Pengguna: kelola akun Owner (termasuk memberi/mencabut role Owner) | ✓ | | | |
 | Pengaturan, Audit Log | ✓ | ✓ | | |
+| Company: tambah, ubah, aktif/nonaktif, masuk ke company | ✓ | | | |
+| Tagihan & Pengaturan platform (verifikasi bayar, harga, rekening, QRIS) | ✓ | | | |
+| Langganan company sendiri (pilih paket, kirim bukti bayar) | | ✓ | | |
 
 ¹ Owner selalu memakai jalur "cair langsung", jadi praktis tidak pernah mengusulkan.
 
 ### Superadmin
 
 - Dibuat lewat script `pnpm db:create-superadmin`, tidak bisa dibuat dari aplikasi.
-- Membuka semua menu dan melihat semua data, tetapi **tidak melakukan transaksi uang** (mencairkan, menyetujui, memverifikasi nota, mencatat pengembalian/penggantian, potong gaji).
+- Mengelola company (menu **Company**), yang juga menjadi halaman pertama setelah login. Company tampil sebagai kartu (klik kartu = detail company) dengan pencarian nama company/Owner dan saring status. Untuk melihat data sebuah company, Superadmin menekan **Buka** pada kartu atau detail company itu; selama company dibuka, pita "Melihat company …" tampil di bawah header dengan tombol Ganti/Keluar, satu-satunya jalan kembali ke halaman Company (menu Company tidak ada di kotak menu company, dan halaman Company tidak punya tombol kembali ke menu). Kolom ✓ Superadmin di tabel atas berlaku untuk company yang sedang dibuka.
+- Membuka semua menu company dan melihat semua datanya, tetapi **tidak melakukan transaksi uang** (mencairkan, menyetujui, memverifikasi nota, mencatat pengembalian/penggantian, potong gaji).
 - **Tidak tampil di UI mana pun**: daftar Pengguna, filter Pelaku di Audit Log, pilihan penerima uang muka, daftar penyetuju, kontak WhatsApp, dan nama "terakhir diubah" di Pengaturan.
 - **Tindakannya tidak dicatat ke audit log**, termasuk login/logout dan percobaan login gagal ke akunnya.
 
@@ -332,7 +340,8 @@ atau atas layar di HP).
 
 ## 11. Pengguna & akun
 
-- Akun superadmin dibuat lewat script `pnpm db:create-superadmin`. Superadmin mendaftarkan Owner, lalu Owner mendaftarkan Finance & Karyawan di menu **Pengguna** (nama, email, role awal); password sementara dikirim lewat email dan wajib diganti saat login pertama.
+- Akun superadmin dibuat lewat script `pnpm db:create-superadmin`. Superadmin membuat company beserta Owner pertamanya (menu **Company**); Owner tambahan dibuat Superadmin dari menu **Pengguna** setelah membuka company itu. Owner lalu mendaftarkan Finance & Karyawan di menu **Pengguna** (nama, email, role awal); password sementara dikirim lewat email dan wajib diganti saat login pertama.
+- Pengguna baru selalu masuk ke company yang sedang dibuka. Email unik di seluruh ArchiPay: satu email = satu akun = satu company, sehingga layar login tetap email + password.
 - Owner hanya bisa mengelola akun tanpa role Owner. Akun Owner (termasuk miliknya sendiri) tampil baca saja; data sendiri diubah lewat menu **Profil**. Role Owner hanya bisa diberikan/dicabut superadmin.
 - Nomor WhatsApp dan rekening bank diisi Owner di halaman edit pengguna. Tanpa nomor, pengguna tidak menerima WhatsApp; tanpa rekening, pencairan Transfer menampilkan peringatan.
 - **Reset password**: password sementara baru dikirim lewat email, dan pengguna keluar dari semua perangkat.
@@ -424,7 +433,170 @@ Kartu "Tanpa project" tidak punya PDF karena tidak punya nilai kontrak.
 
 ---
 
-## 16. Catatan terbuka
+## 16. Company (multi-tenant)
+
+ArchiPay melayani banyak klien dalam satu aplikasi. Setiap klien adalah satu
+**company**.
+
+- **Dibuat Superadmin** di menu Company → Tambah company: nama, alamat,
+  telepon/WhatsApp kantor, serta nama & email **Owner pertama**. Bersamaan
+  dengan itu dibuat pengaturan bawaan (nota 3 hari, pengembalian 3 hari,
+  tanpa nota maks. Rp50.000, maks. 2 uang muka tertunda) dan 6 kategori biaya
+  awal, yang bisa diubah Owner di Pengaturan.
+- **Data terpisah penuh**: pengguna, project, uang muka, pertanggungjawaban,
+  potong gaji, pengaturan, kategori biaya, dan audit log selalu disaring per
+  company di server. Membuka id milik company lain hasilnya "tidak ditemukan".
+- **Nomor dokumen per company**: setiap company punya urutan `UM-…`/`PJ-…`
+  sendiri, mulai dari 0001 setiap bulan. Nama project dan kategori, serta
+  pengecekan "nota sudah pernah diunggah", juga berlaku per company.
+- **Nonaktifkan company** (detail company → Status): semua pengguna company
+  itu tidak bisa login dan sesi yang berjalan berhenti; layar login
+  menampilkan "Akses company Anda sedang dinonaktifkan". Pengingat WhatsApp
+  untuk company nonaktif tidak dikirim. Data tetap utuh dan kembali terbuka
+  saat diaktifkan lagi. Company tidak bisa dihapus.
+- **Warna kartu company** (menu Company) = status klien, satu status satu
+  warna & ikon (`features/companies/status.ts`): **Masa gratis** indigo
+  (hadiah), **Aktif** hijau (centang), **Tenggang** kuning (jam pasir),
+  **Terkunci** merah (gembok), **Nonaktif** abu-abu (tombol daya). Chip
+  saring di atas kartu memakai titik warna yang sama sebagai keterangan,
+  ditambah chip **Segera habis** (masa aktif ≤ 7 hari). Kartu diurutkan dari
+  yang perlu tindakan: Terkunci, Tenggang, Segera habis, lalu lainnya.
+- **Halaman platform Superadmin** berpindah lewat tab: **Company**,
+  **Tagihan**, **Pengaturan platform** (lihat bagian 17).
+- **Zona waktu** masih satu untuk semua company (`APP_TIMEZONE`).
+
+---
+
+## 17. Langganan
+
+Mekanismenya sama dengan SakuDagang. Kode: `src/features/subscriptions/`,
+aturan akses `src/lib/subscription-access.ts` & `src/lib/auth/dal.ts`.
+
+### 17.1 Aturan dasar
+
+- **Masa gratis** untuk setiap company baru, lamanya diatur Superadmin di
+  Pengaturan platform (bawaan **14 hari**) sejak company dibuat, dengan
+  **batas pengguna masa gratis** (bawaan **10 pengguna aktif**).
+- **Harga dasar + per pengguna** (keputusan 31 Okt 2026, menggantikan harga
+  flat), diatur di Pengaturan platform (`features/subscriptions/pricing.ts`):
+
+  ```
+  harga per bulan = harga dasar + max(0, pengguna − termasuk) × harga per pengguna tambahan
+  paket N bulan   = harga per bulan × N × (100 − diskon N bulan) / 100
+  ```
+
+  Contoh dengan harga dasar Rp149.000 termasuk 10 pengguna, tambahan
+  Rp10.000/pengguna, diskon 6 bulan 10% & 1 tahun 20%: 25 pengguna = Rp299.000
+  per bulan; paket 1 tahun = Rp2.870.400 (setara Rp239.200/bulan). Harga 6
+  bulan & 1 tahun **tidak diketik**, selalu hasil hitungan; Pengaturan
+  platform menampilkan tabel simulasinya. Harga dasar 0 = paket belum dijual.
+- **Pengguna yang dihitung**: pengguna **aktif** company (Owner, Finance,
+  Karyawan). Pengguna nonaktif dan Superadmin tidak dihitung.
+- **Batas pengguna** (`companies.user_limit`): jumlah pengguna yang dibeli di
+  paket terakhir yang lunas (atau batas masa gratis). Menambah pengguna baru
+  atau mengaktifkan kembali pengguna yang melewati batas **ditolak**: "Batas N
+  pengguna aktif paket company ini sudah penuh. Nonaktifkan pengguna lain atau
+  tambah kuota pengguna di menu Langganan." Halaman Pengguna menampilkan
+  "Pengguna aktif X dari batas paket N".
+- **Tambah kuota** di tengah masa langganan aktif: Owner membeli tambahan
+  pengguna seharga `tambahan × harga per pengguna × sisa hari / 30`
+  (dibulatkan ke atas per Rp100, tanpa diskon), diverifikasi seperti tagihan
+  biasa; setelah lunas batas bertambah, masa aktif tetap. Tidak tersedia
+  selama masa gratis/tenggang/terkunci (beli paket baru dengan jumlah
+  pengguna baru).
+- **Harga khusus per company** (hasil negosiasi) di detail company →
+  Langganan: harga dasar, jumlah pengguna termasuk, dan/atau harga per
+  pengguna tambahan; isian kosong mengikuti standar. Diskon selalu standar.
+- **Masa tenggang** (bawaan **3 hari**) setelah masa aktif habis: aplikasi
+  tetap bisa dipakai dengan spanduk merah. Lewat itu company **terkunci**.
+
+### 17.2 Status company
+
+| Status | Syarat | Akibat |
+|---|---|---|
+| Masa gratis | belum pernah lunas, masa aktif masih berjalan | normal; spanduk kuning mulai H-7 |
+| Aktif | pernah lunas, masa aktif masih berjalan | normal; spanduk kuning mulai H-7 |
+| Tenggang | masa aktif habis, belum lewat masa tenggang | normal; spanduk merah |
+| Terkunci | lewat masa tenggang | **Owner** hanya bisa membuka menu Langganan; **Finance & Karyawan tidak bisa login** ("Masa berlangganan ArchiPay company Anda sudah habis. Hubungi Owner…"); **Superadmin** tetap bisa membuka company itu |
+| Nonaktif | saklar manual Superadmin (bagian 16) | semua user tidak bisa login, apa pun status langganannya |
+
+Status dihitung dari `companies.subscription_until` setiap request, jadi
+tidak perlu job harian untuk mengunci.
+
+### 17.3 Alur berlangganan (Owner, menu Langganan)
+
+1. Owner membuka **Langganan**: status, masa aktif, dan "pengguna aktif X
+   dari batas N". Owner mengisi **jumlah pengguna** yang dibutuhkan (minimal
+   jumlah yang termasuk harga dasar dan tidak kurang dari pengguna aktif
+   saat ini); tiga kartu paket langsung menghitung total, setara per bulan,
+   hemat %, dan "maksimal N pengguna aktif".
+2. Memilih paket → tampil nominal, rekening bank ArchiPay (bisa lebih dari
+   satu) dan/atau QRIS statis, serta form **"Saya sudah bayar"**. Memilih
+   paket tidak menyimpan apa pun.
+3. Owner mengunggah **bukti transfer** (wajib, foto/PDF maks. 4 MB) + catatan
+   opsional → tagihan tercatat **Menunggu verifikasi**. Harga dihitung ulang di
+   server dan disimpan sebagai snapshot. Admin ArchiPay mendapat WhatsApp
+   (nomor di Pengaturan platform). Klaim tidak mengubah akses. Satu tagihan
+   terbuka per company.
+4. Superadmin memverifikasi (bagian 17.4). Bila **Kurang bayar**, Owner
+   melihat "diterima Rp X dari Rp Y" dan mengirim bukti kekurangan **pada
+   tagihan yang sama**.
+5. **Perpanjangan** dihitung dari tanggal berakhir yang sedang berjalan bila
+   masih di masa depan; bila sudah lewat (termasuk masa tenggang), dari saat
+   lunas. Membayar lebih awal tidak merugikan.
+
+Tidak ada tombol batalkan, baik untuk Owner maupun Superadmin: setiap tagihan
+adalah klaim dengan bukti.
+
+### 17.4 Verifikasi (Superadmin)
+
+- **Menu Tagihan**: kotak masuk semua company, tab *Menunggu verifikasi*
+  (bawaan), *Kurang bayar*, *Riwayat*. Jumlah yang menunggu tampil di tab dan
+  sebagai pita di halaman Company.
+- Untuk tiap pembayaran: **Terima** dengan mengisi nominal yang benar-benar
+  masuk (total ≥ harga → **Lunas**, masa aktif diperpanjang; kurang → **Kurang
+  bayar**), atau **Tolak** dengan alasan wajib (belum ada pembayaran diterima
+  → tagihan **Ditolak**, Owner mulai lagi dari pilihan paket; sudah ada →
+  kembali Kurang bayar).
+- **Detail company → Langganan**: masa aktif & pengguna aktif/batas, tagihan
+  company itu (bisa diverifikasi juga di sini), harga khusus, dan **Catat
+  pembayaran langsung** (pilih paket + jumlah pengguna, harga otomatis) →
+  langsung lunas.
+- **Pengaturan platform**: komponen harga + tabel simulasi, masa gratis &
+  tenggang, batas pengguna masa gratis, WhatsApp admin, rekening bank,
+  gambar QRIS.
+- Kartu company menampilkan "pengguna aktif/batas", misalnya 12/25 pengguna.
+
+### 17.5 Pemberitahuan ke Owner (WhatsApp + email)
+
+Dikirim ke semua Owner aktif company: WhatsApp bila nomornya ada, dan email.
+
+- Hasil verifikasi: **lunas** (masa aktif sampai …), **kurang bayar**
+  (diterima Rp X, kurang Rp Y), **ditolak** (beserta alasan).
+- Pengingat **H-3 dan H-1** sebelum masa gratis/langganan habis, lewat cron
+  harian yang sama dengan pengingat uang muka (`/api/cron/reminders`).
+  `companies.last_reminder_key` mencegah kiriman dobel.
+
+### 17.6 Data
+
+| Tabel | Isi |
+|---|---|
+| `companies` (+kolom) | `subscription_until` (akhir masa gratis/langganan), `user_limit` (batas pengguna aktif), `last_reminder_key` |
+| `platform_settings` | Satu baris: WhatsApp admin, gambar QRIS, masa gratis, masa tenggang |
+| `payment_bank_accounts` | Rekening tujuan transfer langganan |
+| `platform_settings` (+kolom harga) | Harga dasar, pengguna termasuk, harga per pengguna tambahan, diskon 6 & 12 bulan, batas pengguna masa gratis |
+| `company_pricing` | Harga khusus per company (per komponen; NULL = standar) |
+| `subscriptions` | Satu baris per tagihan: jenis `PLAN` (paket N bulan untuk N pengguna) atau `TOPUP` (tambah kuota), harga (snapshot), total diterima, periode, status `CLAIMED`/`UNDERPAID`/`ACTIVE`/`REJECTED` |
+| `subscription_payments` | Satu baris per bukti/pembayaran: bukti (R2, `<companyId>/subscription-proofs/…`), nominal diterima, keterangan/alasan admin |
+
+Bukti transfer hanya bisa dibuka Superadmin dan Owner company tersebut
+(`/api/subscription-payments/<id>/proof`). Owner yang mengirim bukti
+tercatat di Audit Log ("Kirim bukti bayar langganan"); tindakan Superadmin
+tidak dicatat.
+
+---
+
+## 18. Catatan terbuka
 
 Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 

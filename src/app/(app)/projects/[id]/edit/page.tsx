@@ -38,9 +38,9 @@ export default function EditProjectPage({ params }: PageProps<"/projects/[id]/ed
 }
 
 async function EditProjectContent({ params }: Pick<PageProps<"/projects/[id]/edit">, "params">) {
-  await requirePermission("project:manage");
+  const user = await requirePermission("project:manage");
   const parsed = projectIdSchema.safeParse((await params).id);
-  const project = parsed.success ? await getProjectForEdit(parsed.data) : null;
+  const project = parsed.success ? await getProjectForEdit(user.company.id, parsed.data) : null;
   if (!project) notFound();
 
   return (

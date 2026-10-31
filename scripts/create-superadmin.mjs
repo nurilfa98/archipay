@@ -4,9 +4,10 @@
 // Cara pakai (jalankan setelah pnpm db:migrate):
 //   pnpm db:create-superadmin admin@archipay.id passwordRahasia "Nama Superadmin"
 //
-// Urutannya: superadmin mendaftarkan Owner dari halaman Pengguna, lalu Owner
-// mendaftarkan Finance & Karyawan. Akun superadmin tidak tampil di UI mana pun
-// dan tindakannya tidak dicatat ke audit log.
+// Urutannya: superadmin membuat company (klien) beserta Owner pertamanya di
+// menu Company, lalu Owner mendaftarkan Finance & Karyawan. Superadmin tidak
+// terikat company mana pun (users.company_id NULL), tidak tampil di UI mana
+// pun, dan tindakannya tidak dicatat ke audit log.
 //
 // Catatan: password yang diketik di terminal tersimpan di riwayat shell.
 // Setelah login, ganti password lewat menu user → "Ganti password".

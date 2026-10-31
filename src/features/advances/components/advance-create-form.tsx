@@ -50,6 +50,7 @@ import {
   type DisbursementMethod,
 } from "@/features/advances/constants";
 import type { RecipientOption } from "@/features/advances/queries";
+import { formatAccountNumber } from "@/lib/bank";
 import { formatRupiah } from "@/lib/format";
 
 type Mode = "direct" | "propose" | "request";
@@ -329,7 +330,7 @@ function DestinationAccount({ recipient, isSelf }: { recipient: RecipientOption;
     <div className="rounded-lg border bg-muted/40 p-3 text-sm">
       <p className="text-muted-foreground">Rekening tujuan</p>
       <p className="font-medium">
-        {recipient.bankName} · {recipient.bankAccountNumber}
+        {recipient.bankName} · {formatAccountNumber(recipient.bankName, recipient.bankAccountNumber)}
       </p>
       <p className="text-muted-foreground">
         Sesuai data rekening {isSelf ? "Anda" : recipient.fullName} di menu Pengguna.

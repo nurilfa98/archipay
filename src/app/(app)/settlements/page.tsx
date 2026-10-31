@@ -59,8 +59,9 @@ export default function SettlementsPage({ searchParams }: PageProps<"/settlement
 async function SettlementsContent({ searchParams }: Pick<PageProps<"/settlements">, "searchParams">) {
   // Melihat cukup advance:view-own (superadmin melihat tanpa bisa mengunggah nota).
   const user = await requirePermission("advance:view-own");
+  const companyId = user.company.id;
   const params = await searchParams;
-  const scope = await resolveProjectScope(readProjectParam(params));
+  const scope = await resolveProjectScope(companyId, readProjectParam(params));
 
   // Pertanggungjawaban selalu dibuka dari kartu project; tanpa project yang
   // valid kembali ke halaman Project.
@@ -73,8 +74,14 @@ async function SettlementsContent({ searchParams }: Pick<PageProps<"/settlements
 
   const [todos, history, years] = await Promise.all([
     // "Perlu tindakan" tidak ikut filter periode: tugas yang tertunda selalu tampil.
-    listSettlementTodos({ id: user.id, canVerify: can(user, "settlement:verify"), project: projectFilter }),
+    listSettlementTodos({
+      id: user.id,
+      companyId,
+      canVerify: can(user, "settlement:verify"),
+      project: projectFilter,
+    }),
     listSettlements({
+      companyId,
       recipientId,
       project: projectFilter,
       year: filters.year,
@@ -82,7 +89,7 @@ async function SettlementsContent({ searchParams }: Pick<PageProps<"/settlements
       advanceStatuses: filters.status ? [toAdvanceStatus(filters.status)] : undefined,
       limit: HISTORY_LIMIT,
     }),
-    listSettlementYears({ recipientId, project: projectFilter }),
+    listSettlementYears({ companyId, recipientId, project: projectFilter }),
   ]);
   const yearOptions =
     filters.year && !years.includes(filters.year) ? [filters.year, ...years].sort((a, b) => b - a) : years;

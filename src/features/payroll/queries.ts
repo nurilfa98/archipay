@@ -34,7 +34,7 @@ export type PayrollCandidate = {
   outstanding: number; // sisa yang belum kembali (positif)
 };
 
-export async function listPayrollCandidates(): Promise<PayrollCandidate[]> {
+export async function listPayrollCandidates(companyId: string): Promise<PayrollCandidate[]> {
   await io();
   const rows = await db
     .select({
@@ -51,7 +51,13 @@ export async function listPayrollCandidates(): Promise<PayrollCandidate[]> {
     .from(settlements)
     .innerJoin(advanceRequests, eq(settlements.advanceId, advanceRequests.id))
     .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
-    .where(and(eq(advanceRequests.status, "RETURN_PENDING"), lt(settlements.returnDueAt, sql`now()`)))
+    .where(
+      and(
+        eq(settlements.companyId, companyId),
+        eq(advanceRequests.status, "RETURN_PENDING"),
+        lt(settlements.returnDueAt, sql`now()`),
+      ),
+    )
     .orderBy(asc(recipient.fullName), asc(settlements.returnDueAt));
 
   // Laporan RETURN_PENDING selalu sudah bernomor & punya batas pengembalian.
@@ -72,7 +78,10 @@ export type PayrollDeduction = {
 
 // Riwayat potongan, difilter per periode gaji: tahun saja ("2026-%") atau
 // tahun + bulan ("2026-11").
-export async function listPayrollDeductions(filter: { year?: number; month?: number }): Promise<PayrollDeduction[]> {
+export async function listPayrollDeductions(
+  companyId: string,
+  filter: { year?: number; month?: number },
+): Promise<PayrollDeduction[]> {
   await io();
   const createdBy = alias(users, "created_by");
   const period = filter.year
@@ -98,7 +107,9 @@ export async function listPayrollDeductions(filter: { year?: number; month?: num
     .innerJoin(settlements, eq(settlements.advanceId, advanceRequests.id))
     .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
     .innerJoin(createdBy, eq(advanceLedgerEntries.createdById, createdBy.id))
-    .where(and(eq(advanceLedgerEntries.type, "PAYROLL_DEDUCTION"), period))
+    .where(
+      and(eq(advanceLedgerEntries.companyId, companyId), eq(advanceLedgerEntries.type, "PAYROLL_DEDUCTION"), period),
+    )
     .orderBy(desc(advanceLedgerEntries.payrollPeriod), desc(advanceLedgerEntries.createdAt))
     .limit(500);
 
@@ -111,12 +122,12 @@ export async function listPayrollDeductions(filter: { year?: number; month?: num
 }
 
 // Tahun-tahun periode gaji yang punya potongan, untuk pilihan filter.
-export async function listPayrollYears(): Promise<number[]> {
+export async function listPayrollYears(companyId: string): Promise<number[]> {
   await io();
   const rows = await db
     .selectDistinct({ year: sql<string>`substr(${advanceLedgerEntries.payrollPeriod}, 1, 4)` })
     .from(advanceLedgerEntries)
-    .where(eq(advanceLedgerEntries.type, "PAYROLL_DEDUCTION"));
+    .where(and(eq(advanceLedgerEntries.companyId, companyId), eq(advanceLedgerEntries.type, "PAYROLL_DEDUCTION")));
   return rows.map((row) => Number(row.year)).filter(Boolean).sort((a, b) => b - a);
 }
 

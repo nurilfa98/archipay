@@ -27,7 +27,7 @@ import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
 import { logAudit, type AuditAction } from "@/lib/audit";
-import { verifySession, type CurrentUser } from "@/lib/auth/dal";
+import { verifySession, type CompanyUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { endOfDayAfter, formatDate } from "@/lib/dates";
 import { db } from "@/lib/db";
@@ -88,6 +88,7 @@ export async function createAdvance(
   formData: FormData,
 ): Promise<ActionResult> {
   const actor = await verifySession();
+  const companyId = actor.company.id;
   const isRequest = formData.get("kind") === "request";
   const direct = !isRequest && can(actor, "advance:disburse");
   const allowed = isRequest
@@ -109,7 +110,7 @@ export async function createAdvance(
   const input = parsed.data;
 
   // Uang muka baru wajib masuk ke project yang masih aktif.
-  const project = await getActiveProject(input.projectId);
+  const project = await getActiveProject(companyId, input.projectId);
   if (!project) {
     return { success: false, message: "Project tidak ditemukan atau sudah selesai. Pilih project lagi di halaman Uang Muka." };
   }
@@ -117,13 +118,13 @@ export async function createAdvance(
   if (!isRequest && input.recipientId === actor.id) {
     return fieldError("recipientId", "Pemberi dan penerima dana harus orang berbeda");
   }
-  const recipient = await getActiveRecipient(input.recipientId);
+  const recipient = await getActiveRecipient(companyId, input.recipientId);
   if (!recipient) return fieldError("recipientId", "Karyawan tidak ditemukan atau sudah nonaktif");
 
   // Karyawan yang masih punya uang muka tertunda (lewat batas unggah nota, belum
   // dipertanggungjawabkan) sampai batas di Pengaturan tidak boleh menerima uang muka baru.
-  const { maxOverdueAdvances } = await getCompanySettings();
-  const overdue = (await countOverdueAdvances([recipient.id]))[recipient.id] ?? 0;
+  const { maxOverdueAdvances } = await getCompanySettings(companyId);
+  const overdue = (await countOverdueAdvances(companyId, [recipient.id]))[recipient.id] ?? 0;
   if (overdue >= maxOverdueAdvances) {
     return isRequest
       ? { success: false, message: overdueMessage(overdue, maxOverdueAdvances, true) }
@@ -134,7 +135,7 @@ export async function createAdvance(
   // FINANCE mengusulkan untuk satu-satunya OWNER).
   const approvers = direct
     ? []
-    : eligibleApprovers(await listApprovers(), { recipientId: recipient.id, createdById: actor.id });
+    : eligibleApprovers(await listApprovers(companyId), { recipientId: recipient.id, createdById: actor.id });
   if (!direct && approvers.length === 0) {
     return isRequest
       ? { success: false, message: "Belum ada Owner yang dapat menyetujui pengajuan Anda. Silakan hubungi Owner." }
@@ -142,7 +143,7 @@ export async function createAdvance(
   }
 
   const disbursement = direct
-    ? await buildDisbursement(actor.id, input.disbursementMethod, input.transferReference, recipient)
+    ? await buildDisbursement(actor, input.disbursementMethod, input.transferReference, recipient)
     : null;
   const status: AdvanceStatus = direct ? "DISBURSED" : "PENDING_APPROVAL";
   const ip = await getClientIp();
@@ -150,11 +151,12 @@ export async function createAdvance(
   const createdAt = new Date();
   const created = await db.transaction(async (tx) => {
     // Nomor "UM-2026-10-0001" diambil di transaksi yang sama dengan INSERT.
-    const documentNumber = await nextDocumentNumber(tx, ADVANCE_NUMBER_PREFIX, createdAt);
+    const documentNumber = await nextDocumentNumber(tx, companyId, ADVANCE_NUMBER_PREFIX, createdAt);
     const [row] = await tx
       .insert(advanceRequests)
       .values({
         ...documentNumber,
+        companyId,
         createdAt,
         projectId: project.id,
         recipientId: recipient.id,
@@ -169,6 +171,7 @@ export async function createAdvance(
 
     await logAudit(
       {
+        companyId,
         userId: actor.id,
         action: direct ? "ADVANCE_DISBURSED" : isRequest ? "ADVANCE_REQUESTED" : "ADVANCE_PROPOSED",
         entityName: "advance_requests",
@@ -242,7 +245,7 @@ export async function rejectAdvance(advanceId: string, reason: string): Promise<
   });
   if (!updated) return STALE;
 
-  const creator = await getActiveRecipient(advance.createdById);
+  const creator = await getActiveRecipient(actor.company.id, advance.createdById);
   if (creator) {
     const isOwnRequest = advance.createdById === advance.recipientId;
     after(() => notifyRejected(advance, creator, isOwnRequest, actor.fullName, parsedReason.data));
@@ -272,13 +275,13 @@ export async function disburseApprovedAdvance(
     };
   }
 
-  const recipient = await getActiveRecipient(advance.recipientId);
+  const recipient = await getActiveRecipient(actor.company.id, advance.recipientId);
   if (!recipient) {
     return { success: false, message: "Akun penerima sudah nonaktif. Batalkan uang muka ini." };
   }
 
   const disbursement = await buildDisbursement(
-    actor.id,
+    actor,
     advance.disbursementMethod,
     reference.data,
     recipient,
@@ -323,7 +326,7 @@ export async function cancelAdvance(advanceId: string, reason: string): Promise<
 
   // Karyawan hanya perlu tahu bila sebelumnya sudah diberi tahu dana cair.
   if (advance.status === "DISBURSED") {
-    const recipient = await getActiveRecipient(advance.recipientId);
+    const recipient = await getActiveRecipient(actor.company.id, advance.recipientId);
     if (recipient) after(() => notifyCancelled(advance, recipient, parsedReason.data));
   }
   return done();
@@ -370,19 +373,27 @@ export async function acknowledgeAdvance(advanceId: string, consent: boolean): P
     // 2. Draf pertanggungjawaban, agar karyawan bisa langsung mengisi nota.
     afterUpdate: async (tx) => {
       await tx.insert(advanceLedgerEntries).values({
+        companyId: actor.company.id,
         advanceId: advance.id,
         type: "DISBURSEMENT",
         amount: advance.amount,
         note: "Dana diterima karyawan",
         createdById: actor.id,
       });
-      await tx.insert(settlements).values({ advanceId: advance.id }).onConflictDoNothing();
+      await tx
+        .insert(settlements)
+        .values({ companyId: actor.company.id, advanceId: advance.id })
+        .onConflictDoNothing();
     },
   });
   if (!updated) return STALE;
 
   after(async () =>
-    notifyAcknowledged(advance, advance.recipientName, await getOwnerContacts([advance.disbursedById])),
+    notifyAcknowledged(
+      advance,
+      advance.recipientName,
+      await getOwnerContacts(actor.company.id, [advance.disbursedById]),
+    ),
   );
   return done();
 }
@@ -414,7 +425,7 @@ export async function disputeAdvance(advanceId: string, reason: string): Promise
       advance,
       advance.recipientName,
       parsedReason.data,
-      await getOwnerContacts([advance.disbursedById]),
+      await getOwnerContacts(actor.company.id, [advance.disbursedById]),
     ),
   );
   return done();
@@ -438,18 +449,18 @@ function getAcknowledgmentText(advance: AdvanceDetail) {
 }
 
 // Data pencairan. Waktu cair = waktu server saat ini (tidak bisa dimundurkan),
-// tenggat dihitung dari pengaturan perusahaan yang berlaku saat ini.
+// tenggat dihitung dari pengaturan company yang berlaku saat ini.
 async function buildDisbursement(
-  actorId: string,
+  actor: CompanyUser,
   method: DisbursementMethod,
   transferReference: string | null,
   recipient: RecipientOption,
 ) {
-  const settings = await getCompanySettings();
+  const settings = await getCompanySettings(actor.company.id);
   const disbursedAt = new Date();
   const isTransfer = method === "TRANSFER";
   return {
-    disbursedById: actorId,
+    disbursedById: actor.id,
     disbursedAt,
     transferReference: isTransfer ? transferReference : null,
     destinationBankName: isTransfer ? recipient.bankName : null,
@@ -459,7 +470,7 @@ async function buildDisbursement(
   };
 }
 
-type Loaded = { actor: CurrentUser; advance: AdvanceDetail };
+type Loaded = { actor: CompanyUser; advance: AdvanceDetail };
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // Hanya penerima atau pemegang advance:view-all yang boleh menyentuh data ini.
@@ -469,7 +480,7 @@ async function loadAdvance(advanceId: string): Promise<ActionResult<Loaded>> {
   const id = advanceIdSchema.safeParse(advanceId);
   if (!id.success) return NOT_FOUND;
 
-  const advance = await getAdvanceDetail(id.data);
+  const advance = await getAdvanceDetail(actor.company.id, id.data);
   if (!advance) return NOT_FOUND;
   if (advance.recipientId !== actor.id && !can(actor, "advance:view-all")) return NOT_FOUND;
 
@@ -479,7 +490,7 @@ async function loadAdvance(advanceId: string): Promise<ActionResult<Loaded>> {
 // UPDATE bersyarat + audit dalam satu transaksi. Mengembalikan false bila
 // status di database sudah bukan `from` (didahului orang lain).
 async function applyTransition(
-  actor: CurrentUser,
+  actor: CompanyUser,
   advance: AdvanceDetail,
   from: AdvanceStatus,
   change: {
@@ -502,6 +513,7 @@ async function applyTransition(
     await change.afterUpdate?.(tx);
     await logAudit(
       {
+        companyId: actor.company.id,
         userId: actor.id,
         entityName: "advance_requests",
         entityId: advance.id,

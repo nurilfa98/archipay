@@ -71,7 +71,9 @@ async function HeaderAction() {
 async function ProjectsContent() {
   const user = await requirePermission("advance:view-own");
   const tiles = (
-    can(user, "project:manage") ? await ownerTiles() : await viewerTiles(user.id, can(user, "advance:view-all"))
+    can(user, "project:manage")
+      ? await ownerTiles(user.company.id)
+      : await viewerTiles(user.company.id, user.id, can(user, "advance:view-all"))
   ).sort(byNewest);
 
   const showAdvances = can(user, "advance:view-own");
@@ -120,8 +122,8 @@ async function ProjectsContent() {
 }
 
 // OWNER: semua project beserta nilai kontrak & pengeluaran.
-async function ownerTiles(): Promise<Tile[]> {
-  const rows = await listProjectFinance({ includeAll: true });
+async function ownerTiles(companyId: string): Promise<Tile[]> {
+  const rows = await listProjectFinance(companyId, { includeAll: true });
   return rows.map((row) => ({
     card: row,
     finance: { contractValue: row.contractValue, expense: row.expense, usedPercent: row.usedPercent },
@@ -129,8 +131,8 @@ async function ownerTiles(): Promise<Tile[]> {
 }
 
 // FINANCE melihat hitungan seluruh karyawan, karyawan hanya miliknya.
-async function viewerTiles(userId: string, viewAll: boolean): Promise<Tile[]> {
-  const cards = await listProjectCards({ recipientId: viewAll ? undefined : userId });
+async function viewerTiles(companyId: string, userId: string, viewAll: boolean): Promise<Tile[]> {
+  const cards = await listProjectCards({ companyId, recipientId: viewAll ? undefined : userId });
   return cards.map((card) => ({ card }));
 }
 

@@ -18,14 +18,17 @@
 //
 // Status "lewat batas" sendiri tidak bergantung pada cron: halaman selalu
 // menghitungnya dari tanggal. Cron HANYA mengirim pengingat.
+//
+// Multi-tenant: satu cron untuk semua company. Pengingat ke Owner dikirim ke
+// Owner company pemilik uang muka itu saja; company nonaktif dilewati.
 
 import "server-only";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AWAITING_RECEIPT_STATUSES } from "@/features/advances/constants";
-import { getOwnerContacts } from "@/features/advances/queries";
+import { getOwnerContacts, type Contact } from "@/features/advances/queries";
 import { db } from "@/lib/db";
-import { advanceLedgerEntries, advanceRequests, reminderLogs, settlements, users } from "@/lib/db/schema";
+import { advanceLedgerEntries, advanceRequests, companies, reminderLogs, settlements, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { reminderText, type ReminderAudience } from "./notifications";
@@ -39,6 +42,7 @@ export const REMINDER_KINDS = [
 export type ReminderKind = (typeof REMINDER_KINDS)[number];
 
 export type ReminderCandidate = {
+  companyId: string;
   advanceId: string;
   advanceNumber: string;
   advanceStatus: string;
@@ -65,7 +69,15 @@ const AUDIENCE: Record<ReminderKind, ReminderAudience[]> = {
 };
 
 export async function runReminders() {
-  const owners = await getOwnerContacts([]);
+  // Owner per company, dibaca sekali per company per jalannya cron.
+  const ownersByCompany = new Map<string, Contact[]>();
+  const ownersOf = async (companyId: string) => {
+    const cached = ownersByCompany.get(companyId);
+    if (cached) return cached;
+    const owners = await getOwnerContacts(companyId, []);
+    ownersByCompany.set(companyId, owners);
+    return owners;
+  };
   const summary: Record<ReminderKind, number> = {
     SETTLEMENT_DUE_SOON: 0,
     SETTLEMENT_OVERDUE: 0,
@@ -87,6 +99,7 @@ export async function runReminders() {
         candidate.settlementId ? `/settlements/${candidate.settlementId}` : `/advances/${candidate.advanceId}`,
         env.NEXT_PUBLIC_APP_URL,
       ).toString();
+      const owners = AUDIENCE[kind].includes("owner") ? await ownersOf(candidate.companyId) : [];
       const messages = AUDIENCE[kind].flatMap((audience) =>
         audience === "employee"
           ? candidate.recipientPhone
@@ -108,7 +121,7 @@ export async function runReminders() {
   return summary;
 }
 
-// Calon penerima per jenis pengingat. Karyawan nonaktif dilewati.
+// Calon penerima per jenis pengingat. Karyawan nonaktif dan company nonaktif dilewati.
 async function listCandidates(kind: ReminderKind): Promise<ReminderCandidate[]> {
   const isSettlement = kind === "SETTLEMENT_DUE_SOON" || kind === "SETTLEMENT_OVERDUE";
   const dueAt = isSettlement ? advanceRequests.settlementDueAt : settlements.returnDueAt;
@@ -122,6 +135,7 @@ async function listCandidates(kind: ReminderKind): Promise<ReminderCandidate[]> 
 
   const rows = await db
     .select({
+      companyId: advanceRequests.companyId,
       advanceId: advanceRequests.id,
       advanceNumber: advanceRequests.number,
       advanceStatus: advanceRequests.status,
@@ -136,9 +150,10 @@ async function listCandidates(kind: ReminderKind): Promise<ReminderCandidate[]> 
       ),
     })
     .from(advanceRequests)
+    .innerJoin(companies, eq(advanceRequests.companyId, companies.id))
     .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
     .leftJoin(settlements, eq(settlements.advanceId, advanceRequests.id))
-    .where(and(status, timing, eq(recipient.isActive, true)))
+    .where(and(status, timing, eq(recipient.isActive, true), eq(companies.isActive, true)))
     .limit(500);
   return rows;
 }

@@ -3,7 +3,8 @@
 // Nilai kontrak hanya dikembalikan oleh listProjectsForManage(), yang
 // pemanggilnya WAJIB sudah memeriksa project:manage (OWNER). Query lain
 // (kartu pilihan project, banner) tidak pernah membawa angka itu, sehingga
-// tidak bisa bocor ke Finance atau karyawan.
+// tidak bisa bocor ke Finance atau karyawan. Semua fungsi menerima companyId
+// (company yang sedang dibuka).
 //
 // Referensi: node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md
 
@@ -47,9 +48,13 @@ export function projectCondition(project: string | undefined): SQL | undefined {
   return project === NO_PROJECT ? isNull(advanceRequests.projectId) : eq(advanceRequests.projectId, project);
 }
 
-export async function getProjectInfo(projectId: string): Promise<ProjectInfo | null> {
+export async function getProjectInfo(companyId: string, projectId: string): Promise<ProjectInfo | null> {
   await io();
-  const [row] = await db.select(infoColumns).from(projects).where(eq(projects.id, projectId)).limit(1);
+  const [row] = await db
+    .select(infoColumns)
+    .from(projects)
+    .where(and(eq(projects.id, projectId), eq(projects.companyId, companyId)))
+    .limit(1);
   return row ? toInfo(row) : null;
 }
 
@@ -59,20 +64,20 @@ export type ProjectScope = { kind: "picker" } | { kind: "none" } | { kind: "proj
 
 // cache(): dipanggil oleh tombol di judul halaman dan isi halaman sekaligus,
 // tetapi hanya sekali ke database per permintaan.
-export const resolveProjectScope = cache(async (param: string | undefined): Promise<ProjectScope> => {
+export const resolveProjectScope = cache(async (companyId: string, param: string | undefined): Promise<ProjectScope> => {
   if (!param) return { kind: "picker" };
   if (param === NO_PROJECT) return { kind: "none" };
-  const project = await getProjectInfo(param);
+  const project = await getProjectInfo(companyId, param);
   return project ? { kind: "project", project } : { kind: "picker" };
 });
 
 // Project aktif untuk pilihan "tetapkan project" uang muka lama.
-export async function listActiveProjects(): Promise<{ id: string; name: string }[]> {
+export async function listActiveProjects(companyId: string): Promise<{ id: string; name: string }[]> {
   await io();
   return db
     .select({ id: projects.id, name: projects.name })
     .from(projects)
-    .where(eq(projects.status, "ACTIVE"))
+    .where(and(eq(projects.companyId, companyId), eq(projects.status, "ACTIVE")))
     .orderBy(asc(projects.name));
 }
 
@@ -132,7 +137,11 @@ const EMPTY_STATS: ProjectStats = {
 // viewer punya uang muka di dalamnya (agar riwayat lama tetap terjangkau).
 // includeAll: project selesai tanpa uang muka ikut tampil (untuk OWNER, yang
 // mengelola semua project).
-export async function listProjectCards(filter: { recipientId?: string; includeAll?: boolean }): Promise<ProjectCardData[]> {
+export async function listProjectCards(filter: {
+  companyId: string;
+  recipientId?: string;
+  includeAll?: boolean;
+}): Promise<ProjectCardData[]> {
   await io();
   const [statRows, projectRows] = await Promise.all([
     db
@@ -161,11 +170,17 @@ export async function listProjectCards(filter: { recipientId?: string; includeAl
           ),
       })
       .from(advanceRequests)
-      .where(filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined)
+      .where(
+        and(
+          eq(advanceRequests.companyId, filter.companyId),
+          filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
+        ),
+      )
       .groupBy(advanceRequests.projectId),
     db
       .select({ ...infoColumns, createdAt: projects.createdAt })
       .from(projects)
+      .where(eq(projects.companyId, filter.companyId))
       .orderBy(desc(projects.createdAt)),
   ]);
 
@@ -201,7 +216,7 @@ export type ProjectForManage = ProjectInfo & {
   advanceCount: number;
 };
 
-export async function listProjectsForManage(): Promise<ProjectForManage[]> {
+export async function listProjectsForManage(companyId: string): Promise<ProjectForManage[]> {
   await io();
   const rows = await db
     .select({
@@ -212,6 +227,7 @@ export async function listProjectsForManage(): Promise<ProjectForManage[]> {
       ),
     })
     .from(projects)
+    .where(eq(projects.companyId, companyId))
     // Aktif dulu, lalu urut nama.
     .orderBy(asc(projects.status), asc(projects.name));
   return rows.map((row) => ({ ...toInfo(row), contractValue: row.contractValue, advanceCount: row.advanceCount }));
@@ -220,23 +236,24 @@ export async function listProjectsForManage(): Promise<ProjectForManage[]> {
 // Isian awal halaman ubah project. Memuat nilai kontrak, jadi pemanggil WAJIB
 // sudah memeriksa project:manage (OWNER).
 export async function getProjectForEdit(
+  companyId: string,
   projectId: string,
 ): Promise<(ProjectInfo & { contractValue: number | null }) | null> {
   await io();
   const [row] = await db
     .select({ ...infoColumns, contractValue: projects.contractValue })
     .from(projects)
-    .where(eq(projects.id, projectId))
+    .where(and(eq(projects.id, projectId), eq(projects.companyId, companyId)))
     .limit(1);
   return row ? { ...toInfo(row), contractValue: row.contractValue } : null;
 }
 
 // Dipakai Server Action: project aktif yang boleh menerima uang muka baru.
-export async function getActiveProject(projectId: string): Promise<ProjectInfo | null> {
+export async function getActiveProject(companyId: string, projectId: string): Promise<ProjectInfo | null> {
   const [row] = await db
     .select(infoColumns)
     .from(projects)
-    .where(and(eq(projects.id, projectId), eq(projects.status, "ACTIVE")))
+    .where(and(eq(projects.id, projectId), eq(projects.companyId, companyId), eq(projects.status, "ACTIVE")))
     .limit(1);
   return row ? toInfo(row) : null;
 }

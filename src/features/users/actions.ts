@@ -9,7 +9,8 @@
 //   muka) tetap utuh.
 // - Siapa boleh mengelola akun siapa diatur features/users/access.ts:
 //   superadmin mengelola Owner, Owner mengelola Finance & Karyawan. Akun
-//   superadmin dijawab "tidak ditemukan".
+//   superadmin dan akun company lain dijawab "tidak ditemukan".
+// - Pengguna baru selalu masuk ke company yang sedang dibuka.
 // - Tidak ada yang bisa menonaktifkan atau me-reset akunnya sendiri.
 //
 // Referensi:
@@ -24,18 +25,19 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
-import { verifySession, type CurrentUser } from "@/lib/auth/dal";
+import { verifyAccount, verifySession, type CompanyUser } from "@/lib/auth/dal";
 import { generateTemporaryPassword, hashPassword } from "@/lib/auth/password";
 import { can } from "@/lib/auth/permissions";
 import type { AssignableRole, Role } from "@/lib/auth/roles";
 import { db, isUniqueViolation } from "@/lib/db";
 import { roles, userRoles, users } from "@/lib/db/schema";
+import { assertSeatAvailable, SeatLimitError } from "@/features/subscriptions/seats";
 import { sendEmail } from "@/lib/email";
 import { getClientIp } from "@/lib/request";
 import type { ActionResult } from "@/types/action-result";
 import { assignableRolesFor, canManageUser } from "./access";
 import { credentialsEmail } from "./emails";
-import { getUserDetail, type UserDetail } from "./queries";
+import { getOwnProfile, getUserDetail, type UserDetail } from "./queries";
 import { createUserSchema, profileSchema, updateUserSchema, userIdSchema } from "./schemas";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
@@ -85,14 +87,17 @@ export async function createUser(
   try {
     // Transaksi: user, role, dan audit tersimpan bersamaan atau tidak sama sekali.
     userId = await db.transaction(async (tx) => {
+      // Batas pengguna aktif paket langganan company (BUSINESS-FLOW §17.1).
+      await assertSeatAvailable(tx, actor.company.id);
       const [created] = await tx
         .insert(users)
-        .values({ ...data, passwordHash, mustChangePassword: true })
+        .values({ ...data, companyId: actor.company.id, passwordHash, mustChangePassword: true })
         .returning({ id: users.id });
 
       await setRoles(tx, created.id, initialRoles);
       await logAudit(
         {
+          companyId: actor.company.id,
           userId: actor.id,
           action: "USER_CREATED",
           entityName: "users",
@@ -108,6 +113,7 @@ export async function createUser(
     // Email ganda ditolak oleh UNIQUE constraint di database, bukan dengan
     // "cek dulu baru insert", agar tetap aman walau dua orang submit bersamaan.
     if (isUniqueViolation(error)) return EMAIL_TAKEN;
+    if (error instanceof SeatLimitError) return { success: false, message: error.message };
     throw error;
   }
 
@@ -177,6 +183,7 @@ export async function updateUser(
       if (rolesChanged) await setRoles(tx, before.id, newRoles);
       await logAudit(
         {
+          companyId: actor.company.id,
           userId: actor.id,
           action: "USER_UPDATED",
           entityName: "users",
@@ -208,7 +215,7 @@ export async function updateOwnProfile(
   _prevState: ActionResult | undefined,
   formData: FormData,
 ): Promise<ActionResult> {
-  const actor = await verifySession();
+  const actor = await verifyAccount();
 
   const parsed = profileSchema.safeParse({
     fullName: formData.get("fullName"),
@@ -219,7 +226,7 @@ export async function updateOwnProfile(
   });
   if (!parsed.success) return invalid(parsed.error);
 
-  const before = await getUserDetail(actor.id);
+  const before = await getOwnProfile(actor.id);
   if (!before) return NOT_FOUND;
 
   // Audit hanya mencatat field yang benar-benar berubah.
@@ -241,6 +248,7 @@ export async function updateOwnProfile(
       await tx.update(users).set(profile).where(eq(users.id, actor.id));
       await logAudit(
         {
+          companyId: actor.company?.id ?? null,
           userId: actor.id,
           action: "USER_UPDATED",
           entityName: "users",
@@ -284,26 +292,36 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
   // Cookie session user yang dinonaktifkan masih tersimpan di browsernya,
   // tapi getCurrentUser() di DAL mengecek is_active, jadi aksesnya berhenti
   // di request berikutnya.
-  const updated = await db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(users)
-      .set({ isActive: input.data.active })
-      .where(eq(users.id, input.data.userId))
-      .returning({ id: users.id });
-    if (!row) return false;
+  const { active: activate, userId: targetId } = input.data;
+  let updated: boolean;
+  try {
+    updated = await db.transaction(async (tx) => {
+      // Mengaktifkan kembali ikut dihitung ke batas pengguna paket langganan.
+      if (activate && !target.data.isActive) await assertSeatAvailable(tx, actor.company.id);
+      const [row] = await tx
+        .update(users)
+        .set({ isActive: activate })
+        .where(eq(users.id, targetId))
+        .returning({ id: users.id });
+      if (!row) return false;
 
-    await logAudit(
-      {
-        userId: actor.id,
-        action: input.data.active ? "USER_ACTIVATED" : "USER_DEACTIVATED",
-        entityName: "users",
-        entityId: row.id,
-        ipAddress: await getClientIp(),
-      },
-      tx,
-    );
-    return true;
-  });
+      await logAudit(
+        {
+          companyId: actor.company.id,
+          userId: actor.id,
+          action: activate ? "USER_ACTIVATED" : "USER_DEACTIVATED",
+          entityName: "users",
+          entityId: row.id,
+          ipAddress: await getClientIp(),
+        },
+        tx,
+      );
+      return true;
+    });
+  } catch (error) {
+    if (error instanceof SeatLimitError) return { success: false, message: error.message };
+    throw error;
+  }
   if (!updated) return NOT_FOUND;
 
   revalidateUsers();
@@ -352,6 +370,7 @@ export async function resetUserPassword(
       .where(eq(users.id, target.id));
     await logAudit(
       {
+        companyId: actor.company.id,
         userId: actor.id,
         action: "USER_PASSWORD_RESET",
         entityName: "users",
@@ -384,10 +403,11 @@ async function getUserManager() {
   return can(user, "user:manage") ? user : null;
 }
 
-// Akun target harus boleh dikelola actor (features/users/access.ts). Akun
-// superadmin dijawab "tidak ditemukan" agar keberadaannya tidak bocor.
-async function getManagedUser(actor: CurrentUser, userId: string): Promise<ActionResult<UserDetail>> {
-  const target = await getUserDetail(userId);
+// Akun target harus berada di company yang sama dan boleh dikelola actor
+// (features/users/access.ts). Akun superadmin & company lain dijawab "tidak
+// ditemukan" agar keberadaannya tidak bocor.
+async function getManagedUser(actor: CompanyUser, userId: string): Promise<ActionResult<UserDetail>> {
+  const target = await getUserDetail(actor.company.id, userId);
   if (!target || target.roles.includes("SUPERADMIN")) return NOT_FOUND;
   if (!canManageUser(actor, target)) return OWNER_ONLY;
   return { success: true, data: target };

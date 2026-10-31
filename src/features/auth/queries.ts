@@ -9,20 +9,29 @@
 import "server-only";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { users } from "@/lib/db/schema";
+import { companies, roles, userRoles, users } from "@/lib/db/schema";
 
 const credentialColumns = {
   id: users.id,
+  companyId: users.companyId,
   passwordHash: users.passwordHash,
   isActive: users.isActive,
   mustChangePassword: users.mustChangePassword,
   sessionVersion: users.sessionVersion,
 };
 
+// Status & masa langganan company ikut dibaca: user dari company yang
+// dinonaktifkan atau terkunci (langganan habis) tidak bisa login.
+// companyIsActive null = superadmin (tanpa company).
 export async function findUserForLogin(email: string) {
   const [user] = await db
-    .select(credentialColumns)
+    .select({
+      ...credentialColumns,
+      companyIsActive: companies.isActive,
+      companySubscriptionUntil: companies.subscriptionUntil,
+    })
     .from(users)
+    .leftJoin(companies, eq(users.companyId, companies.id))
     .where(eq(users.email, email))
     .limit(1);
 
@@ -41,4 +50,14 @@ export async function findUserCredentials(userId: string) {
     .limit(1);
 
   return user;
+}
+
+// Nama role user, untuk aturan login company terkunci (hanya Owner yang boleh masuk).
+export async function findUserRoleNames(userId: string) {
+  const rows = await db
+    .select({ name: roles.name })
+    .from(userRoles)
+    .innerJoin(roles, eq(userRoles.roleId, roles.id))
+    .where(eq(userRoles.userId, userId));
+  return rows.map((row) => row.name);
 }

@@ -28,7 +28,8 @@ import {
 import { updateUser } from "@/features/users/actions";
 import type { UserDetail } from "@/features/users/queries";
 import { ROLE_LABELS, type AssignableRole } from "@/lib/auth/roles";
-import { formatPhone } from "@/lib/phone";
+import { BankAccountFields } from "@/components/bank-account-fields";
+import { PhoneInput } from "@/components/phone-input";
 import { TextField } from "./text-field";
 
 // `roles` = role yang boleh diberikan pengelola (features/users/access.ts).
@@ -70,34 +71,21 @@ export function UserEditForm({ user, roles }: { user: UserDetail; roles: Assigna
           required
           error={fieldError("email")}
         />
-        <TextField
+        <PhoneInput
           name="phoneNumber"
           label="Nomor WhatsApp"
-          type="tel"
-          inputMode="tel"
-          placeholder="0812-3456-7890"
-          defaultValue={user.phoneNumber ? formatPhone(user.phoneNumber) : ""}
+          defaultValue={user.phoneNumber}
           required
           error={fieldError("phoneNumber")}
         />
 
         {/* Rekening dipakai Finance saat mencairkan uang muka lewat transfer */}
         <div className="grid gap-5 sm:grid-cols-2">
-          <TextField
-            name="bankName"
-            label="Nama bank"
-            placeholder="BCA"
-            defaultValue={user.bankName ?? ""}
-            autoComplete="off"
-            error={fieldError("bankName")}
-          />
-          <TextField
-            name="bankAccountNumber"
-            label="Nomor rekening"
-            inputMode="numeric"
-            defaultValue={user.bankAccountNumber ?? ""}
-            autoComplete="off"
-            error={fieldError("bankAccountNumber")}
+          <BankAccountFields
+            defaultBankName={user.bankName}
+            defaultAccountNumber={user.bankAccountNumber}
+            bankNameError={fieldError("bankName")}
+            accountError={fieldError("bankAccountNumber")}
           />
         </div>
 

@@ -2,7 +2,9 @@
 // dibutuhkan).
 //
 // Pemanggil WAJIB sudah memastikan user boleh melihat datanya: penerima
-// dana atau pemegang advance:view-all (sama dengan aturan uang muka).
+// dana atau pemegang advance:view-all (sama dengan aturan uang muka). Daftar
+// & detail dibatasi ke company yang sedang dibuka; fungsi yang menerima id
+// laporan/uang muka (nota, ledger) dipanggil SETELAH detailnya lolos cek itu.
 //
 // Referensi:
 // - https://orm.drizzle.team/docs/joins (bagian "Aliases & Selfjoins")
@@ -111,6 +113,7 @@ function toListItem({
 // year/month → periode nomor laporan (PJ-2026-10-xxxx). Draf belum bernomor,
 // jadi tidak ikut bila tahun dipilih.
 export async function listSettlements(filter: {
+  companyId: string;
   recipientId?: string;
   // id project, atau NO_PROJECT untuk uang muka lama tanpa project.
   project?: string;
@@ -127,6 +130,7 @@ export async function listSettlements(filter: {
     .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
     .where(
       and(
+        eq(settlements.companyId, filter.companyId),
         filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
         projectCondition(filter.project),
         filter.advanceStatuses ? inArray(advanceRequests.status, [...filter.advanceStatuses]) : undefined,
@@ -139,7 +143,11 @@ export async function listSettlements(filter: {
   return rows.map(toListItem);
 }
 
-export async function listSettlementYears(filter: { recipientId?: string; project?: string }): Promise<number[]> {
+export async function listSettlementYears(filter: {
+  companyId: string;
+  recipientId?: string;
+  project?: string;
+}): Promise<number[]> {
   await io();
   const rows = await db
     .selectDistinct({ year: settlements.periodYear })
@@ -147,6 +155,7 @@ export async function listSettlementYears(filter: { recipientId?: string; projec
     .innerJoin(advanceRequests, eq(settlements.advanceId, advanceRequests.id))
     .where(
       and(
+        eq(settlements.companyId, filter.companyId),
         isNotNull(settlements.periodYear),
         filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
         projectCondition(filter.project),
@@ -191,6 +200,7 @@ const TODO_KIND_FOR_VERIFIER: Partial<Record<string, SettlementTodo["kind"]>> = 
 //   atau bayar penggantian.
 export async function listSettlementTodos(viewer: {
   id: string;
+  companyId: string;
   canVerify: boolean;
   // Batasi ke satu project (id, atau NO_PROJECT). Kosong = semua project.
   project?: string;
@@ -232,6 +242,7 @@ export async function listSettlementTodos(viewer: {
         .innerJoin(settlements, eq(settlements.advanceId, advanceRequests.id))
         .where(
           and(
+            eq(advanceRequests.companyId, viewer.companyId),
             inArray(advanceRequests.status, Object.keys(TODO_KIND_FOR_VERIFIER)),
             ne(advanceRequests.recipientId, viewer.id),
             projectCondition(viewer.project),
@@ -283,7 +294,7 @@ export type SettlementDetail = {
   returnOverdue: boolean;
 };
 
-export async function getSettlementDetail(id: string): Promise<SettlementDetail | null> {
+export async function getSettlementDetail(companyId: string, id: string): Promise<SettlementDetail | null> {
   await io();
   const revisionBy = alias(users, "revision_by");
   const verifiedBy = alias(users, "verified_by");
@@ -325,7 +336,7 @@ export async function getSettlementDetail(id: string): Promise<SettlementDetail 
     .leftJoin(projects, eq(advanceRequests.projectId, projects.id))
     .leftJoin(revisionBy, eq(settlements.revisionRequestedById, revisionBy.id))
     .leftJoin(verifiedBy, eq(settlements.verifiedById, verifiedBy.id))
-    .where(eq(settlements.id, id))
+    .where(and(eq(settlements.id, id), eq(settlements.companyId, companyId)))
     .limit(1);
 
   if (!row) return null;
@@ -416,17 +427,17 @@ export async function getSettlementRefByAdvance(
 
 export type ExpenseCategory = { id: string; name: string };
 
-export async function listExpenseCategories(): Promise<ExpenseCategory[]> {
+export async function listExpenseCategories(companyId: string): Promise<ExpenseCategory[]> {
   await io();
   return db
     .select({ id: expenseCategories.id, name: expenseCategories.name })
     .from(expenseCategories)
-    .where(eq(expenseCategories.isActive, true))
+    .where(and(eq(expenseCategories.companyId, companyId), eq(expenseCategories.isActive, true)))
     .orderBy(asc(expenseCategories.sortOrder), asc(expenseCategories.name));
 }
 
 // File nota + pemilik datanya, untuk route /api/receipts/[itemId].
-export async function getReceiptFile(itemId: string) {
+export async function getReceiptFile(companyId: string, itemId: string) {
   const [row] = await db
     .select({
       fileKey: settlementItems.fileKey,
@@ -436,7 +447,7 @@ export async function getReceiptFile(itemId: string) {
     .from(settlementItems)
     .innerJoin(settlements, eq(settlementItems.settlementId, settlements.id))
     .innerJoin(advanceRequests, eq(settlements.advanceId, advanceRequests.id))
-    .where(eq(settlementItems.id, itemId))
+    .where(and(eq(settlementItems.id, itemId), eq(settlementItems.companyId, companyId)))
     .limit(1);
   return row ?? null;
 }

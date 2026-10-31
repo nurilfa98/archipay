@@ -47,8 +47,8 @@ async function DashboardContent() {
   // Owner melihat keuangan per project; Finance & karyawan tetap ringkasan uang muka.
   const isOwner = can(user, "project:manage");
   const [summary, recent] = await Promise.all([
-    isOwner ? null : getAdvanceSummary({ recipientId }),
-    listAdvances({ recipientId, limit: RECENT_LIMIT }),
+    isOwner ? null : getAdvanceSummary({ companyId: user.company.id, recipientId }),
+    listAdvances({ companyId: user.company.id, recipientId, limit: RECENT_LIMIT }),
   ]);
 
   return (
@@ -57,7 +57,7 @@ async function DashboardContent() {
         <AdvanceSummaryCards summary={summary} />
       ) : (
         <Suspense fallback={<OwnerDashboardSkeleton />}>
-          <OwnerDashboard />
+          <OwnerDashboard companyId={user.company.id} />
         </Suspense>
       )}
       <section className="flex flex-col gap-2" aria-labelledby="recent-advances-title">

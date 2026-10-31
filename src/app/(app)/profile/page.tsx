@@ -11,8 +11,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfileForm } from "@/features/users/components/profile-form";
-import { getUserDetail } from "@/features/users/queries";
-import { verifySession } from "@/lib/auth/dal";
+import { getOwnProfile } from "@/features/users/queries";
+import { verifyAccount } from "@/lib/auth/dal";
 
 export const metadata: Metadata = {
   title: "Profil",
@@ -30,8 +30,8 @@ export default function ProfilePage() {
 }
 
 async function ProfileContent() {
-  const actor = await verifySession();
-  const user = await getUserDetail(actor.id);
+  const actor = await verifyAccount();
+  const user = await getOwnProfile(actor.id);
   if (!user) redirect("/login");
 
   return (

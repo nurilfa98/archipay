@@ -1,5 +1,7 @@
 // Tombol mengambang di pojok kanan bawah: kembali ke kotak menu (/), sama
-// seperti klik logo ArchiPay di header. Tidak tampil di halaman menu itu sendiri.
+// seperti klik logo ArchiPay di header. Tidak tampil di halaman menu itu sendiri
+// maupun di halaman platform Superadmin (/companies): dari sana Superadmin
+// masuk ke company lewat tombol Buka, bukan lewat kotak menu.
 //
 // Client Component karena butuh usePathname(). Di halaman dengan segmen
 // dinamis, URL baru diketahui saat request, jadi layout membungkusnya dengan
@@ -11,10 +13,11 @@ import { LayoutGridIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { isPlatformPath } from "./nav-config";
 
 export function MenuFab() {
   const pathname = usePathname();
-  if (pathname === "/") return null;
+  if (pathname === "/" || isPlatformPath(pathname)) return null;
 
   return (
     <Button

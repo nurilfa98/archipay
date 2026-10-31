@@ -6,11 +6,17 @@
 // Ini hanya soal tampilan: halamannya sendiri tetap wajib memanggil
 // requirePermission() dari lib/auth/dal.ts.
 //
+// Kotak menu hanya berisi menu milik company yang sedang dibuka. Halaman
+// platform Superadmin (/companies) BUKAN menu di sini: Superadmin langsung
+// mendarat di sana setelah login dan kembali lewat tombol Ganti/Keluar di pita
+// company (lihat PLATFORM_PAGES).
+//
 // Uang Muka & Pertanggungjawaban BUKAN menu: keduanya dibuka dari kartu
 // project (menu Project), jadi selalu terikat ke satu project. Keduanya ada di
 // SUB_PAGES agar breadcrumb tetap bisa menampilkan "Project > Uang Muka".
 
 import {
+  CreditCardIcon,
   FileClockIcon,
   FolderKanbanIcon,
   HouseIcon,
@@ -79,6 +85,14 @@ export const MENU_ITEMS: MenuItem[] = [
     keywords: ["setting", "kategori", "batas"],
     permission: "settings:manage",
   },
+  {
+    title: "Langganan",
+    href: "/subscription",
+    icon: CreditCardIcon,
+    description: "Masa aktif, paket & tagihan ArchiPay",
+    keywords: ["bayar", "paket", "perpanjang", "tagihan", "billing"],
+    permission: "subscription:view",
+  },
 ];
 
 // Halaman yang bukan menu, tetapi tampil di breadcrumb di bawah induknya.
@@ -87,6 +101,19 @@ export const SUB_PAGES: { title: string; href: string; parent?: string }[] = [
   { title: "Pertanggungjawaban", href: "/settlements", parent: "/projects" },
   { title: "Profil", href: "/profile" },
 ];
+
+// Halaman platform Superadmin (tidak terikat company), berpindah lewat tab di
+// app/(app)/(platform)/layout.tsx. Di halaman ini breadcrumb tidak
+// menampilkan "Menu" dan tombol kembali ke menu disembunyikan.
+export const PLATFORM_PAGES: { title: string; href: string }[] = [
+  { title: "Company", href: "/companies" },
+  { title: "Tagihan", href: "/billing" },
+  { title: "Pengaturan platform", href: "/platform-settings" },
+];
+
+export function isPlatformPath(pathname: string) {
+  return PLATFORM_PAGES.some((page) => matchesPath(pathname, page.href));
+}
 
 // Halaman cocok dengan menu bila URL-nya sama atau berada di bawahnya
 // (misal /projects/123 tetap termasuk "Project").

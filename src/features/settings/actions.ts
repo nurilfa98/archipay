@@ -9,11 +9,11 @@
 
 "use server";
 
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
-import { verifySession } from "@/lib/auth/dal";
+import { verifySession, type CompanyUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { db, isUniqueViolation } from "@/lib/db";
 import { companySettings, expenseCategories } from "@/lib/db/schema";
@@ -53,7 +53,7 @@ export async function updateCompanySettings(
   });
   if (!parsed.success) return invalid(parsed.error);
 
-  const before = await getCompanySettings();
+  const before = await getCompanySettings(actor.company.id);
   const changed = (Object.keys(parsed.data) as (keyof typeof parsed.data)[]).filter(
     (key) => before[key] !== parsed.data[key],
   );
@@ -64,13 +64,14 @@ export async function updateCompanySettings(
     await tx
       .update(companySettings)
       .set({ ...parsed.data, updatedById: actor.id })
-      .where(eq(companySettings.id, 1));
+      .where(eq(companySettings.companyId, actor.company.id));
     await logAudit(
       {
+        companyId: actor.company.id,
         userId: actor.id,
         action: "SETTINGS_UPDATED",
         entityName: "company_settings",
-        entityId: "1",
+        entityId: actor.company.id,
         oldValues: Object.fromEntries(changed.map((key) => [key, before[key]])),
         newValues: Object.fromEntries(changed.map((key) => [key, parsed.data[key]])),
         ipAddress: ip,
@@ -103,13 +104,15 @@ export async function createExpenseCategory(name: string): Promise<ActionResult>
       // Kategori baru diletakkan paling bawah.
       const [{ next }] = await tx
         .select({ next: sql`coalesce(max(${expenseCategories.sortOrder}), 0) + 1`.mapWith(Number) })
-        .from(expenseCategories);
+        .from(expenseCategories)
+        .where(eq(expenseCategories.companyId, actor.company.id));
       const [created] = await tx
         .insert(expenseCategories)
-        .values({ name: parsed.data, sortOrder: next })
+        .values({ companyId: actor.company.id, name: parsed.data, sortOrder: next })
         .returning({ id: expenseCategories.id });
       await logAudit(
         {
+          companyId: actor.company.id,
           userId: actor.id,
           action: "EXPENSE_CATEGORY_CREATED",
           entityName: "expense_categories",
@@ -138,7 +141,7 @@ export async function renameExpenseCategory(categoryId: string, name: string): P
   if (!id.success) return { success: false, message: "Kategori tidak ditemukan." };
   if (!parsed.success) return nameError(parsed.error);
 
-  return updateCategory(actor.id, id.data, { name: parsed.data });
+  return updateCategory(actor, id.data, { name: parsed.data });
 }
 
 export async function setExpenseCategoryActive(categoryId: string, isActive: boolean): Promise<ActionResult> {
@@ -148,11 +151,11 @@ export async function setExpenseCategoryActive(categoryId: string, isActive: boo
   const id = categoryIdSchema.safeParse(categoryId);
   if (!id.success || typeof isActive !== "boolean") return { success: false, message: "Kategori tidak ditemukan." };
 
-  return updateCategory(actor.id, id.data, { isActive });
+  return updateCategory(actor, id.data, { isActive });
 }
 
 async function updateCategory(
-  actorId: string,
+  actor: CompanyUser,
   categoryId: string,
   values: { name?: string; isActive?: boolean },
 ): Promise<ActionResult> {
@@ -162,14 +165,15 @@ async function updateCategory(
       const [before] = await tx
         .select({ name: expenseCategories.name, isActive: expenseCategories.isActive })
         .from(expenseCategories)
-        .where(eq(expenseCategories.id, categoryId))
+        .where(and(eq(expenseCategories.id, categoryId), eq(expenseCategories.companyId, actor.company.id)))
         .limit(1);
       if (!before) return false;
 
       await tx.update(expenseCategories).set(values).where(eq(expenseCategories.id, categoryId));
       await logAudit(
         {
-          userId: actorId,
+          companyId: actor.company.id,
+          userId: actor.id,
           action: "EXPENSE_CATEGORY_UPDATED",
           entityName: "expense_categories",
           entityId: categoryId,

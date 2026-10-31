@@ -1,13 +1,17 @@
 // Halaman / (tepat setelah login): kotak menu ArchiPay dengan kolom pencarian.
 // Menu yang tampil disaring sesuai role user (lihat nav-config.ts).
+// Superadmin yang belum membuka company diarahkan ke daftar company; Owner
+// company yang terkunci (langganan habis) diarahkan ke Langganan.
 //
 // Judul statis di luar <Suspense>; daftar menu butuh role user (cookie), jadi
 // berada di dalamnya.
 
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { MenuLauncher, MenuLauncherSkeleton } from "@/components/layout/menu-launcher";
-import { verifySession } from "@/lib/auth/dal";
+import { verifyAccount } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/permissions";
 
 export const metadata: Metadata = {
   title: "Menu",
@@ -32,11 +36,13 @@ export default function MenuPage() {
 }
 
 async function Greeting() {
-  const user = await verifySession();
+  const user = await verifyAccount();
   return `Halo, ${user.fullName.split(" ")[0]}`;
 }
 
 async function Menu() {
-  const user = await verifySession();
+  const user = await verifyAccount();
+  if (!user.company) redirect("/companies");
+  if (user.company.access.locked && !can(user, "company:manage")) redirect("/subscription");
   return <MenuLauncher roles={user.roles} />;
 }

@@ -40,19 +40,18 @@ Lokasi folder diatur di `drizzle.config.ts` (`out: "./database/migrations"`).
 
 - **Jangan mengubah, mengganti nama, atau menghapus migration yang sudah dijalankan** di database mana pun (terutama production). drizzle-kit mencatat migration yang sudah dijalankan di tabel `drizzle.__drizzle_migrations`; perubahan berikutnya selalu dibuat sebagai migration baru.
 - Jangan menyunting `meta/` secara manual. File di sana dibuat dan dibaca drizzle-kit.
-- Data awal yang wajib ada (pengaturan perusahaan, kategori biaya) diisi lewat migration, sehingga database baru langsung siap setelah `pnpm db:migrate`. Akun superadmin dibuat terpisah lewat `pnpm db:create-superadmin` (lihat `scripts/create-superadmin.mjs`); Owner didaftarkan superadmin dari aplikasi.
+- Migration hanya membuat struktur tabel. Data awal per company (pengaturan bawaan & 6 kategori biaya) dibuat aplikasi saat Superadmin menambah company (`features/companies/actions.ts`). Tabel `roles` dan akun superadmin diisi lewat `pnpm db:create-superadmin` (lihat `scripts/create-superadmin.mjs`).
 
 ## Riwayat migration
 
+Riwayat migration di-reset pada 31 Oktober 2026 saat ArchiPay menjadi
+multi-tenant (belum ada klien aktif, data lama hanya data uji). Database lama
+tidak bisa di-upgrade ke migration ini: buat database baru, lalu jalankan
+`pnpm db:migrate` dan `pnpm db:create-superadmin`.
+
 | File | Isi |
 |---|---|
-| `0000_giant_leopardon` | Tabel `users`, `roles`, `user_roles`. Nama acak bawaan drizzle-kit untuk migration pertama, dibiarkan agar riwayat tidak berubah. |
-| `0001_audit_logs_login_attempts` | Tabel `audit_logs` dan `login_attempts` (rate limit login). |
-| `0002_users_password_session` | Kolom `must_change_password` dan `session_version` di `users`. |
-| `0003_advances_company_settings` | Tabel `advance_requests` dan `company_settings`. *Manual:* baris pengaturan bawaan (nota 3 hari, pengembalian 3 hari, tanpa nota maks. Rp50.000). |
-| `0004_advance_monthly_number` | Nomor uang muka per bulan (`UM-2026-10-0001`): kolom periode + tabel `document_sequences`. *Manual:* menomori ulang data lama. |
-| `0005_settlements_ledger` | Tabel `settlements`, `settlement_items`, `expense_categories`, `advance_ledger_entries`. *Manual:* 6 kategori biaya awal, dan baris ledger untuk uang muka yang sudah dikonfirmasi sebelumnya. |
-| `0006_settlement_drafts` | *Manual:* membuat draf pertanggungjawaban untuk uang muka yang sudah dikonfirmasi sebelum draf dibuat otomatis. |
-| `0007_returns_reminders` | Kolom `method`, `reference`, `payroll_period` di ledger + tabel `reminder_logs`. |
-| `0008_audit_logs_created_at` | Index `created_at` di `audit_logs` (filter Audit Log). |
-| `0011_projects` | Tabel `projects` + kolom `advance_requests.project_id` (boleh kosong untuk uang muka lama, "Tanpa project"). Wajib diisi oleh aplikasi untuk uang muka baru. |
+| `0000_init` | Seluruh tabel: `companies` (tenant), `users` (+`company_id`, NULL hanya untuk superadmin), `roles`, `user_roles`, `audit_logs`, `login_attempts`, `company_settings` (satu baris per company), `projects`, `advance_requests`, `document_sequences` (nomor per company), `expense_categories`, `settlements`, `settlement_items`, `advance_ledger_entries`, `reminder_logs`. Nama project, nomor UM/PJ, nama kategori, dan hash file nota unik per company. |
+| `0001_subscriptions` | Langganan: `companies.subscription_until` & `last_reminder_key`, `platform_settings`, `payment_bank_accounts`, `subscription_plans`, `company_plan_prices`, `subscriptions` (maks. satu tagihan terbuka per company, dijaga unique index parsial), `subscription_payments`. Company yang sudah ada mendapat masa gratis 14 hari sejak dibuat. |
+| `0002_drop_plan_prices` | Hapus `subscription_plans` & `company_plan_prices` (harga flat per paket diganti harga dasar + per pengguna). |
+| `0003_user_based_pricing` | `companies.user_limit` (batas pengguna aktif), komponen harga & batas pengguna masa gratis di `platform_settings`, `company_pricing` (harga khusus per komponen), `subscriptions.kind` (`PLAN`/`TOPUP`) & `users`; `months` boleh kosong untuk tambah kuota. Tagihan uji yang sudah ada dianggap 10 pengguna. |

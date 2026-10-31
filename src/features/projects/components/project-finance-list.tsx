@@ -112,9 +112,14 @@ function Stat({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+// Seluruh blok (ikon, nama, klien) bisa diklik: area klik link dibentangkan
+// menutupi blok lewat ::after (relative di pembungkus).
 function ProjectName({ project }: { project: ProjectFinanceRow }) {
   return (
-    <div style={projectAccentStyle(project.id ? project.icon : null)} className="project-accent flex min-w-0 items-center gap-3">
+    <div
+      style={projectAccentStyle(project.id ? project.icon : null)}
+      className="project-accent group relative flex min-w-0 items-center gap-3"
+    >
       <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-(--project-strong) text-(--project-on)">
         <ProjectIcon name={project.icon} className="size-4" />
       </div>
@@ -122,7 +127,7 @@ function ProjectName({ project }: { project: ProjectFinanceRow }) {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <Link
             href={project.id ? `/projects/${project.id}` : `/advances?project=${NO_PROJECT}`}
-            className="truncate font-medium hover:underline"
+            className="truncate font-medium group-hover:underline after:absolute after:inset-0"
           >
             {project.name}
           </Link>

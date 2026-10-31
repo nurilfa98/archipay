@@ -11,7 +11,8 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldGroup } from "@/components/ui/field";
 import { updateOwnProfile } from "@/features/users/actions";
 import type { UserDetail } from "@/features/users/queries";
-import { formatPhone } from "@/lib/phone";
+import { BankAccountFields } from "@/components/bank-account-fields";
+import { PhoneInput } from "@/components/phone-input";
 import { notify } from "@/lib/notify";
 import { TextField } from "./text-field";
 
@@ -52,35 +53,22 @@ export function ProfileForm({ user }: { user: UserDetail }) {
           required
           error={fieldError("email")}
         />
-        <TextField
+        <PhoneInput
           name="phoneNumber"
           label="Nomor WhatsApp"
-          type="tel"
-          inputMode="tel"
-          placeholder="0812-3456-7890"
           description="Dipakai untuk notifikasi uang muka dan pengingat."
-          defaultValue={user.phoneNumber ? formatPhone(user.phoneNumber) : ""}
+          defaultValue={user.phoneNumber}
           required
           error={fieldError("phoneNumber")}
         />
 
         {/* Rekening dipakai Finance/Owner saat mencairkan uang muka lewat transfer */}
         <div className="grid gap-5 sm:grid-cols-2">
-          <TextField
-            name="bankName"
-            label="Nama bank"
-            placeholder="BCA"
-            defaultValue={user.bankName ?? ""}
-            autoComplete="off"
-            error={fieldError("bankName")}
-          />
-          <TextField
-            name="bankAccountNumber"
-            label="Nomor rekening"
-            inputMode="numeric"
-            defaultValue={user.bankAccountNumber ?? ""}
-            autoComplete="off"
-            error={fieldError("bankAccountNumber")}
+          <BankAccountFields
+            defaultBankName={user.bankName}
+            defaultAccountNumber={user.bankAccountNumber}
+            bankNameError={fieldError("bankName")}
+            accountError={fieldError("bankAccountNumber")}
           />
         </div>
 

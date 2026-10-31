@@ -32,9 +32,14 @@ export default function AuditPage({ searchParams }: PageProps<"/audit">) {
 }
 
 async function AuditContent({ searchParams }: Pick<PageProps<"/audit">, "searchParams">) {
-  await requirePermission("audit:view");
+  const user = await requirePermission("audit:view");
+  const companyId = user.company.id;
   const filters = parseAuditFilters(await searchParams);
-  const [logs, years, actors] = await Promise.all([listAuditLogs(filters), listAuditYears(), listAuditActors()]);
+  const [logs, years, actors] = await Promise.all([
+    listAuditLogs(companyId, filters),
+    listAuditYears(companyId),
+    listAuditActors(companyId),
+  ]);
   const yearOptions =
     filters.year && !years.includes(filters.year) ? [filters.year, ...years].sort((a, b) => b - a) : years;
 
@@ -79,6 +84,8 @@ function describeEntity(log: AuditLogRow): { entityKind: string; entityLabel: st
       return { entityKind: "Pengguna", entityLabel: label, entityHref: `/users/${log.entityId}` };
     case "expense_categories":
       return { entityKind: "Kategori biaya", entityLabel: label, entityHref: "/settings" };
+    case "projects":
+      return { entityKind: "Project", entityLabel: label, entityHref: `/projects/${log.entityId}` };
     case "company_settings":
       return { entityKind: "Pengaturan", entityLabel: "Kebijakan uang muka", entityHref: "/settings" };
     default:

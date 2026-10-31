@@ -1,27 +1,28 @@
 # Ceklis Production ArchiPay
 
 Hal yang perlu disiapkan agar aplikasi berjalan sesuai harapan di production.
-Satu deployment = satu perusahaan, jadi ceklis ini dijalankan untuk setiap
-perusahaan. Contoh nilai dan cara generate kunci ada di `.env.example`; alur
+Satu deployment melayani banyak company (multi-tenant): bagian 1–8 dijalankan
+sekali per deployment, bagian 9 untuk setiap company baru. Contoh nilai dan cara generate kunci ada di `.env.example`; alur
 bisnisnya ada di [BUSINESS-FLOW.md](./BUSINESS-FLOW.md).
 
-Ditulis berdasarkan kode per 26 Oktober 2026.
+Ditulis berdasarkan kode per 31 Oktober 2026.
 
 ---
 
 ## 1. Database (PostgreSQL)
 
 - [ ] Siapkan database production yang **terpisah** dari database development, lalu isi `DATABASE_URL`.
-- [ ] Jalankan `pnpm db:migrate`. Migration ini juga mengisi pengaturan bawaan dan 6 kategori biaya.
+- [ ] Jalankan `pnpm db:migrate`. Pengaturan bawaan dan 6 kategori biaya dibuat otomatis untuk setiap company baru.
 - [ ] **Connection pooling.** Di serverless (Vercel), setiap instance membuka koneksinya sendiri (bawaan postgres.js: 10 koneksi), jadi pakai URL *pooler* dari provider database.
 - [ ] ⚠️ Bila pooler memakai mode *transaction* (misal Supabase port 6543), postgres.js wajib diberi opsi `prepare: false` di `src/lib/db/index.ts`. Saat ini opsi tersebut **belum** diatur.
 - [ ] Aktifkan backup otomatis harian.
 
-## 2. Akun superadmin & Owner pertama
+## 2. Akun superadmin & company pertama
 
 - [ ] Jalankan `pnpm db:create-superadmin <email> <password> "Nama"`.
 - [ ] Login, lalu **langsung ganti password** lewat menu user → Ganti password, karena password tadi tersimpan di riwayat terminal.
-- [ ] Daftarkan akun Owner lewat menu Pengguna (role awal Owner).
+- [ ] Isi **Pengaturan platform** sebelum membuat company: harga dasar per bulan, jumlah pengguna termasuk, harga per pengguna tambahan, diskon 6 bulan & 1 tahun, masa gratis (bawaan 14 hari) & tenggang (3 hari), batas pengguna masa gratis (10), nomor WhatsApp admin, rekening bank dan/atau gambar QRIS. Tanpa harga dasar, Owner tidak bisa memilih paket.
+- [ ] Buat company (klien) beserta Owner pertamanya lewat menu **Company** → Tambah company. Password sementara dikirim ke email Owner, dan masa gratis dimulai saat itu.
 
 ## 3. Environment variables
 
@@ -64,6 +65,7 @@ Dipakai untuk mengirim password sementara saat akun dibuat dan saat password di-
 ## 7. Pengingat harian (cron)
 
 - [ ] Isi `CRON_SECRET` (minimal 16 karakter). Tanpa nilai ini, endpoint pengingat menolak semua request.
+- [ ] Cron yang sama juga mengirim pengingat masa aktif langganan H-3/H-1 ke Owner (WhatsApp & email). Penguncian company tidak bergantung pada cron.
 - [ ] **Vercel:** jadwal sudah ada di `vercel.json` (`0 1 * * *` = 08.00 WIB), dan Vercel mengirim header otorisasinya otomatis.
 - [ ] **Hosting lain:** pasang penjadwal (crontab, cron-job.org, dll) seperti contoh di `.env.example`.
 - [ ] Uji sekali; respons harus `{"ok":true,...}`:
@@ -78,7 +80,9 @@ Dipakai untuk mengirim password sementara saat akun dibuat dan saat password di-
 - [ ] ⚠️ **Vercel:** batas ukuran request 4,5 MB, sedangkan file nota boleh sampai 4 MB plus isian form. Masih masuk tetapi tipis, jadi uji unggah PDF berukuran sekitar 4 MB.
 - [ ] **Self-hosting:** pakai server Node yang terus berjalan (`pnpm build && pnpm start`) agar notifikasi yang dikirim setelah respons (`after()`) sempat selesai.
 
-## 9. Data awal di aplikasi
+## 9. Data awal di aplikasi (per company)
+
+Dikerjakan Owner company tersebut (Superadmin hanya bisa melihat).
 
 - [ ] Tinjau **Pengaturan**: batas unggah nota (bawaan 3 hari), batas pengembalian (3 hari), batas biaya tanpa nota (Rp50.000).
 - [ ] Sesuaikan **kategori biaya** dengan kebutuhan perusahaan.
@@ -102,4 +106,4 @@ Dipakai untuk mengirim password sementara saat akun dibuat dan saat password di-
   4. Karyawan konfirmasi → unggah nota → foto tersimpan di R2 dan bisa dibuka.
   5. Verifikasi → catat pengembalian.
   6. Cek semua langkah tercatat di **Audit Log**.
-- [ ] Putuskan [catatan terbuka di BUSINESS-FLOW.md](./BUSINESS-FLOW.md#15-catatan-terbuka). Yang paling penting: karyawan yang tidak pernah mengirim nota tidak pernah masuk daftar Potong Gaji.
+- [ ] Putuskan [catatan terbuka di BUSINESS-FLOW.md](./BUSINESS-FLOW.md#18-catatan-terbuka). Yang paling penting: karyawan yang tidak pernah mengirim nota tidak pernah masuk daftar Potong Gaji.

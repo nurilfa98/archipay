@@ -47,13 +47,14 @@ async function NewAdvanceContent({ searchParams }: Pick<PageProps<"/advances/new
   if (!direct && !can(user, "advance:propose")) redirect("/projects");
 
   // Tanpa project aktif yang valid, kembali ke halaman Project.
-  const scope = await resolveProjectScope(readProjectParam(await searchParams));
+  const companyId = user.company.id;
+  const scope = await resolveProjectScope(companyId, readProjectParam(await searchParams));
   if (scope.kind !== "project" || scope.project.status !== "ACTIVE") redirect("/projects");
 
   const [options, approvers, settings] = await Promise.all([
-    listRecipientOptions(user.id),
-    direct ? [] : listApprovers(),
-    getCompanySettings(),
+    listRecipientOptions(companyId, user.id),
+    direct ? [] : listApprovers(companyId),
+    getCompanySettings(companyId),
   ]);
   // Usulan FINANCE: sembunyikan penerima yang tidak punya penyetuju sah
   // (misal satu-satunya OWNER), karena usulannya tidak akan bisa disetujui.
@@ -66,7 +67,10 @@ async function NewAdvanceContent({ searchParams }: Pick<PageProps<"/advances/new
 
   // Penerima yang sudah mencapai batas uang muka tertunda tetap tampil, tetapi
   // form menolak mencatat uang muka baru untuk mereka (dan Server Action mengecek ulang).
-  const overdueCounts = await countOverdueAdvances(recipients.map((recipient) => recipient.id));
+  const overdueCounts = await countOverdueAdvances(
+    companyId,
+    recipients.map((recipient) => recipient.id),
+  );
 
   return (
     <>

@@ -50,9 +50,9 @@ async function PayrollContent({ searchParams }: Pick<PageProps<"/payroll-deducti
   const canManage = can(user, "payroll:manage");
   const filters = parsePayrollFilters(await searchParams);
   const [candidates, deductions, years, currentPeriod] = await Promise.all([
-    listPayrollCandidates(),
-    listPayrollDeductions(filters),
-    listPayrollYears(),
+    listPayrollCandidates(user.company.id),
+    listPayrollDeductions(user.company.id, filters),
+    listPayrollYears(user.company.id),
     getCurrentPayrollPeriod(),
   ]);
   const yearOptions =

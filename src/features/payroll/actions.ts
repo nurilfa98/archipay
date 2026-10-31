@@ -36,7 +36,7 @@ export async function recordPayrollDeduction(settlementId: string, formData: For
 
   const id = settlementIdSchema.safeParse(settlementId);
   if (!id.success) return NOT_ELIGIBLE;
-  const settlement = await getSettlementDetail(id.data);
+  const settlement = await getSettlementDetail(actor.company.id, id.data);
   if (!settlement || settlement.advanceStatus !== "RETURN_PENDING" || !settlement.returnOverdue) return NOT_ELIGIBLE;
   // Pemisahan tugas: tidak bisa menandai potongan gaji untuk diri sendiri.
   if (settlement.recipientId === actor.id) return FORBIDDEN;
@@ -76,7 +76,7 @@ export async function recordPayrollDeduction(settlementId: string, formData: For
     return NOT_ELIGIBLE;
   }
 
-  const recipient = await getActiveRecipient(settlement.recipientId);
+  const recipient = await getActiveRecipient(actor.company.id, settlement.recipientId);
   if (recipient && settlement.number) {
     const summary = { id: settlement.id, number: settlement.number, advanceNumber: settlement.advanceNumber };
     after(() =>

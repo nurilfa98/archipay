@@ -40,13 +40,17 @@ export default function RequestAdvancePage({ searchParams }: PageProps<"/advance
 async function RequestAdvanceContent({ searchParams }: Pick<PageProps<"/advances/request">, "searchParams">) {
   const user = await requirePermission("advance:request");
   // Tanpa project aktif yang valid, kembali ke halaman Project.
-  const scope = await resolveProjectScope(readProjectParam(await searchParams));
+  const companyId = user.company.id;
+  const scope = await resolveProjectScope(companyId, readProjectParam(await searchParams));
   if (scope.kind !== "project" || scope.project.status !== "ACTIVE") redirect("/projects");
 
-  const [self, settings] = await Promise.all([getActiveRecipient(user.id), getCompanySettings()]);
+  const [self, settings] = await Promise.all([
+    getActiveRecipient(companyId, user.id),
+    getCompanySettings(companyId),
+  ]);
   // verifySession sudah memastikan user aktif; ini hanya pengaman tipe.
   if (!self) redirect("/login");
-  const overdueCounts = await countOverdueAdvances([self.id]);
+  const overdueCounts = await countOverdueAdvances(companyId, [self.id]);
 
   return (
     <>

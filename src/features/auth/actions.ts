@@ -18,13 +18,16 @@ import { eq } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
+import { clearActiveCompanyCookie } from "@/lib/auth/active-company";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { createSession, destroySession, getSession } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { getPlatformSettings } from "@/lib/platform-settings";
 import { getClientIp } from "@/lib/request";
+import { getCompanyAccess } from "@/lib/subscription-access";
 import type { ActionResult } from "@/types/action-result";
-import { findUserCredentials, findUserForLogin } from "./queries";
+import { findUserCredentials, findUserForLogin, findUserRoleNames } from "./queries";
 import { checkLoginRateLimit, recordLoginAttempt } from "./rate-limit";
 import { changePasswordSchema, loginSchema } from "./schemas";
 
@@ -71,19 +74,33 @@ export async function login(
     await recordLoginAttempt(email, ip, false);
     // Audit hanya untuk akun yang ada, agar OWNER bisa melihat bila ada
     // yang mencoba menebak password akun tertentu.
-    if (user) await logFailedLogin(user.id, "WRONG_PASSWORD", ip);
+    if (user) await logFailedLogin(user, "WRONG_PASSWORD", ip);
     return { success: false, message: "Email atau password salah." };
   }
 
   // Aman memberi tahu status akun di sini karena password sudah terbukti benar.
   if (!user.isActive) {
-    await logFailedLogin(user.id, "INACTIVE", ip);
+    await logFailedLogin(user, "INACTIVE", ip);
     return { success: false, message: "Akun Anda dinonaktifkan. Hubungi admin." };
+  }
+  if (user.companyIsActive === false) {
+    await logFailedLogin(user, "COMPANY_INACTIVE", ip);
+    return { success: false, message: "Akses company Anda sedang dinonaktifkan. Hubungi admin ArchiPay." };
+  }
+  // Langganan habis & lewat masa tenggang: hanya Owner yang boleh masuk, dan
+  // ia hanya bisa membuka menu Langganan (lib/auth/dal.ts).
+  if (user.companySubscriptionUntil && (await isLockedForUser(user.id, user.companySubscriptionUntil))) {
+    await logFailedLogin(user, "SUBSCRIPTION_LOCKED", ip);
+    return {
+      success: false,
+      message: "Masa berlangganan ArchiPay company Anda sudah habis. Hubungi Owner untuk memperpanjang.",
+    };
   }
 
   // 4. Catat, lalu buat session (menulis cookie terenkripsi)
   await recordLoginAttempt(email, ip, true);
   await logAudit({
+    companyId: user.companyId,
     userId: user.id,
     action: "LOGIN_SUCCESS",
     entityName: "users",
@@ -93,12 +110,15 @@ export async function login(
   // Checkbox "Ingat saya" di login-form.tsx: value="1" bila dicentang.
   const rememberMe = formData.get("rememberMe") === "1";
   await createSession(user.id, user.sessionVersion, rememberMe);
+  // Superadmin (tanpa company) selalu mulai dari daftar company, bukan dari
+  // company yang terakhir dibuka di sesi sebelumnya.
+  if (!user.companyId) await clearActiveCompanyCookie();
   clearClientCache();
 
   // 5. Pindah halaman. redirect() bekerja dengan melempar error khusus, jadi
   // JANGAN letakkan di dalam try/catch, nanti tertangkap dan tidak jalan.
   // User dengan password sementara langsung diarahkan ke halaman ganti password.
-  redirect(user.mustChangePassword ? "/change-password" : "/");
+  redirect(user.mustChangePassword ? "/change-password" : homePath(user.companyId));
 }
 
 // Ganti password milik sendiri. Dipakai untuk dua keadaan:
@@ -150,6 +170,7 @@ export async function changePassword(
       .where(eq(users.id, account.id));
     await logAudit(
       {
+        companyId: account.companyId,
         userId: account.id,
         action: "PASSWORD_CHANGED",
         entityName: "users",
@@ -165,7 +186,19 @@ export async function changePassword(
   // Pilihan "Ingat saya" dari sesi sebelumnya dipertahankan.
   await createSession(account.id, sessionVersion, session.rememberMe);
   clearClientCache();
-  redirect("/");
+  redirect(homePath(account.companyId));
+}
+
+async function isLockedForUser(userId: string, subscriptionUntil: Date) {
+  const { graceDays } = await getPlatformSettings();
+  if (!getCompanyAccess({ subscriptionUntil, hasPaid: false, graceDays }).locked) return false;
+  return !(await findUserRoleNames(userId)).includes("OWNER");
+}
+
+// Halaman pertama setelah login: kotak menu untuk user company, daftar
+// company untuk Superadmin (company_id NULL).
+function homePath(companyId: string | null) {
+  return companyId ? "/" : "/companies";
 }
 
 // Logout sengaja TIDAK memanggil redirect(). Halaman tujuan dibuka oleh
@@ -177,13 +210,15 @@ export async function changePassword(
 export async function logout() {
   // Ambil userId SEBELUM session dihapus, untuk dicatat di audit log.
   const { userId } = await getSession();
+  const account = userId ? await findUserCredentials(userId) : undefined;
 
-  if (userId) {
+  if (account) {
     await logAudit({
-      userId,
+      companyId: account.companyId,
+      userId: account.id,
       action: "LOGOUT",
       entityName: "users",
-      entityId: userId,
+      entityId: account.id,
       ipAddress: await getClientIp(),
     });
   }
@@ -203,12 +238,17 @@ function clearClientCache() {
 
 // Fungsi tanpa `export` di file "use server" TIDAK menjadi Server Action,
 // jadi tidak bisa dipanggil dari browser. Aman untuk helper internal.
-function logFailedLogin(userId: string, reason: "WRONG_PASSWORD" | "INACTIVE", ip: string | null) {
+function logFailedLogin(
+  account: { id: string; companyId: string | null },
+  reason: "WRONG_PASSWORD" | "INACTIVE" | "COMPANY_INACTIVE" | "SUBSCRIPTION_LOCKED",
+  ip: string | null,
+) {
   return logAudit({
+    companyId: account.companyId,
     userId: null, // pelaku belum terautentikasi
     action: "LOGIN_FAILED",
     entityName: "users",
-    entityId: userId, // akun yang dicoba
+    entityId: account.id, // akun yang dicoba
     newValues: { reason },
     ipAddress: ip,
   });

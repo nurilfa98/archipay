@@ -2,7 +2,8 @@
 //
 // Pemanggil WAJIB sudah memastikan user boleh melihat datanya: halaman
 // daftar menyaring per penerima untuk karyawan, halaman detail mengecek
-// "penerima atau advance:view-all".
+// "penerima atau advance:view-all". Semua fungsi menerima companyId (company
+// yang sedang dibuka) sehingga data company lain tidak pernah terbaca.
 //
 // Satu uang muka berhubungan dengan beberapa user (penerima, pencatat,
 // penyetuju, pencair). alias() membuat tabel users bisa di-join beberapa kali
@@ -105,6 +106,7 @@ function withTypes<T extends { status: string; disbursementMethod: string }>(row
 // Tanpa limit untuk daftar "perlu tindakan" (jumlahnya kecil karena
 // disaring per status); daftar riwayat dibatasi agar halaman tetap ringan.
 export async function listAdvances(filter: {
+  companyId: string;
   recipientId?: string;
   // id project, atau NO_PROJECT untuk uang muka lama tanpa project.
   project?: string;
@@ -120,6 +122,7 @@ export async function listAdvances(filter: {
     .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
     .where(
       and(
+        eq(advanceRequests.companyId, filter.companyId),
         filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
         projectCondition(filter.project),
         filter.statuses ? inArray(advanceRequests.status, [...filter.statuses]) : undefined,
@@ -134,13 +137,18 @@ export async function listAdvances(filter: {
 }
 
 // Tahun yang punya uang muka, terbaru dulu. Untuk pilihan filter Tahun.
-export async function listAdvanceYears(filter: { recipientId?: string; project?: string }): Promise<number[]> {
+export async function listAdvanceYears(filter: {
+  companyId: string;
+  recipientId?: string;
+  project?: string;
+}): Promise<number[]> {
   await io();
   const rows = await db
     .selectDistinct({ year: advanceRequests.periodYear })
     .from(advanceRequests)
     .where(
       and(
+        eq(advanceRequests.companyId, filter.companyId),
         filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
         projectCondition(filter.project),
       ),
@@ -157,7 +165,10 @@ export type AdvanceSummary = Record<
   { count: number; amount: number; overdueCount: number }
 >;
 
-export async function getAdvanceSummary(filter: { recipientId?: string }): Promise<AdvanceSummary> {
+export async function getAdvanceSummary(filter: {
+  companyId: string;
+  recipientId?: string;
+}): Promise<AdvanceSummary> {
   await io();
   const rows = await db
     .select({
@@ -168,7 +179,12 @@ export async function getAdvanceSummary(filter: { recipientId?: string }): Promi
       overdueCount: sql`count(*) filter (where ${advanceRequests.settlementDueAt} < now())`.mapWith(Number),
     })
     .from(advanceRequests)
-    .where(filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined)
+    .where(
+      and(
+        eq(advanceRequests.companyId, filter.companyId),
+        filter.recipientId ? eq(advanceRequests.recipientId, filter.recipientId) : undefined,
+      ),
+    )
     .groupBy(advanceRequests.status);
 
   const summary = Object.fromEntries(
@@ -180,7 +196,7 @@ export async function getAdvanceSummary(filter: { recipientId?: string }): Promi
   return summary;
 }
 
-export async function getAdvanceDetail(id: string): Promise<AdvanceDetail | null> {
+export async function getAdvanceDetail(companyId: string, id: string): Promise<AdvanceDetail | null> {
   await io();
   const createdBy = alias(users, "created_by");
   const decidedBy = alias(users, "decided_by");
@@ -218,7 +234,7 @@ export async function getAdvanceDetail(id: string): Promise<AdvanceDetail | null
     .leftJoin(decidedBy, eq(advanceRequests.decidedById, decidedBy.id))
     .leftJoin(disbursedBy, eq(advanceRequests.disbursedById, disbursedBy.id))
     .leftJoin(cancelledBy, eq(advanceRequests.cancelledById, cancelledBy.id))
-    .where(eq(advanceRequests.id, id))
+    .where(and(eq(advanceRequests.id, id), eq(advanceRequests.companyId, companyId)))
     .limit(1);
 
   return row ? withTypes(row) : null;
@@ -242,22 +258,31 @@ const recipientColumns = {
   bankAccountNumber: users.bankAccountNumber,
 };
 
-// Calon penerima: semua user aktif kecuali pencatat sendiri
+// Calon penerima: semua user aktif di company ini kecuali pencatat sendiri
 // (pemberi dan penerima dana harus orang berbeda) dan superadmin.
-export async function listRecipientOptions(excludeUserId: string): Promise<RecipientOption[]> {
+export async function listRecipientOptions(companyId: string, excludeUserId: string): Promise<RecipientOption[]> {
   await io();
   return db
     .select(recipientColumns)
     .from(users)
-    .where(and(eq(users.isActive, true), ne(users.id, excludeUserId), notSuperadmin(users.id)))
+    .where(
+      and(
+        eq(users.companyId, companyId),
+        eq(users.isActive, true),
+        ne(users.id, excludeUserId),
+        notSuperadmin(users.id),
+      ),
+    )
     .orderBy(asc(users.fullName));
 }
 
-export async function getActiveRecipient(userId: string): Promise<RecipientOption | null> {
+export async function getActiveRecipient(companyId: string, userId: string): Promise<RecipientOption | null> {
   const [row] = await db
     .select(recipientColumns)
     .from(users)
-    .where(and(eq(users.id, userId), eq(users.isActive, true), notSuperadmin(users.id)))
+    .where(
+      and(eq(users.id, userId), eq(users.companyId, companyId), eq(users.isActive, true), notSuperadmin(users.id)),
+    )
     .limit(1);
   return row ?? null;
 }
@@ -265,8 +290,9 @@ export async function getActiveRecipient(userId: string): Promise<RecipientOptio
 export type Contact = { id: string; fullName: string; phoneNumber: string | null };
 
 // Kontak untuk notifikasi: user tertentu (misal pencair dana) + semua OWNER
-// aktif, tanpa duplikat. Dipakai untuk laporan "tidak sesuai" & konfirmasi.
-export async function getOwnerContacts(extraUserIds: (string | null)[]): Promise<Contact[]> {
+// aktif di company ini, tanpa duplikat. Dipakai untuk laporan "tidak sesuai"
+// & konfirmasi.
+export async function getOwnerContacts(companyId: string, extraUserIds: (string | null)[]): Promise<Contact[]> {
   const contactColumns = { id: users.id, fullName: users.fullName, phoneNumber: users.phoneNumber };
 
   const owners = await db
@@ -274,30 +300,30 @@ export async function getOwnerContacts(extraUserIds: (string | null)[]): Promise
     .from(users)
     .innerJoin(userRoles, eq(userRoles.userId, users.id))
     .innerJoin(roles, eq(userRoles.roleId, roles.id))
-    .where(and(eq(roles.name, "OWNER"), eq(users.isActive, true)));
+    .where(and(eq(users.companyId, companyId), eq(roles.name, "OWNER"), eq(users.isActive, true)));
 
   const ids = extraUserIds.filter((id): id is string => !!id);
   const extras = ids.length
     ? await db
         .select(contactColumns)
         .from(users)
-        .where(and(inArray(users.id, ids), eq(users.isActive, true)))
+        .where(and(inArray(users.id, ids), eq(users.companyId, companyId), eq(users.isActive, true)))
     : [];
 
   return [...new Map([...owners, ...extras].map((contact) => [contact.id, contact])).values()];
 }
 
-// Semua user aktif yang boleh menyetujui uang muka (advance:approve). Dicek
-// lewat can() agar tetap mengikuti ROLE_PERMISSIONS, bukan nama role.
-// Saring lagi dengan eligibleApprovers() (service.ts) per uang muka.
-export async function listApprovers(): Promise<Contact[]> {
+// Semua user aktif di company ini yang boleh menyetujui uang muka
+// (advance:approve). Dicek lewat can() agar tetap mengikuti ROLE_PERMISSIONS,
+// bukan nama role. Saring lagi dengan eligibleApprovers() (service.ts) per uang muka.
+export async function listApprovers(companyId: string): Promise<Contact[]> {
   await io();
   const rows = await db
     .select({ id: users.id, fullName: users.fullName, phoneNumber: users.phoneNumber, role: roles.name })
     .from(users)
     .innerJoin(userRoles, eq(userRoles.userId, users.id))
     .innerJoin(roles, eq(userRoles.roleId, roles.id))
-    .where(eq(users.isActive, true));
+    .where(and(eq(users.companyId, companyId), eq(users.isActive, true)));
 
   const people = new Map<string, Contact & { roles: Role[] }>();
   for (const { role, ...contact } of rows) {
@@ -314,7 +340,10 @@ export async function listApprovers(): Promise<Contact[]> {
 // dikembalikan untuk diperbaiki), dihitung per penerima. Status yang dihitung
 // sama dengan pengingat "batas nota terlewati" (AWAITING_RECEIPT_STATUSES).
 // Dikembalikan sebagai objek biasa agar bisa dikirim ke Client Component.
-export async function countOverdueAdvances(recipientIds: string[]): Promise<Record<string, number>> {
+export async function countOverdueAdvances(
+  companyId: string,
+  recipientIds: string[],
+): Promise<Record<string, number>> {
   if (recipientIds.length === 0) return {};
   await io();
   const rows = await db
@@ -322,6 +351,7 @@ export async function countOverdueAdvances(recipientIds: string[]): Promise<Reco
     .from(advanceRequests)
     .where(
       and(
+        eq(advanceRequests.companyId, companyId),
         inArray(advanceRequests.recipientId, recipientIds),
         inArray(advanceRequests.status, [...AWAITING_RECEIPT_STATUSES]),
         lt(advanceRequests.settlementDueAt, sql`now()`),

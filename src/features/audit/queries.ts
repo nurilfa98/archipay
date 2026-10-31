@@ -1,8 +1,8 @@
-// Query halaman Audit Log (khusus OWNER).
+// Query halaman Audit Log (khusus OWNER). Hanya catatan company yang sedang dibuka.
 //
 // Setiap baris audit_logs menunjuk data yang terdampak lewat
 // entity_name + entity_id. Query ini menyambungkannya ke tabel aslinya agar
-// halaman bisa menampilkan "UM-2026-10-0001" atau "Budi", bukan UUID.
+// halaman bisa menampilkan "UM-2026-10-0001", "Budi", atau nama project, bukan UUID.
 // Laporan yang belum pernah dikirim belum bernomor PJ: tampil sebagai
 // "Draf UM-2026-10-0001".
 
@@ -12,7 +12,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
 import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
-import { advanceRequests, auditLogs, expenseCategories, settlements, users } from "@/lib/db/schema";
+import { advanceRequests, auditLogs, expenseCategories, projects, settlements, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { AUDIT_PAGE_LIMIT, auditActionsOf } from "./constants";
 import type { AuditFilters } from "./schemas";
@@ -42,7 +42,7 @@ function zonedStart(year: number, month: number, offset: SQL) {
   return sql`((make_timestamp(${year}, ${month}, 1, 0, 0, 0) + ${offset}) at time zone ${tz})`;
 }
 
-export async function listAuditLogs(filter: AuditFilters): Promise<AuditLogRow[]> {
+export async function listAuditLogs(companyId: string, filter: AuditFilters): Promise<AuditLogRow[]> {
   await io();
   const period = filter.year
     ? filter.month
@@ -72,7 +72,8 @@ export async function listAuditLogs(filter: AuditFilters): Promise<AuditLogRow[]
         ${settlements.number},
         'Draf ' || ${settlementAdvance.number},
         ${targetUser.fullName},
-        ${expenseCategories.name}
+        ${expenseCategories.name},
+        ${projects.name}
       )`,
       oldValues: auditLogs.oldValues,
       newValues: auditLogs.newValues,
@@ -90,8 +91,10 @@ export async function listAuditLogs(filter: AuditFilters): Promise<AuditLogRow[]
       expenseCategories,
       and(eq(auditLogs.entityName, "expense_categories"), eq(expenseCategories.id, auditLogs.entityId)),
     )
+    .leftJoin(projects, and(eq(auditLogs.entityName, "projects"), eq(projects.id, auditLogs.entityId)))
     .where(
       and(
+        eq(auditLogs.companyId, companyId),
         period,
         filter.category ? inArray(auditLogs.action, auditActionsOf(filter.category)) : undefined,
         filter.actorId ? eq(auditLogs.userId, filter.actorId) : undefined,
@@ -113,24 +116,25 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 // Rentang tahun yang punya catatan, untuk pilihan filter. Memakai min/max
 // (dibantu index created_at) agar tidak memindai seluruh tabel.
-export async function listAuditYears(): Promise<number[]> {
+export async function listAuditYears(companyId: string): Promise<number[]> {
   await io();
   const [row] = await db
     .select({
       first: sql<number | null>`extract(year from min(${auditLogs.createdAt}) at time zone ${tz})::int`,
       last: sql<number | null>`extract(year from max(${auditLogs.createdAt}) at time zone ${tz})::int`,
     })
-    .from(auditLogs);
+    .from(auditLogs)
+    .where(eq(auditLogs.companyId, companyId));
   if (!row?.first || !row.last) return [];
   return Array.from({ length: row.last - row.first + 1 }, (_, index) => row.last! - index);
 }
 
-// Semua pengguna (termasuk nonaktif, tanpa superadmin) untuk filter "Pelaku".
-export async function listAuditActors(): Promise<{ id: string; fullName: string }[]> {
+// Semua pengguna company ini (termasuk nonaktif, tanpa superadmin) untuk filter "Pelaku".
+export async function listAuditActors(companyId: string): Promise<{ id: string; fullName: string }[]> {
   await io();
   return db
     .select({ id: users.id, fullName: users.fullName })
     .from(users)
-    .where(notSuperadmin(users.id))
+    .where(and(eq(users.companyId, companyId), notSuperadmin(users.id)))
     .orderBy(asc(users.fullName));
 }

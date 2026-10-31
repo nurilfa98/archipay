@@ -128,11 +128,29 @@ Hanya untuk: webhook dari pihak ketiga, endpoint yang dipanggil aplikasi lain
 | Lapisan              | Tugas                                                    |
 | -------------------- | -------------------------------------------------------- |
 | `proxy.ts`           | Cek cepat "ada cookie session?" → redirect ke /login     |
-| `lib/auth/dal.ts`    | Verifikasi session sungguhan + role (sumber kebenaran)   |
-| `queries`/`actions`  | Selalu panggil DAL, cek kepemilikan data                 |
+| `lib/auth/dal.ts`    | Verifikasi session sungguhan + role + company aktif (sumber kebenaran) |
+| `queries`/`actions`  | Selalu panggil DAL, saring `company_id`, cek kepemilikan data |
 | DTO                  | Hanya kirim field yang perlu ke client                   |
 
 `proxy.ts` saja **tidak cukup** — semua pengecekan penting harus dekat ke data.
+
+### Multi-tenant (company)
+
+Setiap tabel bisnis punya `company_id`. `verifySession()` / `requirePermission()`
+mengembalikan `user.company` (company yang sedang dibuka: milik user sendiri,
+atau pilihan Superadmin dari cookie `archipay_company`), dan **setiap** query
+fitur bisnis menerima `companyId` sebagai parameter wajib:
+
+```ts
+const user = await requirePermission("advance:view-own");
+const rows = await listAdvances({ companyId: user.company.id, ... });
+const advance = await getAdvanceDetail(user.company.id, id); // id company lain → null → 404
+```
+
+Saat menulis data, `company_id` diisi dari `actor.company.id`, bukan dari
+input browser. Halaman platform Superadmin (menu Company) memakai
+`verifyAccount()` / `requirePlatformAdmin()` karena belum tentu ada company
+aktif. File nota disimpan dengan awalan `<companyId>/receipts/...`.
 
 Dengan `cacheComponents: true`, komponen yang membaca `cookies()` (mis. data user
 login) harus dibungkus `<Suspense>`, kalau tidak build akan error.

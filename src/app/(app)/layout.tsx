@@ -31,8 +31,10 @@
 import { Suspense } from "react";
 import { AppHeader } from "@/components/layout/app-header";
 import { MenuFab } from "@/components/layout/menu-fab";
+import { ActiveCompanyBar } from "@/features/companies/components/active-company-bar";
+import { SubscriptionBanner } from "@/features/subscriptions/components/subscription-banner";
 import { UserMenu, UserMenuSkeleton } from "@/features/auth/components/user-menu";
-import { verifySession } from "@/lib/auth/dal";
+import { verifyAccount } from "@/lib/auth/dal";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
@@ -44,6 +46,9 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           </Suspense>
         }
       />
+      <Suspense>
+        <HeaderCompanyBar />
+      </Suspense>
       {/* pb-24: ruang di bawah konten agar tidak tertutup tombol menu mengambang. */}
       <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 pt-6 pb-24">{children}</main>
       <Suspense>
@@ -55,6 +60,18 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
 
 // Kalau session tidak valid (misal user dinonaktifkan), user diarahkan ke /login.
 async function HeaderUserMenu() {
-  const user = await verifySession();
+  const user = await verifyAccount();
   return <UserMenu user={{ fullName: user.fullName, email: user.email, roles: user.roles }} />;
+}
+
+// Pita "Melihat company ..." khusus Superadmin yang sedang membuka company,
+// dan spanduk masa aktif langganan khusus Owner.
+async function HeaderCompanyBar() {
+  const user = await verifyAccount();
+  return (
+    <>
+      <ActiveCompanyBar user={user} />
+      <SubscriptionBanner user={user} />
+    </>
+  );
 }

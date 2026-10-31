@@ -70,7 +70,7 @@ export type ProjectReport = {
 
 const recipient = alias(users, "recipient");
 
-export async function getProjectReport(projectId: string): Promise<ProjectReport | null> {
+export async function getProjectReport(companyId: string, projectId: string): Promise<ProjectReport | null> {
   await io();
   const [project] = await db
     .select({
@@ -81,7 +81,7 @@ export async function getProjectReport(projectId: string): Promise<ProjectReport
       contractValue: projects.contractValue,
     })
     .from(projects)
-    .where(eq(projects.id, projectId))
+    .where(and(eq(projects.id, projectId), eq(projects.companyId, companyId)))
     .limit(1);
   if (!project) return null;
 

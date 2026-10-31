@@ -5,85 +5,29 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1792748619075,
-      "tag": "0000_giant_leopardon",
+      "when": 1793419202076,
+      "tag": "0000_init",
       "breakpoints": true
     },
     {
       "idx": 1,
       "version": "7",
-      "when": 1792759163216,
-      "tag": "0001_audit_logs_login_attempts",
+      "when": 1793430222777,
+      "tag": "0001_subscriptions",
       "breakpoints": true
     },
     {
       "idx": 2,
       "version": "7",
-      "when": 1792831796499,
-      "tag": "0002_users_password_session",
+      "when": 1793433273545,
+      "tag": "0002_drop_plan_prices",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
-      "when": 1792838682982,
-      "tag": "0003_advances_company_settings",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1792903775519,
-      "tag": "0004_advance_monthly_number",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1792908895727,
-      "tag": "0005_settlements_ledger",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1792909368670,
-      "tag": "0006_settlement_drafts",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1792911301936,
-      "tag": "0007_returns_reminders",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1792916151359,
-      "tag": "0008_audit_logs_created_at",
-      "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "7",
-      "when": 1793072455542,
-      "tag": "0009_max_overdue_advances",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "7",
-      "when": 1793073768550,
-      "tag": "0010_settlement_late_reason",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "7",
-      "when": 1793335274866,
-      "tag": "0011_projects",
+      "when": 1793433301875,
+      "tag": "0003_user_based_pricing",
       "breakpoints": true
     }
   ]

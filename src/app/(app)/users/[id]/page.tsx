@@ -27,6 +27,7 @@ import { StatusBadge } from "@/features/users/components/users-table";
 import { getUserDetail } from "@/features/users/queries";
 import { requirePermission } from "@/lib/auth/dal";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { formatAccountNumber } from "@/lib/bank";
 import { formatPhone } from "@/lib/phone";
 
 export const metadata: Metadata = {
@@ -53,7 +54,7 @@ export default function UserDetailPage({ params }: PageProps<"/users/[id]">) {
 
 async function UserDetailContent({ id }: { id: string }) {
   const actor = await requirePermission("user:manage");
-  const user = await getUserDetail(id);
+  const user = await getUserDetail(actor.company.id, id);
   if (!user || user.roles.includes("SUPERADMIN")) notFound();
 
   const header = <PageHeader title={user.fullName} description={user.email} action={<StatusBadge user={user} />} />;
@@ -76,7 +77,9 @@ async function UserDetailContent({ id }: { id: string }) {
               <Item label="Nomor WhatsApp">{user.phoneNumber ? formatPhone(user.phoneNumber) : "-"}</Item>
               <Item label="Role">{user.roles.map((role) => ROLE_LABELS[role]).join(", ")}</Item>
               <Item label="Nama bank">{user.bankName ?? "-"}</Item>
-              <Item label="Nomor rekening">{user.bankAccountNumber ?? "-"}</Item>
+              <Item label="Nomor rekening">
+                {user.bankAccountNumber ? formatAccountNumber(user.bankName, user.bankAccountNumber) : "-"}
+              </Item>
             </dl>
           </CardContent>
         </Card>

@@ -29,11 +29,11 @@ export default function SettingsPage() {
 }
 
 async function SettingsContent() {
-  await requirePermission("settings:manage");
+  const user = await requirePermission("settings:manage");
   const [settings, updateInfo, categories] = await Promise.all([
-    getCompanySettings(),
-    getSettingsUpdateInfo(),
-    listAllExpenseCategories(),
+    getCompanySettings(user.company.id),
+    getSettingsUpdateInfo(user.company.id),
+    listAllExpenseCategories(user.company.id),
   ]);
 
   return (

@@ -2,7 +2,8 @@
 // password_hash, aman dikirim ke komponen.
 //
 // Pemanggil WAJIB sudah mengecek permission "user:manage" (requirePermission)
-// sebelum memakai fungsi di sini.
+// sebelum memakai fungsi di sini, dan mengirim company yang sedang dibuka:
+// pengguna company lain tidak pernah ikut terbaca.
 //
 // Kenapa setiap fungsi diawali `await io()`?
 // Driver postgres.js memanggil Math.random() saat membuka koneksi. Saat
@@ -18,7 +19,7 @@
 // - node_modules/next/dist/docs/01-app/02-guides/data-security.md
 
 import "server-only";
-import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
 import { io } from "next/cache";
 import { isRole, type Role } from "@/lib/auth/roles";
 import { notSuperadmin } from "@/lib/auth/superadmin";
@@ -51,7 +52,7 @@ const listColumns = {
 
 // `search` mencocokkan nama atau email (tidak peka huruf besar/kecil).
 // Akun superadmin tidak ikut tampil.
-export async function listUsers(search?: string): Promise<UserListItem[]> {
+export async function listUsers(companyId: string, search?: string): Promise<UserListItem[]> {
   await io();
   const pattern = search ? `%${escapeLike(search)}%` : undefined;
 
@@ -60,6 +61,7 @@ export async function listUsers(search?: string): Promise<UserListItem[]> {
     .from(users)
     .where(
       and(
+        eq(users.companyId, companyId),
         notSuperadmin(users.id),
         pattern ? or(ilike(users.fullName, pattern), ilike(users.email, pattern)) : undefined,
       ),
@@ -70,14 +72,25 @@ export async function listUsers(search?: string): Promise<UserListItem[]> {
   return rows.map((row) => ({ ...row, roles: rolesByUser.get(row.id) ?? [] }));
 }
 
-// Tidak menyaring superadmin (dipakai juga halaman Profil milik sendiri).
-// Halaman yang menampilkan user lain wajib mengecek roles-nya.
-export async function getUserDetail(id: string): Promise<UserDetail | null> {
+// Satu pengguna di company tertentu. Tidak menyaring superadmin (company-nya
+// null, jadi memang tidak pernah cocok); halaman yang menampilkan user lain
+// tetap mengecek roles-nya.
+export async function getUserDetail(companyId: string, id: string): Promise<UserDetail | null> {
+  return findUserDetail(and(eq(users.id, id), eq(users.companyId, companyId)));
+}
+
+// Akun milik sendiri (halaman & action Profil), termasuk Superadmin yang tidak
+// punya company.
+export async function getOwnProfile(userId: string): Promise<UserDetail | null> {
+  return findUserDetail(eq(users.id, userId));
+}
+
+async function findUserDetail(where: SQL | undefined): Promise<UserDetail | null> {
   await io();
   const [row] = await db
     .select({ ...listColumns, bankName: users.bankName, bankAccountNumber: users.bankAccountNumber })
     .from(users)
-    .where(eq(users.id, id))
+    .where(where)
     .limit(1);
 
   if (!row) return null;

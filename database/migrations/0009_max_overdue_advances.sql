@@ -1,2 +1,0 @@
-ALTER TABLE "company_settings" ADD COLUMN "max_overdue_advances" integer DEFAULT 2 NOT NULL;--> statement-breakpoint
-ALTER TABLE "company_settings" ADD CONSTRAINT "company_settings_max_overdue" CHECK ("company_settings"."max_overdue_advances" between 1 and 10);

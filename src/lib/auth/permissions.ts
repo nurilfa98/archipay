@@ -36,6 +36,9 @@ export const PERMISSIONS = [
   "user:manage", // tambah/nonaktifkan user & atur role Finance/Karyawan
   "user:manage-owner", // tambah/kelola akun Owner & memberi/mencabut role Owner
   "audit:view", // melihat audit log
+  "company:manage", // kelola company (klien) & masuk ke company mana pun (platform)
+  "subscription:view", // menu Langganan company sendiri: pilih paket & kirim bukti bayar
+  "subscription:manage", // verifikasi tagihan semua company, harga paket, Pengaturan platform
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -43,13 +46,17 @@ export type Permission = (typeof PERMISSIONS)[number];
 // Contoh pembagian akses; sesuaikan dengan SOP perusahaan.
 // `satisfies` memastikan setiap role terdaftar dan setiap permission valid.
 const ROLE_PERMISSIONS = {
-  // Superadmin membuka semua menu dan melihat semua data, tetapi TIDAK
-  // melakukan transaksi uang (mencairkan, menyetujui, memverifikasi,
+  // Superadmin mengelola company (klien). Setelah masuk ke sebuah company
+  // (lib/auth/active-company.ts) ia membuka semua menu dan melihat semua
+  // data company itu, tetapi TIDAK melakukan transaksi uang (mencairkan, menyetujui, memverifikasi,
   // mencatat potong gaji): tindakannya tidak dicatat ke audit log, jadi
-  // jejak uang harus selalu milik Owner/Finance/Karyawan.
+  // jejak uang harus selalu milik Owner/Finance/Karyawan. Langganan company
+  // dikelola dari halaman Company/Tagihan (subscription:manage), bukan dari
+  // menu Langganan milik Owner.
   SUPERADMIN: PERMISSIONS.filter(
     (permission) =>
       ![
+        "subscription:view",
         "advance:disburse",
         "advance:propose",
         "advance:approve",
@@ -62,9 +69,10 @@ const ROLE_PERMISSIONS = {
   // Owner boleh semuanya, kecuali mengajukan uang muka untuk dirinya sendiri
   // (dana perusahaan memang di tangannya, dan pengajuan Owner tidak bisa
   // disetujui siapa pun karena penyetuju tidak boleh penerimanya sendiri),
-  // dan mengelola akun Owner (khusus superadmin).
+  // serta mengelola akun Owner, company, & tagihan semua company (khusus superadmin).
   OWNER: PERMISSIONS.filter(
-    (permission) => permission !== "advance:request" && permission !== "user:manage-owner",
+    (permission) =>
+      !["advance:request", "user:manage-owner", "company:manage", "subscription:manage"].includes(permission),
   ),
   FINANCE: [
     "advance:view-own",

@@ -60,16 +60,20 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
   let card: ProjectCardData | undefined;
   let finance: ProjectFinanceRow | undefined;
   if (canManage) {
-    finance = (await listProjectFinance({ includeAll: true })).find((row) => row.id === id);
+    finance = (await listProjectFinance(user.company.id, { includeAll: true })).find((row) => row.id === id);
     card = finance;
   } else {
     const viewAll = can(user, "advance:view-all");
-    card = (await listProjectCards({ recipientId: viewAll ? undefined : user.id, includeAll: true })).find(
-      (item) => item.id === id,
-    );
+    card = (
+      await listProjectCards({
+        companyId: user.company.id,
+        recipientId: viewAll ? undefined : user.id,
+        includeAll: true,
+      })
+    ).find((item) => item.id === id);
   }
   if (!card || !card.status) notFound();
-  const categories = finance ? await expenseByCategory(id) : [];
+  const categories = finance ? await expenseByCategory(user.company.id, id) : [];
   const active = card.status === "ACTIVE";
 
   return (

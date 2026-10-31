@@ -6,7 +6,9 @@ Project Financial Control & Petty Cash Management System. ArchiPay mencatat
 dan **potong gaji** bila sisa dana tidak dikembalikan. Notifikasi dan
 pengingat dikirim lewat WhatsApp.
 
-Satu deployment = satu perusahaan.
+Multi-tenant: satu deployment melayani banyak **company** (klien). Superadmin
+(pengelola platform) membuat company beserta Owner pertamanya, dan setiap
+company hanya melihat datanya sendiri.
 
 ## Teknologi
 
@@ -29,8 +31,8 @@ Prasyarat: Node.js 20.9 atau lebih baru, pnpm 9, dan database PostgreSQL.
 2. Salin `.env.example` menjadi `.env`, lalu isi minimal `DATABASE_URL` dan
    `SESSION_SECRET` (cara generate ada di file tersebut).
 
-3. Buat tabel database dan akun superadmin (superadmin lalu mendaftarkan
-   Owner dari menu Pengguna):
+3. Buat tabel database dan akun superadmin (superadmin lalu membuat company
+   beserta Owner pertamanya dari menu Company):
 
    ```bash
    pnpm db:migrate

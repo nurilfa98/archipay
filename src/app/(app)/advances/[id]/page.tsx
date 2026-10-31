@@ -35,6 +35,7 @@ import { EDITABLE_ADVANCE_STATUSES, toSettlementStatus } from "@/features/settle
 import { getSettlementRefByAdvance } from "@/features/settlements/queries";
 import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
+import { formatAccountNumber } from "@/lib/bank";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -55,7 +56,7 @@ export default function AdvanceDetailPage({ params }: PageProps<"/advances/[id]"
 
 async function AdvanceDetailContent({ id }: { id: string }) {
   const viewer = await requirePermission("advance:view-own");
-  const advance = await getAdvanceDetail(id);
+  const advance = await getAdvanceDetail(viewer.company.id, id);
   if (!advance) notFound();
 
   const isRecipient = advance.recipientId === viewer.id;
@@ -72,7 +73,7 @@ async function AdvanceDetailContent({ id }: { id: string }) {
   // selama belum berakhir.
   const canAssignProject =
     !advance.projectId && can(viewer, "project:manage") && !isFinished(advance.status);
-  const assignableProjects = canAssignProject ? await listActiveProjects() : null;
+  const assignableProjects = canAssignProject ? await listActiveProjects(viewer.company.id) : null;
 
   return (
     <>
@@ -282,7 +283,7 @@ function AdvanceDetails({
       {isTransfer && advance.disbursedAt && (
         <Item label="Rekening tujuan">
           {advance.destinationBankName && advance.destinationAccountNumber
-            ? `${advance.destinationBankName} · ${advance.destinationAccountNumber}`
+            ? `${advance.destinationBankName} · ${formatAccountNumber(advance.destinationBankName, advance.destinationAccountNumber)}`
             : "Belum tercatat"}
           {advance.transferReference && (
             <span className="block text-muted-foreground">Ref. {advance.transferReference}</span>

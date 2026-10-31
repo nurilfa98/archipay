@@ -54,6 +54,7 @@ export const AUDIT_ACTIONS = {
   SETTINGS_UPDATED: { label: "Ubah kebijakan", category: "SETTINGS", tone: "active" },
   EXPENSE_CATEGORY_CREATED: { label: "Tambah kategori biaya", category: "SETTINGS", tone: "success" },
   EXPENSE_CATEGORY_UPDATED: { label: "Ubah kategori biaya", category: "SETTINGS", tone: "active" },
+  SUBSCRIPTION_PAYMENT_CLAIMED: { label: "Kirim bukti bayar langganan", category: "SETTINGS", tone: "active" },
 } as const satisfies Record<AuditAction, ActionInfo>;
 
 // Aksi lama yang tidak (lagi) dikenal tetap ditampilkan apa adanya.

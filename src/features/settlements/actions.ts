@@ -29,7 +29,7 @@ import { z } from "zod";
 import { getActiveRecipient, getOwnerContacts } from "@/features/advances/queries";
 import { getCompanySettings } from "@/features/settings/queries";
 import { logAudit } from "@/lib/audit";
-import { verifySession, type CurrentUser } from "@/lib/auth/dal";
+import { verifySession, type CompanyUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { endOfDayAfter, formatDateOnly, zonedDateString } from "@/lib/dates";
 import { db, isUniqueViolation } from "@/lib/db";
@@ -88,6 +88,7 @@ export async function addSettlementItem(settlementId: string, formData: FormData
   const loaded = await loadSettlement(settlementId);
   if (!loaded.success) return loaded;
   const { actor, settlement } = loaded.data;
+  const companyId = actor.company.id;
 
   const itemCount = (await listSettlementItems(settlement.id)).length;
   if (!getSettlementActions({ ...settlement, itemCount }, actor).edit) return FORBIDDEN;
@@ -109,7 +110,13 @@ export async function addSettlementItem(settlementId: string, formData: FormData
   const [category] = await db
     .select({ id: expenseCategories.id })
     .from(expenseCategories)
-    .where(and(eq(expenseCategories.id, input.categoryId), eq(expenseCategories.isActive, true)))
+    .where(
+      and(
+        eq(expenseCategories.id, input.categoryId),
+        eq(expenseCategories.companyId, companyId),
+        eq(expenseCategories.isActive, true),
+      ),
+    )
     .limit(1);
   if (!category) return fieldError("categoryId", "Kategori tidak ditemukan");
 
@@ -124,7 +131,7 @@ export async function addSettlementItem(settlementId: string, formData: FormData
 
   let file: { bytes: Uint8Array<ArrayBuffer>; hash: string; contentType: string; extension: string } | null = null;
   if (input.noReceipt) {
-    const { noReceiptMaxAmount } = await getCompanySettings();
+    const { noReceiptMaxAmount } = await getCompanySettings(companyId);
     if (input.amount > noReceiptMaxAmount) {
       return fieldError("amount", `Biaya tanpa nota maksimal ${formatRupiah(noReceiptMaxAmount)} per item`);
     }
@@ -138,13 +145,14 @@ export async function addSettlementItem(settlementId: string, formData: FormData
     if (!type) return fieldError("file", "File harus berupa foto (JPG, PNG, WebP) atau PDF");
 
     const hash = hashFile(bytes);
-    const duplicate = await findReceiptByHash(hash);
+    const duplicate = await findReceiptByHash(companyId, hash);
     if (duplicate) return fieldError("file", duplicateMessage(duplicate));
     file = { bytes, hash, ...type };
   }
 
   const itemId = crypto.randomUUID();
-  const fileKey = file ? `receipts/${settlement.advanceId}/${itemId}.${file.extension}` : null;
+  // Diawali id company agar file tiap klien terpisah di storage.
+  const fileKey = file ? `${companyId}/receipts/${settlement.advanceId}/${itemId}.${file.extension}` : null;
   // File diunggah SEBELUM baris disimpan. Bila penyimpanan gagal, file
   // dihapus lagi agar tidak ada file yatim di storage.
   if (file && fileKey) {
@@ -162,6 +170,7 @@ export async function addSettlementItem(settlementId: string, formData: FormData
       if (!(await lockEditable(tx, settlement.advanceId))) return false;
       await tx.insert(settlementItems).values({
         id: itemId,
+        companyId,
         settlementId: settlement.id,
         receiptDate: input.receiptDate,
         categoryId: input.categoryId,
@@ -176,6 +185,7 @@ export async function addSettlementItem(settlementId: string, formData: FormData
       });
       await logAudit(
         {
+          companyId: actor.company.id,
           userId: actor.id,
           action: "SETTLEMENT_ITEM_ADDED",
           entityName: "settlements",
@@ -229,6 +239,7 @@ export async function removeSettlementItem(settlementId: string, itemId: string)
     if (!row) return null;
     await logAudit(
       {
+        companyId: actor.company.id,
         userId: actor.id,
         action: "SETTLEMENT_ITEM_REMOVED",
         entityName: "settlements",
@@ -291,7 +302,7 @@ export async function submitSettlement(settlementId: string, lateReason: string)
 
     const documentNumber = settlement.number
       ? null
-      : await nextDocumentNumber(tx, SETTLEMENT_NUMBER_PREFIX, submittedAt);
+      : await nextDocumentNumber(tx, actor.company.id, SETTLEMENT_NUMBER_PREFIX, submittedAt);
     await tx
       .update(settlements)
       .set({ ...documentNumber, submittedAt, revisionNote: null, lateReason: lateReasonText })
@@ -299,6 +310,7 @@ export async function submitSettlement(settlementId: string, lateReason: string)
 
     await logAudit(
       {
+        companyId: actor.company.id,
         userId: actor.id,
         action: "SETTLEMENT_SUBMITTED",
         entityName: "settlements",
@@ -320,7 +332,7 @@ export async function submitSettlement(settlementId: string, lateReason: string)
   if (!number) return STALE;
 
   after(async () => {
-    const contacts = await getOwnerContacts([settlement.disbursedById]);
+    const contacts = await getOwnerContacts(actor.company.id, [settlement.disbursedById]);
     await notifySubmitted(
       {
         id: settlement.id,
@@ -370,6 +382,7 @@ export async function requestSettlementRevision(settlementId: string, note: stri
       .where(eq(settlements.id, settlement.id));
     await logAudit(
       {
+        companyId: actor.company.id,
         userId: actor.id,
         action: "SETTLEMENT_REVISION_REQUESTED",
         entityName: "settlements",
@@ -383,7 +396,7 @@ export async function requestSettlementRevision(settlementId: string, note: stri
   });
   if (!updated) return STALE;
 
-  const recipient = await getActiveRecipient(settlement.recipientId);
+  const recipient = await getActiveRecipient(actor.company.id, settlement.recipientId);
   if (recipient && settlement.number) {
     const summary = { id: settlement.id, number: settlement.number, advanceNumber: settlement.advanceNumber };
     after(() => notifyRevisionRequested(summary, recipient, parsedNote.data));
@@ -428,7 +441,7 @@ export async function verifySettlement(
   const approved = items.filter((item) => byId.get(item.id)!.approved);
   const approvedAmount = sum(approved);
   const verifiedAt = new Date();
-  const { returnDueDays: defaultReturnDays } = await getCompanySettings();
+  const { returnDueDays: defaultReturnDays } = await getCompanySettings(actor.company.id);
   const ip = await getClientIp();
 
   const result = await db.transaction(async (tx) => {
@@ -454,6 +467,7 @@ export async function verifySettlement(
     if (approved.length > 0) {
       await tx.insert(advanceLedgerEntries).values(
         approved.map((item) => ({
+          companyId: actor.company.id,
           advanceId: settlement.advanceId,
           type: "EXPENSE_APPROVED",
           amount: -item.amount,
@@ -488,6 +502,7 @@ export async function verifySettlement(
 
     await logAudit(
       {
+        companyId: actor.company.id,
         userId: actor.id,
         action: "SETTLEMENT_VERIFIED",
         entityName: "settlements",
@@ -506,7 +521,7 @@ export async function verifySettlement(
   });
   if (!result) return STALE;
 
-  const recipient = await getActiveRecipient(settlement.recipientId);
+  const recipient = await getActiveRecipient(actor.company.id, settlement.recipientId);
   if (recipient && settlement.number) {
     const summary = {
       id: settlement.id,
@@ -572,7 +587,7 @@ async function recordBalancePayment(
       : STALE;
   }
 
-  const recipient = await getActiveRecipient(settlement.recipientId);
+  const recipient = await getActiveRecipient(actor.company.id, settlement.recipientId);
   if (recipient && settlement.number) {
     const summary = { id: settlement.id, number: settlement.number, advanceNumber: settlement.advanceNumber };
     after(() => notifyBalanceRecorded(summary, recipient, { type, ...result }));
@@ -585,7 +600,7 @@ async function recordBalancePayment(
 // Helper (tanpa export → bukan Server Action, tidak bisa dipanggil dari browser)
 // ---------------------------------------------------------------------------
 
-type Loaded = { actor: CurrentUser; settlement: SettlementDetail };
+type Loaded = { actor: CompanyUser; settlement: SettlementDetail };
 
 // Hanya penerima atau pemegang advance:view-all yang boleh menyentuh data ini.
 // Selain itu dijawab "tidak ditemukan" agar keberadaan datanya tidak bocor.
@@ -594,7 +609,7 @@ async function loadSettlement(settlementId: string): Promise<ActionResult<Loaded
   const id = settlementIdSchema.safeParse(settlementId);
   if (!id.success) return NOT_FOUND;
 
-  const settlement = await getSettlementDetail(id.data);
+  const settlement = await getSettlementDetail(actor.company.id, id.data);
   if (!settlement) return NOT_FOUND;
   if (settlement.recipientId !== actor.id && !can(actor, "advance:view-all")) return NOT_FOUND;
   return { success: true, data: { actor, settlement } };
@@ -611,13 +626,13 @@ async function lockEditable(tx: Transaction, advanceId: string) {
   return !!row && (EDITABLE_ADVANCE_STATUSES as readonly string[]).includes(row.status);
 }
 
-async function findReceiptByHash(hash: string) {
+async function findReceiptByHash(companyId: string, hash: string) {
   const [row] = await db
     .select({ number: settlements.number, advanceNumber: advanceRequests.number })
     .from(settlementItems)
     .innerJoin(settlements, eq(settlementItems.settlementId, settlements.id))
     .innerJoin(advanceRequests, eq(settlements.advanceId, advanceRequests.id))
-    .where(eq(settlementItems.fileHash, hash))
+    .where(and(eq(settlementItems.companyId, companyId), eq(settlementItems.fileHash, hash)))
     .limit(1);
   return row ?? null;
 }

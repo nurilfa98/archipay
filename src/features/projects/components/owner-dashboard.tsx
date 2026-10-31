@@ -11,8 +11,8 @@ import { ExpenseCharts } from "./expense-charts";
 import { FinanceKpis } from "./finance-kpis";
 import { ProjectFinanceList } from "./project-finance-list";
 
-export async function OwnerDashboard() {
-  const { projects, categories, months } = await getOwnerDashboard();
+export async function OwnerDashboard({ companyId }: { companyId: string }) {
+  const { projects, categories, months } = await getOwnerDashboard(companyId);
 
   return (
     <>

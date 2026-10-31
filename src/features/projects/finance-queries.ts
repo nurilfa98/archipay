@@ -60,19 +60,19 @@ export type OwnerDashboard = {
 };
 
 // Total pengeluaran per project (null = uang muka tanpa project).
-async function expenseByProject(): Promise<Map<string | null, number>> {
+async function expenseByProject(companyId: string): Promise<Map<string | null, number>> {
   const rows = await db
     .select({ projectId: advanceRequests.projectId, expense: expenseSum })
     .from(advanceLedgerEntries)
     .innerJoin(advanceRequests, eq(advanceLedgerEntries.advanceId, advanceRequests.id))
-    .where(eq(advanceLedgerEntries.type, "EXPENSE_APPROVED"))
+    .where(and(eq(advanceLedgerEntries.companyId, companyId), eq(advanceLedgerEntries.type, "EXPENSE_APPROVED")))
     .groupBy(advanceRequests.projectId);
   return new Map(rows.map((row) => [row.projectId, row.expense]));
 }
 
 // Pengeluaran per kategori biaya, terbesar dulu. `project` kosong = semua
 // project; diisi id project atau NO_PROJECT untuk satu project saja.
-export async function expenseByCategory(project?: string): Promise<CategoryExpense[]> {
+export async function expenseByCategory(companyId: string, project?: string): Promise<CategoryExpense[]> {
   await io();
   return db
     .select({ id: expenseCategories.id, name: expenseCategories.name, amount: expenseSum })
@@ -80,7 +80,13 @@ export async function expenseByCategory(project?: string): Promise<CategoryExpen
     .innerJoin(advanceRequests, eq(advanceLedgerEntries.advanceId, advanceRequests.id))
     .innerJoin(settlementItems, eq(advanceLedgerEntries.settlementItemId, settlementItems.id))
     .innerJoin(expenseCategories, eq(settlementItems.categoryId, expenseCategories.id))
-    .where(and(eq(advanceLedgerEntries.type, "EXPENSE_APPROVED"), projectCondition(project)))
+    .where(
+      and(
+        eq(advanceLedgerEntries.companyId, companyId),
+        eq(advanceLedgerEntries.type, "EXPENSE_APPROVED"),
+        projectCondition(project),
+      ),
+    )
     .groupBy(expenseCategories.id, expenseCategories.name)
     .orderBy(desc(expenseSum));
 }
@@ -89,7 +95,7 @@ const MONTHS_SHOWN = 6;
 
 // Pengeluaran per bulan (menurut tanggal di nota) untuk MONTHS_SHOWN bulan
 // terakhir, bulan tanpa pengeluaran tetap tampil dengan nilai 0.
-async function expenseByMonth(): Promise<MonthExpense[]> {
+async function expenseByMonth(companyId: string): Promise<MonthExpense[]> {
   const { year, month } = zonedYearMonth(new Date());
   const keys: { key: string; label: string }[] = [];
   for (let back = MONTHS_SHOWN - 1; back >= 0; back--) {
@@ -108,32 +114,39 @@ async function expenseByMonth(): Promise<MonthExpense[]> {
     .from(advanceLedgerEntries)
     .innerJoin(settlementItems, eq(advanceLedgerEntries.settlementItemId, settlementItems.id))
     .where(
-      and(eq(advanceLedgerEntries.type, "EXPENSE_APPROVED"), gte(settlementItems.receiptDate, `${keys[0].key}-01`)),
+      and(
+        eq(advanceLedgerEntries.companyId, companyId),
+        eq(advanceLedgerEntries.type, "EXPENSE_APPROVED"),
+        gte(settlementItems.receiptDate, `${keys[0].key}-01`),
+      ),
     )
     .groupBy(monthKey);
   const byKey = new Map(rows.map((row) => [row.key, row.amount]));
   return keys.map(({ key, label }) => ({ key, label, amount: byKey.get(key) ?? 0 }));
 }
 
-export async function getOwnerDashboard(): Promise<OwnerDashboard> {
+export async function getOwnerDashboard(companyId: string): Promise<OwnerDashboard> {
   await io();
   const [projects, categories, months] = await Promise.all([
-    listProjectFinance(),
-    expenseByCategory(),
-    expenseByMonth(),
+    listProjectFinance(companyId),
+    expenseByCategory(companyId),
+    expenseByMonth(companyId),
   ]);
   return { projects, categories, months };
 }
 
-// Keuangan seluruh project (seluruh perusahaan). Berisi semua project aktif,
+// Keuangan seluruh project (satu company). Berisi semua project aktif,
 // plus project selesai / "Tanpa project" yang punya uang muka; includeAll =
 // project selesai tanpa uang muka juga ikut (halaman Project milik OWNER).
-export async function listProjectFinance(options: { includeAll?: boolean } = {}): Promise<ProjectFinanceRow[]> {
+export async function listProjectFinance(
+  companyId: string,
+  options: { includeAll?: boolean } = {},
+): Promise<ProjectFinanceRow[]> {
   await io();
   const [cards, manage, expenses] = await Promise.all([
-    listProjectCards({ includeAll: options.includeAll }),
-    listProjectsForManage(),
-    expenseByProject(),
+    listProjectCards({ companyId, includeAll: options.includeAll }),
+    listProjectsForManage(companyId),
+    expenseByProject(companyId),
   ]);
 
   const contractValues = new Map(manage.map((project) => [project.id, project.contractValue]));

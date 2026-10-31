@@ -80,5 +80,8 @@ export const updateUserSchema = z
   })
   .superRefine(bankPairRule);
 
+// Dipakai juga form tambah company (Owner pertama), agar aturannya sama.
+export { email as emailSchema, fullName as fullNameSchema };
+
 // id user yang dikirim dari browser (event handler) juga wajib divalidasi.
 export const userIdSchema = z.string().min(1).max(36);

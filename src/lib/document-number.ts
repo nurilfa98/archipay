@@ -27,17 +27,25 @@ export type DocumentNumber = {
   periodMonth: number;
 };
 
+// Urutan nomor terpisah per company: UM-2026-10-0001 di company A tidak
+// berhubungan dengan UM-2026-10-0001 di company B.
 export async function nextDocumentNumber(
   tx: Transaction,
+  companyId: string,
   prefix: string,
   date: Date,
 ): Promise<DocumentNumber> {
   const { year, month } = zonedYearMonth(date);
   const [row] = await tx
     .insert(documentSequences)
-    .values({ prefix, periodYear: year, periodMonth: month, lastValue: 1 })
+    .values({ companyId, prefix, periodYear: year, periodMonth: month, lastValue: 1 })
     .onConflictDoUpdate({
-      target: [documentSequences.prefix, documentSequences.periodYear, documentSequences.periodMonth],
+      target: [
+        documentSequences.companyId,
+        documentSequences.prefix,
+        documentSequences.periodYear,
+        documentSequences.periodMonth,
+      ],
       set: { lastValue: sql`${documentSequences.lastValue} + 1` },
     })
     .returning({ lastValue: documentSequences.lastValue });
