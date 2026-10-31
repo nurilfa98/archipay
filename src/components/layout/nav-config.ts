@@ -53,7 +53,7 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: WalletCardsIcon,
     description: "Sisa uang muka yang dipotong dari gaji",
     keywords: ["payroll", "gaji", "excel"],
-    permission: "payroll:manage",
+    permission: "payroll:view",
   },
   {
     title: "Pengguna",

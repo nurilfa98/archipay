@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { assignableRolesFor } from "@/features/users/access";
 import { UserCreateForm } from "@/features/users/components/user-create-form";
 import { requirePermission } from "@/lib/auth/dal";
 
@@ -17,7 +18,7 @@ export default function NewUserPage() {
     <>
       <PageHeader
         title="Tambah pengguna"
-        description="Akun dibuat dengan role Karyawan. Nomor WhatsApp, role, dan rekening bank bisa diatur setelahnya."
+        description="Pilih role awal akun. Nomor WhatsApp, role, dan rekening bank bisa diatur setelahnya."
       />
       <Card>
         <CardContent>
@@ -31,6 +32,6 @@ export default function NewUserPage() {
 }
 
 async function NewUserContent() {
-  await requirePermission("user:manage");
-  return <UserCreateForm />;
+  const actor = await requirePermission("user:manage");
+  return <UserCreateForm roles={assignableRolesFor(actor)} />;
 }

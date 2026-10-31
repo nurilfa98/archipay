@@ -109,7 +109,7 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
         projectId={id}
         stats={card.stats}
         showAdvances={can(user, "advance:view-own")}
-        showSettlements={can(user, "settlement:submit")}
+        showSettlements={can(user, "advance:view-own")}
       />
 
       {finance && (

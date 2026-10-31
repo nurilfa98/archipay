@@ -1,4 +1,4 @@
-// Halaman /payroll-deductions (Potong Gaji, OWNER & FINANCE).
+// Halaman /payroll-deductions (Potong Gaji, OWNER & FINANCE; superadmin hanya melihat).
 //
 // - Belum dipotong: sisa uang muka yang lewat batas pengembalian. Bisa
 //   diekspor ke Excel (.xlsx) untuk bagian penggajian, lalu ditandai "sudah dipotong".
@@ -22,6 +22,7 @@ import {
 } from "@/features/payroll/queries";
 import { parsePayrollFilters } from "@/features/payroll/schemas";
 import { requirePermission } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/permissions";
 import { formatDateOnly, formatDateTime, zonedDateString } from "@/lib/dates";
 import { MONTH_NAMES } from "@/lib/format";
 
@@ -45,7 +46,8 @@ export default function PayrollDeductionsPage({ searchParams }: PageProps<"/payr
 }
 
 async function PayrollContent({ searchParams }: Pick<PageProps<"/payroll-deductions">, "searchParams">) {
-  const user = await requirePermission("payroll:manage");
+  const user = await requirePermission("payroll:view");
+  const canManage = can(user, "payroll:manage");
   const filters = parsePayrollFilters(await searchParams);
   const [candidates, deductions, years, currentPeriod] = await Promise.all([
     listPayrollCandidates(),
@@ -73,7 +75,8 @@ async function PayrollContent({ searchParams }: Pick<PageProps<"/payroll-deducti
             returnDueTime: candidate.returnDueAt.getTime(),
             outstanding: candidate.outstanding,
             defaultPeriod: currentPeriod,
-            canRecord: candidate.recipientId !== user.id,
+            canRecord: canManage && candidate.recipientId !== user.id,
+            isOwn: candidate.recipientId === user.id,
           }))}
         />
       </section>

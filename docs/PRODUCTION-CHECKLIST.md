@@ -17,10 +17,11 @@ Ditulis berdasarkan kode per 26 Oktober 2026.
 - [ ] ⚠️ Bila pooler memakai mode *transaction* (misal Supabase port 6543), postgres.js wajib diberi opsi `prepare: false` di `src/lib/db/index.ts`. Saat ini opsi tersebut **belum** diatur.
 - [ ] Aktifkan backup otomatis harian.
 
-## 2. Akun Owner pertama
+## 2. Akun superadmin & Owner pertama
 
-- [ ] Jalankan `pnpm db:create-owner <email> <password> "Nama"`.
+- [ ] Jalankan `pnpm db:create-superadmin <email> <password> "Nama"`.
 - [ ] Login, lalu **langsung ganti password** lewat menu user → Ganti password, karena password tadi tersimpan di riwayat terminal.
+- [ ] Daftarkan akun Owner lewat menu Pengguna (role awal Owner).
 
 ## 3. Environment variables
 

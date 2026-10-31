@@ -10,7 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:create-owner": "node scripts/create-owner.mjs"
+    "db:create-superadmin": "node scripts/create-superadmin.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

@@ -22,6 +22,8 @@ export type PayrollCandidateRow = {
   // Periode gaji default di dialog ("2026-10") & boleh tidaknya viewer menandai.
   defaultPeriod: string;
   canRecord: boolean;
+  // Sisa dana milik user yang sedang login (tidak bisa ditandai sendiri).
+  isOwn: boolean;
 };
 
 const column = createDataTableColumns<PayrollCandidateRow>();
@@ -85,7 +87,7 @@ const COLUMNS = column.columns([
           />
         </div>
       ) : (
-        <span className="text-xs text-muted-foreground">Milik Anda</span>
+        <span className="text-xs text-muted-foreground">{row.original.isOwn ? "Milik Anda" : "-"}</span>
       ),
   }),
 ]);

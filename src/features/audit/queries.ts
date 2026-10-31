@@ -10,6 +10,7 @@ import "server-only";
 import { and, asc, desc, eq, gte, inArray, lt, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
+import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
 import { advanceRequests, auditLogs, expenseCategories, settlements, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
@@ -124,8 +125,12 @@ export async function listAuditYears(): Promise<number[]> {
   return Array.from({ length: row.last - row.first + 1 }, (_, index) => row.last! - index);
 }
 
-// Semua pengguna (termasuk nonaktif) untuk filter "Pelaku".
+// Semua pengguna (termasuk nonaktif, tanpa superadmin) untuk filter "Pelaku".
 export async function listAuditActors(): Promise<{ id: string; fullName: string }[]> {
   await io();
-  return db.select({ id: users.id, fullName: users.fullName }).from(users).orderBy(asc(users.fullName));
+  return db
+    .select({ id: users.id, fullName: users.fullName })
+    .from(users)
+    .where(notSuperadmin(users.id))
+    .orderBy(asc(users.fullName));
 }

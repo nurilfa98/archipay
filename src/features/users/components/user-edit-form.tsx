@@ -19,7 +19,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
-  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -28,11 +27,12 @@ import {
 } from "@/components/ui/field";
 import { updateUser } from "@/features/users/actions";
 import type { UserDetail } from "@/features/users/queries";
-import { ROLE_LABELS, ROLES } from "@/lib/auth/roles";
+import { ROLE_LABELS, type AssignableRole } from "@/lib/auth/roles";
 import { formatPhone } from "@/lib/phone";
 import { TextField } from "./text-field";
 
-export function UserEditForm({ user, isSelf }: { user: UserDetail; isSelf: boolean }) {
+// `roles` = role yang boleh diberikan pengelola (features/users/access.ts).
+export function UserEditForm({ user, roles }: { user: UserDetail; roles: AssignableRole[] }) {
   const [state, formAction, pending] = useActionState(updateUser, undefined);
 
   const error = state && !state.success ? state : undefined;
@@ -107,30 +107,20 @@ export function UserEditForm({ user, isSelf }: { user: UserDetail; isSelf: boole
               uncontrolled tidak boleh diganti defaultChecked-nya, jadi
               grupnya dibuat ulang bila daftar role berubah. */}
           <FieldGroup data-slot="checkbox-group" key={user.roles.toSorted().join()}>
-            {ROLES.map((role) => {
-              // Role Owner akun sendiri dikunci. Checkbox yang disabled tidak
-              // ikut terkirim, jadi nilainya dikirim lewat input tersembunyi.
-              const locked = isSelf && role === "OWNER";
-              return (
-                <Field key={role} orientation="horizontal" data-disabled={locked}>
-                  <Checkbox
-                    id={`role-${role}`}
-                    name="roles"
-                    value={role}
-                    defaultChecked={user.roles.includes(role)}
-                    disabled={locked}
-                  />
-                  {locked && <input type="hidden" name="roles" value={role} />}
-                  <FieldLabel htmlFor={`role-${role}`} className="font-normal">
-                    {ROLE_LABELS[role]}
-                  </FieldLabel>
-                </Field>
-              );
-            })}
+            {roles.map((role) => (
+              <Field key={role} orientation="horizontal">
+                <Checkbox
+                  id={`role-${role}`}
+                  name="roles"
+                  value={role}
+                  defaultChecked={user.roles.includes(role)}
+                />
+                <FieldLabel htmlFor={`role-${role}`} className="font-normal">
+                  {ROLE_LABELS[role]}
+                </FieldLabel>
+              </Field>
+            ))}
           </FieldGroup>
-          {isSelf && !fieldError("roles") && (
-            <FieldDescription>Role Owner pada akun sendiri tidak bisa dilepas.</FieldDescription>
-          )}
           <FieldError>{fieldError("roles")}</FieldError>
         </FieldSet>
 

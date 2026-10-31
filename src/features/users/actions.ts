@@ -7,11 +7,10 @@
 // Aturan penting:
 // - User TIDAK dihapus, hanya dinonaktifkan, agar riwayat (audit log, uang
 //   muka) tetap utuh.
-// - OWNER tidak bisa menonaktifkan, me-reset, atau melepas role OWNER dari
-//   akunnya sendiri. Karena pelakunya selalu OWNER aktif, aturan ini sekaligus
-//   menjamin selalu ada minimal satu OWNER aktif.
-//   (Kalau nanti role lain diberi "user:manage", tambahkan pengecekan
-//   "OWNER aktif terakhir" di sini.)
+// - Siapa boleh mengelola akun siapa diatur features/users/access.ts:
+//   superadmin mengelola Owner, Owner mengelola Finance & Karyawan. Akun
+//   superadmin dijawab "tidak ditemukan".
+// - Tidak ada yang bisa menonaktifkan atau me-reset akunnya sendiri.
 //
 // Referensi:
 // - node_modules/next/dist/docs/01-app/01-getting-started/07-mutating-data.md
@@ -25,21 +24,24 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
-import { verifySession } from "@/lib/auth/dal";
+import { verifySession, type CurrentUser } from "@/lib/auth/dal";
 import { generateTemporaryPassword, hashPassword } from "@/lib/auth/password";
 import { can } from "@/lib/auth/permissions";
-import type { Role } from "@/lib/auth/roles";
+import type { AssignableRole, Role } from "@/lib/auth/roles";
 import { db, isUniqueViolation } from "@/lib/db";
 import { roles, userRoles, users } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email";
 import { getClientIp } from "@/lib/request";
 import type { ActionResult } from "@/types/action-result";
+import { assignableRolesFor, canManageUser } from "./access";
 import { credentialsEmail } from "./emails";
-import { getUserDetail } from "./queries";
+import { getUserDetail, type UserDetail } from "./queries";
 import { createUserSchema, profileSchema, updateUserSchema, userIdSchema } from "./schemas";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
 const NOT_FOUND = { success: false, message: "Pengguna tidak ditemukan." } as const;
+const OWNER_ONLY = { success: false, message: "Akun Owner hanya bisa diubah oleh superadmin." } as const;
+const ROLE_NOT_ALLOWED = "Anda tidak bisa memberi role Owner";
 const EMAIL_TAKEN = {
   success: false as const,
   message: "Periksa kembali isian Anda.",
@@ -52,8 +54,9 @@ const EMAIL_TAKEN = {
 
 export type CreateUserResult = { id: string; email: string; emailSent: boolean };
 
-// OWNER cukup mengisi nama dan email. Role awal EMPLOYEE.
-// Password sementara dibuat sistem dan HANYA dikirim ke email user.
+// Cukup mengisi nama, email, dan role awal (superadmin boleh memilih Owner,
+// Owner hanya Finance/Karyawan). Password sementara dibuat sistem dan HANYA
+// dikirim ke email user.
 export async function createUser(
   _prevState: ActionResult<CreateUserResult> | undefined,
   formData: FormData,
@@ -64,13 +67,19 @@ export async function createUser(
   const parsed = createUserSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
+    role: formData.get("role"),
   });
   if (!parsed.success) return invalid(parsed.error);
+
+  const { role, ...data } = parsed.data;
+  if (!assignableRolesFor(actor).includes(role)) {
+    return { success: false, message: "Periksa kembali isian Anda.", fieldErrors: { role: [ROLE_NOT_ALLOWED] } };
+  }
 
   const temporaryPassword = generateTemporaryPassword();
   const passwordHash = await hashPassword(temporaryPassword);
   const ip = await getClientIp();
-  const initialRoles: Role[] = ["EMPLOYEE"];
+  const initialRoles: AssignableRole[] = [role];
 
   let userId: string;
   try {
@@ -78,7 +87,7 @@ export async function createUser(
     userId = await db.transaction(async (tx) => {
       const [created] = await tx
         .insert(users)
-        .values({ ...parsed.data, passwordHash, mustChangePassword: true })
+        .values({ ...data, passwordHash, mustChangePassword: true })
         .returning({ id: users.id });
 
       await setRoles(tx, created.id, initialRoles);
@@ -88,7 +97,7 @@ export async function createUser(
           action: "USER_CREATED",
           entityName: "users",
           entityId: created.id,
-          newValues: { ...parsed.data, roles: initialRoles },
+          newValues: { ...data, roles: initialRoles },
           ipAddress: ip,
         },
         tx,
@@ -97,19 +106,17 @@ export async function createUser(
     });
   } catch (error) {
     // Email ganda ditolak oleh UNIQUE constraint di database, bukan dengan
-    // "cek dulu baru insert", agar tetap aman walau dua OWNER submit bersamaan.
+    // "cek dulu baru insert", agar tetap aman walau dua orang submit bersamaan.
     if (isUniqueViolation(error)) return EMAIL_TAKEN;
     throw error;
   }
 
   // Email dikirim SETELAH transaksi berhasil. Kalau gagal, user tetap
   // tersimpan; OWNER bisa mengirim ulang lewat "Reset password".
-  const emailSent = await sendEmail(
-    credentialsEmail({ ...parsed.data, temporaryPassword, kind: "created" }),
-  );
+  const emailSent = await sendEmail(credentialsEmail({ ...data, temporaryPassword, kind: "created" }));
 
   revalidateUsers();
-  return { success: true, data: { id: userId, email: parsed.data.email, emailSent } };
+  return { success: true, data: { id: userId, email: data.email, emailSent } };
 }
 
 // ---------------------------------------------------------------------------
@@ -136,16 +143,14 @@ export async function updateUser(
   });
   if (!parsed.success) return invalid(parsed.error);
 
-  const before = await getUserDetail(userId.data);
-  if (!before) return NOT_FOUND;
+  const target = await getManagedUser(actor, userId.data);
+  if (!target.success) return target;
+  const before = target.data;
 
   const { roles: newRoles, ...profile } = parsed.data;
-  if (before.id === actor.id && !newRoles.includes("OWNER")) {
-    return {
-      success: false,
-      message: "Periksa kembali isian Anda.",
-      fieldErrors: { roles: ["Anda tidak bisa melepas role Owner dari akun sendiri"] },
-    };
+  const allowedRoles = assignableRolesFor(actor);
+  if (!newRoles.every((role) => allowedRoles.includes(role))) {
+    return { success: false, message: "Periksa kembali isian Anda.", fieldErrors: { roles: [ROLE_NOT_ALLOWED] } };
   }
 
   // Audit hanya mencatat field yang benar-benar berubah.
@@ -273,6 +278,8 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
   if (input.data.userId === actor.id) {
     return { success: false, message: "Anda tidak bisa menonaktifkan akun sendiri." };
   }
+  const target = await getManagedUser(actor, input.data.userId);
+  if (!target.success) return target;
 
   // Cookie session user yang dinonaktifkan masih tersimpan di browsernya,
   // tapi getCurrentUser() di DAL mengecek is_active, jadi aksesnya berhenti
@@ -322,8 +329,9 @@ export async function resetUserPassword(
     return { success: false, message: "Untuk akun sendiri, gunakan menu Ganti password." };
   }
 
-  const target = await getUserDetail(id.data);
-  if (!target) return NOT_FOUND;
+  const managed = await getManagedUser(actor, id.data);
+  if (!managed.success) return managed;
+  const target = managed.data;
   if (!target.isActive) {
     return { success: false, message: "Aktifkan akun ini terlebih dahulu sebelum me-reset password." };
   }
@@ -376,6 +384,15 @@ async function getUserManager() {
   return can(user, "user:manage") ? user : null;
 }
 
+// Akun target harus boleh dikelola actor (features/users/access.ts). Akun
+// superadmin dijawab "tidak ditemukan" agar keberadaannya tidak bocor.
+async function getManagedUser(actor: CurrentUser, userId: string): Promise<ActionResult<UserDetail>> {
+  const target = await getUserDetail(userId);
+  if (!target || target.roles.includes("SUPERADMIN")) return NOT_FOUND;
+  if (!canManageUser(actor, target)) return OWNER_ONLY;
+  return { success: true, data: target };
+}
+
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 // Ganti seluruh role user: hapus semua, lalu isi ulang.
@@ -384,7 +401,7 @@ async function setRoles(tx: Transaction, userId: string, roleNames: Role[]) {
     .select({ id: roles.id })
     .from(roles)
     .where(inArray(roles.name, roleNames));
-  // Tabel roles diisi oleh scripts/create-owner.mjs. Kalau jumlahnya tidak
+  // Tabel roles diisi oleh scripts/create-superadmin.mjs. Kalau jumlahnya tidak
   // cocok, data role di database belum lengkap: batalkan transaksi.
   if (roleRows.length !== roleNames.length) throw new Error("Data role di database tidak lengkap");
 

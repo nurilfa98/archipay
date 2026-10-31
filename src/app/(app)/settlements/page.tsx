@@ -57,7 +57,8 @@ export default function SettlementsPage({ searchParams }: PageProps<"/settlement
 }
 
 async function SettlementsContent({ searchParams }: Pick<PageProps<"/settlements">, "searchParams">) {
-  const user = await requirePermission("settlement:submit");
+  // Melihat cukup advance:view-own (superadmin melihat tanpa bisa mengunggah nota).
+  const user = await requirePermission("advance:view-own");
   const params = await searchParams;
   const scope = await resolveProjectScope(readProjectParam(params));
 

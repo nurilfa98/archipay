@@ -37,24 +37,35 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 
 ## 2. Peran & hak akses
 
-Satu user boleh punya lebih dari satu role; haknya digabung.
+Satu user boleh punya lebih dari satu role; haknya digabung. Urutan
+pendaftaran akun: **Superadmin → Owner → karyawan** (Finance & Karyawan).
 
-| Kemampuan | Owner | Finance | Karyawan |
-|---|:---:|:---:|:---:|
-| Melihat uang muka milik sendiri | ✓ | ✓ | ✓ |
-| Melihat uang muka semua karyawan | ✓ | ✓ | |
-| **Mencairkan langsung** (tanpa persetujuan) | ✓ | | |
-| **Mengusulkan** uang muka untuk karyawan (perlu persetujuan Owner) | ✓¹ | ✓ | |
-| **Menyetujui / menolak** pengajuan & usulan | ✓ | | |
-| Mengajukan uang muka untuk diri sendiri | | ✓ | ✓ |
-| Mengunggah nota & mengirim pertanggungjawaban | ✓ | ✓ | ✓ |
-| Memverifikasi nota, mencatat pengembalian / penggantian | ✓ | ✓ | |
-| Memilih project aktif saat mengajukan/mencairkan uang muka | ✓ | ✓ | ✓ |
-| Mengelola project (tambah, ubah, nilai kontrak, tandai selesai) | ✓ | | |
-| Potong Gaji (lihat daftar, ekspor Excel, tandai dipotong) | ✓ | ✓ | |
-| Pengguna, Pengaturan, Audit Log | ✓ | | |
+| Kemampuan | Superadmin | Owner | Finance | Karyawan |
+|---|:---:|:---:|:---:|:---:|
+| Melihat uang muka milik sendiri | | ✓ | ✓ | ✓ |
+| Melihat uang muka semua karyawan | ✓ | ✓ | ✓ | |
+| **Mencairkan langsung** (tanpa persetujuan) | | ✓ | | |
+| **Mengusulkan** uang muka untuk karyawan (perlu persetujuan Owner) | | ✓¹ | ✓ | |
+| **Menyetujui / menolak** pengajuan & usulan | | ✓ | | |
+| Mengajukan uang muka untuk diri sendiri | | | ✓ | ✓ |
+| Mengunggah nota & mengirim pertanggungjawaban | | ✓ | ✓ | ✓ |
+| Memverifikasi nota, mencatat pengembalian / penggantian | | ✓ | ✓ | |
+| Memilih project aktif saat mengajukan/mencairkan uang muka | | ✓ | ✓ | ✓ |
+| Mengelola project (tambah, ubah, nilai kontrak, tandai selesai) | ✓ | ✓ | | |
+| Potong Gaji: lihat daftar & ekspor Excel | ✓ | ✓ | ✓ | |
+| Potong Gaji: tandai dipotong | | ✓ | ✓ | |
+| Pengguna: kelola akun Finance & Karyawan | ✓ | ✓ | | |
+| Pengguna: kelola akun Owner (termasuk memberi/mencabut role Owner) | ✓ | | | |
+| Pengaturan, Audit Log | ✓ | ✓ | | |
 
 ¹ Owner selalu memakai jalur "cair langsung", jadi praktis tidak pernah mengusulkan.
+
+### Superadmin
+
+- Dibuat lewat script `pnpm db:create-superadmin`, tidak bisa dibuat dari aplikasi.
+- Membuka semua menu dan melihat semua data, tetapi **tidak melakukan transaksi uang** (mencairkan, menyetujui, memverifikasi nota, mencatat pengembalian/penggantian, potong gaji).
+- **Tidak tampil di UI mana pun**: daftar Pengguna, filter Pelaku di Audit Log, pilihan penerima uang muka, daftar penyetuju, kontak WhatsApp, dan nama "terakhir diubah" di Pengaturan.
+- **Tindakannya tidak dicatat ke audit log**, termasuk login/logout dan percobaan login gagal ke akunnya.
 
 ### Aturan pemisahan tugas (berlaku untuk semua role)
 
@@ -321,10 +332,11 @@ atau atas layar di HP).
 
 ## 11. Pengguna & akun
 
-- Akun Owner pertama dibuat lewat script `pnpm db:create-owner`. Pengguna lain dibuat Owner di menu **Pengguna** (nama + email); password sementara dikirim lewat email dan wajib diganti saat login pertama.
+- Akun superadmin dibuat lewat script `pnpm db:create-superadmin`. Superadmin mendaftarkan Owner, lalu Owner mendaftarkan Finance & Karyawan di menu **Pengguna** (nama, email, role awal); password sementara dikirim lewat email dan wajib diganti saat login pertama.
+- Owner hanya bisa mengelola akun tanpa role Owner. Akun Owner (termasuk miliknya sendiri) tampil baca saja; data sendiri diubah lewat menu **Profil**. Role Owner hanya bisa diberikan/dicabut superadmin.
 - Nomor WhatsApp dan rekening bank diisi Owner di halaman edit pengguna. Tanpa nomor, pengguna tidak menerima WhatsApp; tanpa rekening, pencairan Transfer menampilkan peringatan.
 - **Reset password**: password sementara baru dikirim lewat email, dan pengguna keluar dari semua perangkat.
-- **Nonaktifkan**: pengguna tidak bisa login dan sesi berjalan langsung berhenti. Data dan riwayat tetap tersimpan. Owner tidak bisa menonaktifkan akun sendiri atau melepas role Owner dirinya.
+- **Nonaktifkan**: pengguna tidak bisa login dan sesi berjalan langsung berhenti. Data dan riwayat tetap tersimpan. Tidak ada yang bisa menonaktifkan atau me-reset akunnya sendiri.
 - Sesi login: dengan centang **"Ingat saya"** (14 hari), sesi bertahan di perangkat itu sampai 14 hari sejak login. Tanpa centang, sesi berakhir saat browser ditutup, dan paling lama 12 jam. Sesi tidak diperpanjang karena aktivitas. Sesi berakhir lebih cepat bila user logout, mengganti/mereset password, atau akunnya dinonaktifkan. Login dikunci sementara setelah 5 kali gagal per email (atau 20 kali per IP) dalam 15 menit.
 
 ---

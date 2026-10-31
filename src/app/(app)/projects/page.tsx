@@ -75,7 +75,7 @@ async function ProjectsContent() {
   ).sort(byNewest);
 
   const showAdvances = can(user, "advance:view-own");
-  const showSettlements = can(user, "settlement:submit");
+  const showSettlements = can(user, "advance:view-own");
 
   if (tiles.length === 0) {
     return (

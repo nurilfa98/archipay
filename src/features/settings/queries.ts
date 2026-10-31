@@ -2,8 +2,9 @@
 // daftar kategori biaya untuk halaman Pengaturan (khusus OWNER).
 
 import "server-only";
-import { asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 import { io } from "next/cache";
+import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
 import { companySettings, expenseCategories, settlementItems, users } from "@/lib/db/schema";
 
@@ -34,12 +35,13 @@ export async function getCompanySettings(): Promise<CompanySettings> {
 }
 
 // Siapa & kapan terakhir mengubah pengaturan (ditampilkan di halaman Pengaturan).
+// Bila yang mengubah superadmin, namanya tidak ditampilkan (updatedByName null).
 export async function getSettingsUpdateInfo(): Promise<{ updatedAt: Date; updatedByName: string | null }> {
   await io();
   const [row] = await db
     .select({ updatedAt: companySettings.updatedAt, updatedByName: users.fullName })
     .from(companySettings)
-    .leftJoin(users, eq(companySettings.updatedById, users.id))
+    .leftJoin(users, and(eq(companySettings.updatedById, users.id), notSuperadmin(users.id)))
     .where(eq(companySettings.id, 1))
     .limit(1);
   return row ?? { updatedAt: new Date(0), updatedByName: null };

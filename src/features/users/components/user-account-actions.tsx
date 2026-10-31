@@ -25,7 +25,9 @@ import { Button } from "@/components/ui/button";
 import { resetUserPassword, setUserActive } from "@/features/users/actions";
 import type { UserDetail } from "@/features/users/queries";
 
-export function UserAccountActions({ user, isSelf }: { user: UserDetail; isSelf: boolean }) {
+// Hanya ditampilkan untuk akun yang boleh dikelola (features/users/access.ts),
+// jadi tidak pernah untuk akun sendiri.
+export function UserAccountActions({ user }: { user: UserDetail }) {
   async function handleReset() {
     const result = await resetUserPassword(user.id);
     if (!result.success) notify.error(result.message);
@@ -44,17 +46,15 @@ export function UserAccountActions({ user, isSelf }: { user: UserDetail; isSelf:
       <ActionRow
         title="Reset password"
         description={
-          isSelf
-            ? "Untuk akun sendiri, gunakan menu Ganti password di pojok kanan atas."
-            : !user.isActive
-              ? "Aktifkan akun terlebih dahulu untuk me-reset password."
-              : "Kirim password sementara baru ke email pengguna. Pengguna akan keluar dari semua perangkat."
+          !user.isActive
+            ? "Aktifkan akun terlebih dahulu untuk me-reset password."
+            : "Kirim password sementara baru ke email pengguna. Pengguna akan keluar dari semua perangkat."
         }
       >
         <ConfirmButton
           label="Reset password"
           variant="outline"
-          disabled={isSelf || !user.isActive}
+          disabled={!user.isActive}
           dialogTitle={`Reset password ${user.fullName}?`}
           dialogDescription={`Password lama tidak berlaku lagi. Password sementara baru dikirim ke ${user.email}.`}
           confirmLabel="Reset password"
@@ -65,17 +65,14 @@ export function UserAccountActions({ user, isSelf }: { user: UserDetail; isSelf:
       <ActionRow
         title={user.isActive ? "Nonaktifkan akun" : "Aktifkan akun"}
         description={
-          isSelf
-            ? "Anda tidak bisa menonaktifkan akun sendiri."
-            : user.isActive
-              ? "Pengguna tidak bisa login, dan sesi yang sedang berjalan langsung berhenti. Data & riwayatnya tetap tersimpan."
-              : "Pengguna bisa login kembali dengan password terakhirnya."
+          user.isActive
+            ? "Pengguna tidak bisa login, dan sesi yang sedang berjalan langsung berhenti. Data & riwayatnya tetap tersimpan."
+            : "Pengguna bisa login kembali dengan password terakhirnya."
         }
       >
         <ConfirmButton
           label={user.isActive ? "Nonaktifkan" : "Aktifkan"}
           variant={user.isActive ? "destructive" : "outline"}
-          disabled={isSelf}
           dialogTitle={user.isActive ? `Nonaktifkan ${user.fullName}?` : `Aktifkan ${user.fullName}?`}
           dialogDescription={
             user.isActive

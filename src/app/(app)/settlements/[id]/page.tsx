@@ -77,7 +77,7 @@ export default function SettlementDetailPage({ params }: PageProps<"/settlements
 }
 
 async function SettlementDetailContent({ id }: { id: string }) {
-  const viewer = await requirePermission("settlement:submit");
+  const viewer = await requirePermission("advance:view-own");
   const settlement = await getSettlementDetail(id);
   if (!settlement) notFound();
 

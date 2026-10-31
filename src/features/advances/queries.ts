@@ -18,6 +18,7 @@ import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
 import { can } from "@/lib/auth/permissions";
 import { isRole, type Role } from "@/lib/auth/roles";
+import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
 import { advanceRequests, projects, roles, userRoles, users } from "@/lib/db/schema";
 import { projectCondition } from "@/features/projects/queries";
@@ -242,13 +243,13 @@ const recipientColumns = {
 };
 
 // Calon penerima: semua user aktif kecuali pencatat sendiri
-// (pemberi dan penerima dana harus orang berbeda).
+// (pemberi dan penerima dana harus orang berbeda) dan superadmin.
 export async function listRecipientOptions(excludeUserId: string): Promise<RecipientOption[]> {
   await io();
   return db
     .select(recipientColumns)
     .from(users)
-    .where(and(eq(users.isActive, true), ne(users.id, excludeUserId)))
+    .where(and(eq(users.isActive, true), ne(users.id, excludeUserId), notSuperadmin(users.id)))
     .orderBy(asc(users.fullName));
 }
 
@@ -256,7 +257,7 @@ export async function getActiveRecipient(userId: string): Promise<RecipientOptio
   const [row] = await db
     .select(recipientColumns)
     .from(users)
-    .where(and(eq(users.id, userId), eq(users.isActive, true)))
+    .where(and(eq(users.id, userId), eq(users.isActive, true), notSuperadmin(users.id)))
     .limit(1);
   return row ?? null;
 }

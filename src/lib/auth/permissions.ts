@@ -29,10 +29,12 @@ export const PERMISSIONS = [
   "advance:request", // mengajukan uang muka untuk diri sendiri, wajib disetujui
   "settlement:submit", // upload struk / laporan penggunaan uang
   "settlement:verify", // memverifikasi struk & mencatat pengembalian/penggantian selisih
-  "payroll:manage", // daftar potong gaji: ekspor & tandai sudah dipotong
+  "payroll:view", // melihat daftar potong gaji & mengekspornya ke Excel
+  "payroll:manage", // menandai sisa uang muka sudah dipotong dari gaji
   "project:manage", // kelola project: nilai kontrak, status, menetapkan project uang muka lama
   "settings:manage", // ubah kebijakan uang muka & kategori biaya
-  "user:manage", // tambah/nonaktifkan user & atur role
+  "user:manage", // tambah/nonaktifkan user & atur role Finance/Karyawan
+  "user:manage-owner", // tambah/kelola akun Owner & memberi/mencabut role Owner
   "audit:view", // melihat audit log
 ] as const;
 
@@ -41,10 +43,29 @@ export type Permission = (typeof PERMISSIONS)[number];
 // Contoh pembagian akses; sesuaikan dengan SOP perusahaan.
 // `satisfies` memastikan setiap role terdaftar dan setiap permission valid.
 const ROLE_PERMISSIONS = {
-  // Owner boleh semuanya, kecuali mengajukan uang muka untuk dirinya sendiri:
-  // dana perusahaan memang di tangannya, dan pengajuan Owner tidak bisa
-  // disetujui siapa pun (penyetuju tidak boleh penerimanya sendiri).
-  OWNER: PERMISSIONS.filter((permission) => permission !== "advance:request"),
+  // Superadmin membuka semua menu dan melihat semua data, tetapi TIDAK
+  // melakukan transaksi uang (mencairkan, menyetujui, memverifikasi,
+  // mencatat potong gaji): tindakannya tidak dicatat ke audit log, jadi
+  // jejak uang harus selalu milik Owner/Finance/Karyawan.
+  SUPERADMIN: PERMISSIONS.filter(
+    (permission) =>
+      ![
+        "advance:disburse",
+        "advance:propose",
+        "advance:approve",
+        "advance:request",
+        "settlement:submit",
+        "settlement:verify",
+        "payroll:manage",
+      ].includes(permission),
+  ),
+  // Owner boleh semuanya, kecuali mengajukan uang muka untuk dirinya sendiri
+  // (dana perusahaan memang di tangannya, dan pengajuan Owner tidak bisa
+  // disetujui siapa pun karena penyetuju tidak boleh penerimanya sendiri),
+  // dan mengelola akun Owner (khusus superadmin).
+  OWNER: PERMISSIONS.filter(
+    (permission) => permission !== "advance:request" && permission !== "user:manage-owner",
+  ),
   FINANCE: [
     "advance:view-own",
     "advance:view-all",
@@ -52,6 +73,7 @@ const ROLE_PERMISSIONS = {
     "advance:request",
     "settlement:submit",
     "settlement:verify",
+    "payroll:view",
     "payroll:manage",
   ],
   EMPLOYEE: ["advance:view-own", "advance:request", "settlement:submit"],

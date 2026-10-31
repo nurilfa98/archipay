@@ -36,7 +36,7 @@ const COLUMNS = [
 export async function GET() {
   const user = await getCurrentUser();
   if (!user || user.mustChangePassword) return new NextResponse("Unauthorized", { status: 401 });
-  if (!can(user, "payroll:manage")) return new NextResponse("Forbidden", { status: 403 });
+  if (!can(user, "payroll:view")) return new NextResponse("Forbidden", { status: 403 });
 
   const candidates = await listPayrollCandidates();
   if (candidates.length === 0) {

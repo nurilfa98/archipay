@@ -14,9 +14,13 @@
 //       await logAudit({ ... }, tx);
 //     });
 //
+// Tindakan superadmin TIDAK dicatat, begitu pula log yang menyangkut akunnya
+// (misalnya percobaan login gagal ke akun superadmin). Lihat lib/auth/superadmin.ts.
+//
 // Referensi: https://orm.drizzle.team/docs/transactions
 
 import "server-only";
+import { hasSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
 import { auditLogs } from "@/lib/db/schema";
 
@@ -69,5 +73,7 @@ type AuditEntry = {
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function logAudit(entry: AuditEntry, tx: typeof db | Transaction = db) {
+  const involved = [entry.userId, entry.entityName === "users" ? entry.entityId : null];
+  if (await hasSuperadmin(involved.filter((id): id is string => !!id), tx)) return;
   await tx.insert(auditLogs).values(entry);
 }

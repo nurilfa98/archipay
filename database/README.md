@@ -40,7 +40,7 @@ Lokasi folder diatur di `drizzle.config.ts` (`out: "./database/migrations"`).
 
 - **Jangan mengubah, mengganti nama, atau menghapus migration yang sudah dijalankan** di database mana pun (terutama production). drizzle-kit mencatat migration yang sudah dijalankan di tabel `drizzle.__drizzle_migrations`; perubahan berikutnya selalu dibuat sebagai migration baru.
 - Jangan menyunting `meta/` secara manual. File di sana dibuat dan dibaca drizzle-kit.
-- Data awal yang wajib ada (pengaturan perusahaan, kategori biaya) diisi lewat migration, sehingga database baru langsung siap setelah `pnpm db:migrate`. Akun Owner pertama dibuat terpisah lewat `pnpm db:create-owner` (lihat `scripts/create-owner.mjs`).
+- Data awal yang wajib ada (pengaturan perusahaan, kategori biaya) diisi lewat migration, sehingga database baru langsung siap setelah `pnpm db:migrate`. Akun superadmin dibuat terpisah lewat `pnpm db:create-superadmin` (lihat `scripts/create-superadmin.mjs`); Owner didaftarkan superadmin dari aplikasi.
 
 ## Riwayat migration
 

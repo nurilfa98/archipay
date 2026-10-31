@@ -29,11 +29,12 @@ Prasyarat: Node.js 20.9 atau lebih baru, pnpm 9, dan database PostgreSQL.
 2. Salin `.env.example` menjadi `.env`, lalu isi minimal `DATABASE_URL` dan
    `SESSION_SECRET` (cara generate ada di file tersebut).
 
-3. Buat tabel database dan akun Owner pertama:
+3. Buat tabel database dan akun superadmin (superadmin lalu mendaftarkan
+   Owner dari menu Pengguna):
 
    ```bash
    pnpm db:migrate
-   pnpm db:create-owner owner@perusahaan.com passwordRahasia "Nama Owner"
+   pnpm db:create-superadmin admin@perusahaan.com passwordRahasia "Nama Superadmin"
    ```
 
 4. Jalankan aplikasi, lalu buka [http://localhost:3000](http://localhost:3000):
@@ -67,7 +68,7 @@ curl -H "Authorization: Bearer <CRON_SECRET>" http://localhost:3000/api/cron/rem
 | `pnpm lint` | Cek kode dengan ESLint |
 | `pnpm db:generate` | Buat file migration baru setelah mengubah `src/lib/db/schema.ts` |
 | `pnpm db:migrate` | Jalankan migration ke database |
-| `pnpm db:create-owner` | Buat akun Owner (sekaligus mengisi tabel role bila belum ada) |
+| `pnpm db:create-superadmin` | Buat akun superadmin (sekaligus mengisi tabel role bila belum ada) |
 
 ## Dokumentasi
 

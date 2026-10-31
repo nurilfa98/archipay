@@ -1,12 +1,15 @@
-// Membuat akun OWNER pertama, karena belum ada halaman register.
-// Sekaligus mengisi tabel roles (OWNER, FINANCE, EMPLOYEE) bila belum ada.
+// Membuat akun SUPERADMIN, karena belum ada halaman register.
+// Sekaligus mengisi tabel roles (SUPERADMIN, OWNER, FINANCE, EMPLOYEE) bila belum ada.
 //
 // Cara pakai (jalankan setelah pnpm db:migrate):
-//   pnpm db:create-owner owner@archipay.id passwordRahasia "Nama Owner"
+//   pnpm db:create-superadmin admin@archipay.id passwordRahasia "Nama Superadmin"
+//
+// Urutannya: superadmin mendaftarkan Owner dari halaman Pengguna, lalu Owner
+// mendaftarkan Finance & Karyawan. Akun superadmin tidak tampil di UI mana pun
+// dan tindakannya tidak dicatat ke audit log.
 //
 // Catatan: password yang diketik di terminal tersimpan di riwayat shell.
 // Setelah login, ganti password lewat menu user → "Ganti password".
-// User lain (Finance, Karyawan) dibuat dari halaman Pengguna di aplikasi.
 
 import nextEnv from "@next/env";
 import bcrypt from "bcryptjs";
@@ -14,10 +17,10 @@ import postgres from "postgres";
 
 nextEnv.loadEnvConfig(process.cwd());
 
-const [email, password, fullName = "Owner"] = process.argv.slice(2);
+const [email, password, fullName = "Superadmin"] = process.argv.slice(2);
 
 if (!email || !password) {
-  console.error('Cara pakai: pnpm db:create-owner <email> <password> ["Nama Lengkap"]');
+  console.error('Cara pakai: pnpm db:create-superadmin <email> <password> ["Nama Lengkap"]');
   process.exit(1);
 }
 
@@ -25,7 +28,7 @@ const sql = postgres(process.env.DATABASE_URL);
 
 try {
   // ON CONFLICT DO NOTHING membuat script aman dijalankan berulang kali.
-  for (const name of ["OWNER", "FINANCE", "EMPLOYEE"]) {
+  for (const name of ["SUPERADMIN", "OWNER", "FINANCE", "EMPLOYEE"]) {
     await sql`insert into roles (id, name) values (${crypto.randomUUID()}, ${name}) on conflict (name) do nothing`;
   }
 
@@ -40,10 +43,10 @@ try {
       values (${userId}, ${fullName}, ${email.trim().toLowerCase()}, ${passwordHash})`;
     await tx`
       insert into user_roles (user_id, role_id)
-      select ${userId}, id from roles where name = 'OWNER'`;
+      select ${userId}, id from roles where name = 'SUPERADMIN'`;
   });
 
-  console.log(`✓ Akun OWNER dibuat: ${email}`);
+  console.log(`✓ Akun SUPERADMIN dibuat: ${email}`);
 } finally {
   await sql.end();
 }

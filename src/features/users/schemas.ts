@@ -9,7 +9,7 @@
 // - node_modules/next/dist/docs/01-app/02-guides/forms.md (bagian "Form validation")
 
 import { z } from "zod";
-import { ROLES } from "@/lib/auth/roles";
+import { ASSIGNABLE_ROLES } from "@/lib/auth/roles";
 import { normalizeIndonesianPhone } from "@/lib/phone";
 
 const fullName = z
@@ -49,8 +49,13 @@ const bankAccountNumber = z
   .transform((value) => value || null);
 
 // Nomor WhatsApp tidak diminta saat tambah pengguna; diisi lewat profil
-// (menu Profil) oleh pengguna sendiri.
-export const createUserSchema = z.object({ fullName, email });
+// (menu Profil) oleh pengguna sendiri. Role awal dipilih di form; boleh
+// tidaknya role itu diberikan dicek di Server Action (features/users/access.ts).
+export const createUserSchema = z.object({
+  fullName,
+  email,
+  role: z.enum(ASSIGNABLE_ROLES, "Pilih role"),
+});
 
 // Nama bank dan nomor rekening harus diisi berpasangan.
 function bankPairRule(data: { bankName: string | null; bankAccountNumber: string | null }, ctx: z.RefinementCtx) {
@@ -67,11 +72,11 @@ const profileShape = { fullName, email, phoneNumber, bankName, bankAccountNumber
 
 export const profileSchema = z.object(profileShape).superRefine(bankPairRule);
 
-// Edit oleh OWNER: profil + role.
+// Edit oleh pengelola pengguna: profil + role. SUPERADMIN tidak bisa dipilih.
 export const updateUserSchema = z
   .object({
     ...profileShape,
-    roles: z.array(z.enum(ROLES)).min(1, "Pilih minimal satu role"),
+    roles: z.array(z.enum(ASSIGNABLE_ROLES)).min(1, "Pilih minimal satu role"),
   })
   .superRefine(bankPairRule);
 

@@ -1,5 +1,6 @@
-// Form tambah pengguna: OWNER cukup mengisi nama dan email. Nomor WhatsApp
-// dan rekening diisi belakangan lewat halaman edit pengguna.
+// Form tambah pengguna: cukup mengisi nama, email, dan role awal. Pilihan role
+// berasal dari features/users/access.ts (superadmin bisa memilih Owner, Owner
+// hanya Finance/Karyawan). Nomor WhatsApp dan rekening diisi belakangan.
 // Setelah berhasil, toast memberi tahu apakah email kredensial terkirim
 // (dengan tombol "Lihat detail"), lalu form dikosongkan untuk pengguna berikutnya.
 //
@@ -21,18 +22,20 @@ import { useRouter } from "next/navigation";
 import { startTransition, useActionState, useEffect, useState, type FormEvent } from "react";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { createUser, type CreateUserResult } from "@/features/users/actions";
+import { ROLE_LABELS, type AssignableRole } from "@/lib/auth/roles";
 import { TextField } from "./text-field";
 
-export function UserCreateForm() {
+export function UserCreateForm({ roles }: { roles: AssignableRole[] }) {
   // Mengganti `key` membuat React membuat ulang form dari nol (isian & state
   // hasil action ikut kosong). Dipakai setelah pengguna berhasil dibuat.
   const [formKey, setFormKey] = useState(0);
-  return <CreateForm key={formKey} onCreated={() => setFormKey((key) => key + 1)} />;
+  return <CreateForm key={formKey} roles={roles} onCreated={() => setFormKey((key) => key + 1)} />;
 }
 
-function CreateForm({ onCreated }: { onCreated: () => void }) {
+function CreateForm({ roles, onCreated }: { roles: AssignableRole[]; onCreated: () => void }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createUser, undefined);
 
@@ -74,6 +77,21 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
           required
           error={fieldError("email")}
         />
+
+        <FieldSet data-invalid={!!fieldError("role")}>
+          <FieldLegend variant="label">Role</FieldLegend>
+          <RadioGroup name="role" defaultValue="EMPLOYEE">
+            {roles.map((role) => (
+              <Field key={role} orientation="horizontal">
+                <RadioGroupItem value={role} id={`role-${role}`} />
+                <FieldLabel htmlFor={`role-${role}`} className="font-normal">
+                  {ROLE_LABELS[role]}
+                </FieldLabel>
+              </Field>
+            ))}
+          </RadioGroup>
+          <FieldError>{fieldError("role")}</FieldError>
+        </FieldSet>
 
         <Field orientation="horizontal">
           <Button type="submit" disabled={pending}>

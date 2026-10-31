@@ -18,9 +18,10 @@
 // - node_modules/next/dist/docs/01-app/02-guides/data-security.md
 
 import "server-only";
-import { asc, eq, ilike, inArray, or } from "drizzle-orm";
+import { and, asc, eq, ilike, inArray, or } from "drizzle-orm";
 import { io } from "next/cache";
 import { isRole, type Role } from "@/lib/auth/roles";
+import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
 import { roles, userRoles, users } from "@/lib/db/schema";
 
@@ -49,6 +50,7 @@ const listColumns = {
 };
 
 // `search` mencocokkan nama atau email (tidak peka huruf besar/kecil).
+// Akun superadmin tidak ikut tampil.
 export async function listUsers(search?: string): Promise<UserListItem[]> {
   await io();
   const pattern = search ? `%${escapeLike(search)}%` : undefined;
@@ -56,13 +58,20 @@ export async function listUsers(search?: string): Promise<UserListItem[]> {
   const rows = await db
     .select(listColumns)
     .from(users)
-    .where(pattern ? or(ilike(users.fullName, pattern), ilike(users.email, pattern)) : undefined)
+    .where(
+      and(
+        notSuperadmin(users.id),
+        pattern ? or(ilike(users.fullName, pattern), ilike(users.email, pattern)) : undefined,
+      ),
+    )
     .orderBy(asc(users.fullName));
 
   const rolesByUser = await getRolesByUserIds(rows.map((row) => row.id));
   return rows.map((row) => ({ ...row, roles: rolesByUser.get(row.id) ?? [] }));
 }
 
+// Tidak menyaring superadmin (dipakai juga halaman Profil milik sendiri).
+// Halaman yang menampilkan user lain wajib mengecek roles-nya.
 export async function getUserDetail(id: string): Promise<UserDetail | null> {
   await io();
   const [row] = await db
