@@ -77,8 +77,9 @@ export const companies = pgTable("companies", {
     .$onUpdate(() => new Date()),
 });
 
-// Kolom company_id untuk tabel bisnis. Tanpa onDelete cascade: company tidak
-// pernah dihapus, hanya dinonaktifkan.
+// Kolom company_id untuk tabel bisnis. Tanpa onDelete cascade: company
+// biasanya hanya dinonaktifkan. Hapus company (Superadmin) menghapus barisnya
+// secara eksplisit, berurutan, di features/companies/actions.ts (deleteCompany).
 const companyRef = () =>
   varchar("company_id", { length: 36 })
     .notNull()
@@ -140,7 +141,8 @@ export const userRoles = pgTable(
 );
 
 // Jejak audit: siapa melakukan apa, terhadap data apa, kapan, dari mana.
-// Baris di tabel ini tidak boleh diubah atau dihapus oleh aplikasi.
+// Baris di tabel ini tidak boleh diubah atau dihapus oleh aplikasi, kecuali
+// saat Superadmin menghapus company beserta semua datanya.
 export const auditLogs = pgTable(
   "audit_logs",
   {
@@ -468,6 +470,11 @@ export const settlementItems = pgTable(
     fileHash: varchar("file_hash", { length: 64 }),
     fileContentType: varchar("file_content_type", { length: 50 }),
     fileSize: integer("file_size"),
+    // Waktu file nota dihapus otomatis dari penyimpanan karena lewat masa
+    // simpan (platform_settings.receipt_retention_months, dihitung sejak uang
+    // muka Selesai). file_key & file_hash tetap disimpan: item tetap tercatat
+    // "dengan nota" dan nota yang sama tetap ditolak bila diunggah ulang.
+    fileDeletedAt: timestamptz("file_deleted_at"),
 
     // PENDING sampai diverifikasi, lalu APPROVED / REJECTED.
     verificationStatus: varchar("verification_status", { length: 20 }).notNull().default("PENDING"),
@@ -567,6 +574,10 @@ export const platformSettings = pgTable(
     extraUserPrice: rupiah("extra_user_price").notNull().default(0),
     discount6: integer("discount_6").notNull().default(10),
     discount12: integer("discount_12").notNull().default(20),
+    // Masa simpan file nota (bulan) sejak uang muka Selesai. Lewat dari itu
+    // file dihapus otomatis oleh cron harian (features/settlements/receipt-retention.ts)
+    // agar penyimpanan R2 tidak terus menumpuk. Company nonaktif dikecualikan.
+    receiptRetentionMonths: integer("receipt_retention_months").notNull().default(6),
     updatedAt: timestamptz("updated_at")
       .notNull()
       .defaultNow()
@@ -579,6 +590,7 @@ export const platformSettings = pgTable(
     check("platform_settings_included_users_check", sql`${t.includedUsers} BETWEEN 1 AND 1000`),
     check("platform_settings_prices_check", sql`${t.basePrice} >= 0 AND ${t.extraUserPrice} >= 0`),
     check("platform_settings_discounts_check", sql`${t.discount6} BETWEEN 0 AND 90 AND ${t.discount12} BETWEEN 0 AND 90`),
+    check("platform_settings_receipt_retention_check", sql`${t.receiptRetentionMonths} BETWEEN 1 AND 120`),
   ],
 );
 

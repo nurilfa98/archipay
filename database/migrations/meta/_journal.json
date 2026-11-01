@@ -29,6 +29,13 @@
       "when": 1793433301875,
       "tag": "0003_user_based_pricing",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1793531352773,
+      "tag": "0004_receipt_retention",
+      "breakpoints": true
     }
   ]
 }

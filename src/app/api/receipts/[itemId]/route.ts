@@ -29,6 +29,13 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/receipts/[i
   // Tidak berhak = "tidak ditemukan", agar keberadaan file tidak bocor.
   const allowed = receipt && (receipt.recipientId === user.id || can(user, "advance:view-all"));
   if (!allowed || !receipt.fileKey) return new NextResponse("Not found", { status: 404 });
+  // Dihapus otomatis karena lewat masa simpan (features/settlements/receipt-retention.ts).
+  if (receipt.fileDeletedAt) {
+    return new NextResponse("File nota sudah dihapus otomatis karena lewat masa simpan.", {
+      status: 410,
+      headers: { ...PRIVATE_HEADERS, "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
 
   const presignedUrl = await getPresignedUrl(receipt.fileKey);
   if (presignedUrl) return NextResponse.redirect(presignedUrl, { status: 302, headers: PRIVATE_HEADERS });

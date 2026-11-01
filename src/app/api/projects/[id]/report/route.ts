@@ -1,5 +1,5 @@
-// GET /api/projects/<id>/report: unduh laporan PDF satu project (hanya OWNER,
-// permission project:manage, karena memuat nilai kontrak dan keuntungan).
+// GET /api/projects/<id>/report: unduh laporan PDF satu project (OWNER & superadmin,
+// permission project:view-finance, karena memuat nilai kontrak dan keuntungan).
 //
 // PDF dibuat saat diminta dengan data terbaru. Tidak ada yang disimpan.
 // Project tidak ada = 404.
@@ -22,7 +22,7 @@ const PRIVATE_HEADERS = { "Cache-Control": "private, no-store", "X-Content-Type-
 export async function GET(_request: Request, ctx: RouteContext<"/api/projects/[id]/report">) {
   const user = await getCurrentUser();
   if (!user || user.mustChangePassword) return new NextResponse("Unauthorized", { status: 401 });
-  if (!can(user, "project:manage") || !user.company) return new NextResponse("Forbidden", { status: 403 });
+  if (!can(user, "project:view-finance") || !user.company) return new NextResponse("Forbidden", { status: 403 });
 
   const { id } = await ctx.params;
   const parsedId = projectIdSchema.safeParse(id);

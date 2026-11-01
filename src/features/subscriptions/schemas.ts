@@ -122,6 +122,16 @@ const days = (label: string, max: number) =>
     .min(0, `${label} minimal 0 hari`)
     .max(max, `${label} maksimal ${max} hari`);
 
+// Sama dengan CHECK constraint platform_settings_receipt_retention_check.
+export const RECEIPT_RETENTION_MAX_MONTHS = 120;
+export const receiptRetentionSchema = z.object({
+  receiptRetentionMonths: z.coerce
+    .number("Masa simpan nota harus berupa angka")
+    .int("Masa simpan nota harus bilangan bulat")
+    .min(1, "Masa simpan nota minimal 1 bulan")
+    .max(RECEIPT_RETENTION_MAX_MONTHS, `Masa simpan nota maksimal ${RECEIPT_RETENTION_MAX_MONTHS} bulan`),
+});
+
 // Sama dengan CHECK constraint platform_settings.
 export const platformSettingsSchema = z.object({
   freeDays: days("Masa gratis", 90),

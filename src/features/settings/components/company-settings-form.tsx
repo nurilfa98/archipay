@@ -1,6 +1,8 @@
 // Form kebijakan uang muka (OWNER). Memakai onSubmit + startTransition agar
 // isian tidak hilang saat validasi gagal (lihat user-create-form.tsx).
 // Hasil simpan (berhasil / error umum) tampil sebagai toast.
+// readOnly (superadmin): semua isian dinonaktifkan lewat <fieldset disabled>
+// dan tombol simpan tidak tampil.
 
 "use client";
 
@@ -14,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { updateCompanySettings } from "@/features/settings/actions";
 import type { CompanySettings } from "@/features/settings/queries";
 
-export function CompanySettingsForm({ settings }: { settings: CompanySettings }) {
+export function CompanySettingsForm({ settings, readOnly = false }: { settings: CompanySettings; readOnly?: boolean }) {
   const [state, formAction, pending] = useActionState(updateCompanySettings, undefined);
   const [maxDigits, setMaxDigits] = useState(String(settings.noReceiptMaxAmount));
   const error = state && !state.success ? state : undefined;
@@ -27,6 +29,7 @@ export function CompanySettingsForm({ settings }: { settings: CompanySettings })
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (readOnly) return;
     const formData = new FormData(event.currentTarget);
     formData.set("noReceiptMaxAmount", maxDigits);
     startTransition(() => formAction(formData));
@@ -34,62 +37,68 @@ export function CompanySettingsForm({ settings }: { settings: CompanySettings })
 
   return (
     <form onSubmit={handleSubmit} className="max-w-xl">
-      <FieldGroup>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <DaysField
-            name="settlementDueDays"
-            label="Batas unggah nota"
-            defaultValue={settings.settlementDueDays}
-            description="Hari kalender sejak dana dicairkan."
-            error={fieldError("settlementDueDays")}
-          />
-          <DaysField
-            name="returnDueDays"
-            label="Batas pengembalian sisa dana"
-            defaultValue={settings.returnDueDays}
-            description="Hari kalender sejak nota diverifikasi."
-            error={fieldError("returnDueDays")}
-          />
-        </div>
-
-        <DaysField
-          name="maxOverdueAdvances"
-          label="Batas uang muka tertunda"
-          max={10}
-          unit="uang muka"
-          defaultValue={settings.maxOverdueAdvances}
-          description="Karyawan yang sudah mencapai jumlah ini (lewat batas unggah nota, belum dipertanggungjawabkan) tidak bisa menerima uang muka baru."
-          error={fieldError("maxOverdueAdvances")}
-        />
-
-        <Field data-invalid={!!fieldError("noReceiptMaxAmount")}>
-          <FieldLabel htmlFor="noReceiptMaxAmount">Batas biaya tanpa nota (per item)</FieldLabel>
-          <div className="relative max-w-60">
-            <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-muted-foreground">
-              Rp
-            </span>
-            <Input
-              id="noReceiptMaxAmount"
-              inputMode="numeric"
-              autoComplete="off"
-              className="pl-9 tabular-nums"
-              value={maxDigits ? Number(maxDigits).toLocaleString("id-ID") : ""}
-              onChange={(event) => setMaxDigits(event.target.value.replace(/\D/g, "").slice(0, 9))}
-              aria-invalid={!!fieldError("noReceiptMaxAmount")}
-              required
+      <fieldset disabled={readOnly} className="min-w-0">
+        <FieldGroup>
+          <div className="grid gap-5 sm:grid-cols-2">
+            <DaysField
+              name="settlementDueDays"
+              label="Batas unggah nota"
+              defaultValue={settings.settlementDueDays}
+              description="Hari kalender sejak dana dicairkan."
+              error={fieldError("settlementDueDays")}
+            />
+            <DaysField
+              name="returnDueDays"
+              label="Batas pengembalian sisa dana"
+              defaultValue={settings.returnDueDays}
+              description="Hari kalender sejak nota diverifikasi."
+              error={fieldError("returnDueDays")}
             />
           </div>
-          <FieldDescription>Untuk parkir, ojek, dll. Isi 0 bila semua biaya wajib bernota.</FieldDescription>
-          <FieldError>{fieldError("noReceiptMaxAmount")}</FieldError>
-        </Field>
 
-        <Field orientation="horizontal">
-          <Button type="submit" disabled={pending}>
-            {pending && <LoaderCircleIcon className="animate-spin" />}
-            {pending ? "Menyimpan..." : "Simpan pengaturan"}
-          </Button>
-        </Field>
-      </FieldGroup>
+          <DaysField
+            name="maxOverdueAdvances"
+            label="Batas uang muka tertunda"
+            max={10}
+            unit="uang muka"
+            defaultValue={settings.maxOverdueAdvances}
+            description="Karyawan yang sudah mencapai jumlah ini (lewat batas unggah nota, belum dipertanggungjawabkan) tidak bisa menerima uang muka baru."
+            error={fieldError("maxOverdueAdvances")}
+          />
+
+          <Field data-invalid={!!fieldError("noReceiptMaxAmount")}>
+            <FieldLabel htmlFor="noReceiptMaxAmount">Batas biaya tanpa nota (per item)</FieldLabel>
+            <div className="relative max-w-60">
+              <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-muted-foreground">
+                Rp
+              </span>
+              <Input
+                id="noReceiptMaxAmount"
+                inputMode="numeric"
+                autoComplete="off"
+                className="pl-9 tabular-nums"
+                value={maxDigits ? Number(maxDigits).toLocaleString("id-ID") : ""}
+                onChange={(event) => setMaxDigits(event.target.value.replace(/\D/g, "").slice(0, 9))}
+                aria-invalid={!!fieldError("noReceiptMaxAmount")}
+                required
+              />
+            </div>
+            <FieldDescription>Untuk parkir, ojek, dll. Isi 0 bila semua biaya wajib bernota.</FieldDescription>
+            <FieldError>{fieldError("noReceiptMaxAmount")}</FieldError>
+          </Field>
+
+          {readOnly ? (
+            <p className="text-sm text-muted-foreground">Baca saja. Pengaturan company diubah oleh Owner.</p>
+          ) : (
+            <Field orientation="horizontal">
+              <Button type="submit" disabled={pending}>
+                {pending && <LoaderCircleIcon className="animate-spin" />}
+                {pending ? "Menyimpan..." : "Simpan pengaturan"}
+              </Button>
+            </Field>
+          )}
+        </FieldGroup>
+      </fieldset>
     </form>
   );
 }

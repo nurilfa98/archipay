@@ -55,13 +55,16 @@ tidak terikat company mana pun.
 | Mengunggah nota & mengirim pertanggungjawaban | | ✓ | ✓ | ✓ |
 | Memverifikasi nota, mencatat pengembalian / penggantian | | ✓ | ✓ | |
 | Memilih project aktif saat mengajukan/mencairkan uang muka | | ✓ | ✓ | ✓ |
-| Mengelola project (tambah, ubah, nilai kontrak, tandai selesai) | ✓ | ✓ | | |
+| Melihat nilai kontrak, keuntungan per project, unduh PDF laporan | ✓ | ✓ | | |
+| Mengelola project (tambah, ubah, nilai kontrak, tandai selesai, tetapkan project uang muka lama) | | ✓ | | |
 | Potong Gaji: lihat daftar & ekspor Excel | ✓ | ✓ | ✓ | |
 | Potong Gaji: tandai dipotong | | ✓ | ✓ | |
 | Pengguna: kelola akun Finance & Karyawan | ✓ | ✓ | | |
 | Pengguna: kelola akun Owner (termasuk memberi/mencabut role Owner) | ✓ | | | |
-| Pengaturan, Audit Log | ✓ | ✓ | | |
-| Company: tambah, ubah, aktif/nonaktif, masuk ke company | ✓ | | | |
+| Pengaturan: melihat | ✓ | ✓ | | |
+| Pengaturan: mengubah kebijakan uang muka & kategori biaya | | ✓ | | |
+| Audit Log | ✓ | ✓ | | |
+| Company: tambah, ubah, aktif/nonaktif, hapus, masuk ke company | ✓ | | | |
 | Tagihan & Pengaturan platform (verifikasi bayar, harga, rekening, QRIS) | ✓ | | | |
 | Langganan company sendiri (pilih paket, kirim bukti bayar) | | ✓ | | |
 
@@ -72,6 +75,7 @@ tidak terikat company mana pun.
 - Dibuat lewat script `pnpm db:create-superadmin`, tidak bisa dibuat dari aplikasi.
 - Mengelola company (menu **Company**), yang juga menjadi halaman pertama setelah login. Company tampil sebagai kartu (klik kartu = detail company) dengan pencarian nama company/Owner dan saring status. Untuk melihat data sebuah company, Superadmin menekan **Buka** pada kartu atau detail company itu; selama company dibuka, pita "Melihat company …" tampil di bawah header dengan tombol Ganti/Keluar, satu-satunya jalan kembali ke halaman Company (menu Company tidak ada di kotak menu company, dan halaman Company tidak punya tombol kembali ke menu). Kolom ✓ Superadmin di tabel atas berlaku untuk company yang sedang dibuka.
 - Membuka semua menu company dan melihat semua datanya, tetapi **tidak melakukan transaksi uang** (mencairkan, menyetujui, memverifikasi nota, mencatat pengembalian/penggantian, potong gaji).
+- **Project dan Pengaturan company baca saja**: tidak bisa menambah/mengubah project, mengubah status, atau menetapkan project uang muka lama, dan tidak bisa mengubah kebijakan uang muka maupun kategori biaya. Semua itu diatur Owner.
 - **Tidak tampil di UI mana pun**: daftar Pengguna, filter Pelaku di Audit Log, pilihan penerima uang muka, daftar penyetuju, kontak WhatsApp, dan nama "terakhir diubah" di Pengaturan.
 - **Tindakannya tidak dicatat ke audit log**, termasuk login/logout dan percobaan login gagal ke akunnya.
 
@@ -239,6 +243,14 @@ Alasan pembatalan wajib (minimal 5 karakter).
 
 - Alternatifnya, **Kembalikan untuk diperbaiki** dengan catatan (→ `REVISION_REQUESTED`). Keputusan per nota yang belum disimpan ikut dibuang. Karyawan memperbaiki lalu **Kirim ulang**.
 - Karyawan menerima WhatsApp untuk hasil verifikasi maupun permintaan perbaikan.
+- **Masa simpan file nota**: file foto/PDF nota disimpan di R2 dengan key
+  `<companyId>/receipts/<advanceId>/<itemId>.<ext>`. Setelah uang muka
+  **Selesai** (`CLOSED`) dan lewat masa simpan (Pengaturan platform, bawaan
+  **6 bulan**, dihitung sejak entri ledger terakhir), cron harian menghapus
+  filenya (maks. 1.000 file per hari). Item nota tetap ada (nominal,
+  keterangan, hasil verifikasi); kolom nota menampilkan "Nota sudah dihapus
+  (lewat masa simpan)", dan nota yang sama tetap ditolak bila diunggah ulang.
+  Company nonaktif dikecualikan. Bukti bayar langganan tidak ikut dihapus.
 
 ---
 
@@ -332,9 +344,19 @@ terminal `pnpm dev`.
 | Pengembalian / penggantian / potong gaji dicatat | Karyawan | WhatsApp |
 | Pengingat batas waktu | Lihat bagian 9 | WhatsApp |
 | Akun dibuat / password di-reset | Pengguna | Email (password sementara) |
+| User menekan **Hubungi admin platform** di halaman error | Nomor admin di Pengaturan platform | WhatsApp |
 
 Hasil setiap aksi simpan di aplikasi tampil sebagai toast (pojok kanan bawah,
 atau atas layar di HP).
+
+**Halaman error & tidak ditemukan.** Halaman yang gagal dimuat menampilkan
+ilustrasi, "Terjadi kesalahan, coba lagi", tombol **Coba lagi** dan **Ke
+beranda**, serta kode error. User yang login juga melihat tombol **Hubungi
+admin platform**: sekali klik mengirim WhatsApp ke admin platform berisi
+pelapor, role, company, waktu, halaman, kode error & pesannya, lalu tombolnya
+hilang. Maksimal 1 laporan per user per 30 menit (dicatat di memori server,
+hilang bila server restart). Halaman 404 hanya berisi ilustrasi dan tombol Ke
+beranda, tanpa tombol lapor.
 
 ---
 
@@ -346,7 +368,7 @@ atau atas layar di HP).
 - Nomor WhatsApp dan rekening bank diisi Owner di halaman edit pengguna. Tanpa nomor, pengguna tidak menerima WhatsApp; tanpa rekening, pencairan Transfer menampilkan peringatan.
 - **Reset password**: password sementara baru dikirim lewat email, dan pengguna keluar dari semua perangkat.
 - **Nonaktifkan**: pengguna tidak bisa login dan sesi berjalan langsung berhenti. Data dan riwayat tetap tersimpan. Tidak ada yang bisa menonaktifkan atau me-reset akunnya sendiri.
-- Sesi login: dengan centang **"Ingat saya"** (14 hari), sesi bertahan di perangkat itu sampai 14 hari sejak login. Tanpa centang, sesi berakhir saat browser ditutup, dan paling lama 12 jam. Sesi tidak diperpanjang karena aktivitas. Sesi berakhir lebih cepat bila user logout, mengganti/mereset password, atau akunnya dinonaktifkan. Login dikunci sementara setelah 5 kali gagal per email (atau 20 kali per IP) dalam 15 menit.
+- Sesi login: dengan centang **"Ingat saya"** (14 hari), sesi bertahan di perangkat itu sampai 14 hari sejak login. Tanpa centang, sesi berakhir saat browser ditutup, dan paling lama 12 jam. Sesi tidak diperpanjang karena aktivitas. Sesi berakhir lebih cepat bila user logout, mengganti/mereset password, atau akunnya dinonaktifkan. Login dikunci sementara setelah 5 kali gagal per email (atau 20 kali per IP) dalam 15 menit; selama terkunci tombol **Masuk** tidak bisa ditekan dan menampilkan hitungan mundur sisa waktunya.
 
 ---
 
@@ -453,7 +475,16 @@ ArchiPay melayani banyak klien dalam satu aplikasi. Setiap klien adalah satu
   itu tidak bisa login dan sesi yang berjalan berhenti; layar login
   menampilkan "Akses company Anda sedang dinonaktifkan". Pengingat WhatsApp
   untuk company nonaktif tidak dikirim. Data tetap utuh dan kembali terbuka
-  saat diaktifkan lagi. Company tidak bisa dihapus.
+  saat diaktifkan lagi.
+- **Hapus company** (detail company → kartu Hapus company, khusus
+  Superadmin): company beserta SEMUA datanya dihapus permanen, yaitu pengguna
+  & role-nya, project, uang muka, pertanggungjawaban & item nota, saldo/potong
+  gaji, kategori biaya, nomor dokumen, pengaturan, harga khusus, tagihan &
+  pembayaran langganan, audit log, dan catatan percobaan login akun-akunnya.
+  File nota & bukti bayar di penyimpanan ikut dihapus setelahnya. Wajib
+  mengetik ulang nama company di dialog konfirmasi; tidak bisa dibatalkan.
+  Superadmin yang sedang membuka company itu otomatis keluar, lalu diarahkan
+  ke daftar company.
 - **Warna kartu company** (menu Company) = status klien, satu status satu
   warna & ikon (`features/companies/status.ts`): **Masa gratis** indigo
   (hadiah), **Aktif** hijau (centang), **Tenggang** kuning (jam pasir),
@@ -563,8 +594,8 @@ adalah klaim dengan bukti.
   pembayaran langsung** (pilih paket + jumlah pengguna, harga otomatis) →
   langsung lunas.
 - **Pengaturan platform**: komponen harga + tabel simulasi, masa gratis &
-  tenggang, batas pengguna masa gratis, WhatsApp admin, rekening bank,
-  gambar QRIS.
+  tenggang, batas pengguna masa gratis, WhatsApp admin, masa simpan file
+  nota, rekening bank, gambar QRIS.
 - Kartu company menampilkan "pengguna aktif/batas", misalnya 12/25 pengguna.
 
 ### 17.5 Pemberitahuan ke Owner (WhatsApp + email)

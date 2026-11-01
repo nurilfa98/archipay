@@ -31,6 +31,7 @@ export type SettlementItemRow = {
   hasReceipt: boolean;
   noReceiptReason: string | null;
   isPdf: boolean;
+  fileDeleted: boolean; // file nota dihapus otomatis (lewat masa simpan)
   verificationStatus: ItemVerificationStatus;
   rejectionReason: string | null;
 };
@@ -123,11 +124,22 @@ export function SettlementItemsTable({
   );
 }
 
-export function ReceiptLink({ item }: { item: Pick<SettlementItemRow, "id" | "hasReceipt" | "isPdf" | "noReceiptReason"> }) {
+export function ReceiptLink({
+  item,
+}: {
+  item: Pick<SettlementItemRow, "id" | "hasReceipt" | "isPdf" | "noReceiptReason" | "fileDeleted">;
+}) {
   if (!item.hasReceipt) {
     return (
       <span className="block max-w-48 text-xs whitespace-normal text-muted-foreground">
         Tanpa nota: {item.noReceiptReason}
+      </span>
+    );
+  }
+  if (item.fileDeleted) {
+    return (
+      <span className="block max-w-48 text-xs whitespace-normal text-muted-foreground">
+        Nota sudah dihapus (lewat masa simpan)
       </span>
     );
   }

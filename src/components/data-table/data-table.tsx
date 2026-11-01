@@ -22,6 +22,14 @@
 // Semua pemrosesan terjadi di browser (client-side), cocok untuk data
 // ratusan baris. Untuk ribuan baris, pindahkan ke server (manualPagination).
 //
+// Tampilan HP (< md, 768px) bila `renderCard` diisi: tabel diganti daftar
+// kartu (tanpa geser ke samping). Kartu tampil 10 dulu, lalu bertambah 10
+// setiap kali daftar di-scroll sampai bawah (ada juga tombol "Tampilkan 10
+// lagi" sebagai cadangan). Pencarian & filter yang sama tetap berlaku; datanya
+// sudah ada di browser, jadi menambah kartu tidak memanggil server. Kedua
+// tampilan dirender sekaligus dan dipilih lewat CSS (md:hidden / hidden
+// md:block), supaya tidak ada kedipan saat halaman pertama kali tampil.
+//
 // Referensi:
 // - https://ui.shadcn.com/docs/components/data-table
 // - node_modules/@tanstack/react-table/skills/getting-started/SKILL.md
@@ -48,7 +56,7 @@ import {
   type RowData,
 } from "@tanstack/react-table";
 import { ArrowDownIcon, ArrowUpDownIcon, ArrowUpIcon, ListFilterIcon, SearchIcon } from "lucide-react";
-import { useId, useState, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +97,8 @@ export function createDataTableColumns<TData extends RowData>() {
 }
 
 const PAGE_SIZE = 10;
+// Jumlah kartu yang ditambahkan setiap kali daftar kartu (HP) di-scroll ke bawah.
+const CARD_BATCH = 10;
 // Pencarian baru berjalan setelah minimal 3 karakter, supaya ketikan 1-2
 // huruf tidak langsung menyaring tabel. Langsung saat mengetik, tanpa Enter.
 export const SEARCH_MIN_LENGTH = 3;
@@ -102,6 +112,7 @@ export function DataTable<TData extends RowData>({
   activeFilterCount = 0,
   pending = false,
   emptyMessage = "Belum ada data.",
+  renderCard,
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- setiap kolom punya tipe nilai berbeda
   columns: ReadonlyArray<ColumnDef<DataTableFeatures, TData, any>>;
@@ -117,8 +128,17 @@ export function DataTable<TData extends RowData>({
   // true selama data baru dimuat (misal setelah filter diganti): tabel diredupkan.
   pending?: boolean;
   emptyMessage?: string;
+  // Isi satu kartu untuk tampilan HP. Bila tidak diisi, HP tetap memakai tabel.
+  renderCard?: (row: TData) => ReactNode;
 }) {
   const [search, setSearch] = useState("");
+  const [cardLimit, setCardLimit] = useState(CARD_BATCH);
+  // Data baru (filter di URL diganti) → kartu kembali ke 10 pertama.
+  const [prevData, setPrevData] = useState(data);
+  if (data !== prevData) {
+    setPrevData(data);
+    setCardLimit(CARD_BATCH);
+  }
   // Panel langsung terbuka bila halaman dibuka dengan filter aktif
   // (misal dari link/bookmark), supaya user tahu datanya sedang disaring.
   const [filtersOpen, setFiltersOpen] = useState(activeFilterCount > 0);
@@ -137,6 +157,9 @@ export function DataTable<TData extends RowData>({
   const { pageIndex, pageSize } = table.state.pagination;
   const from = total === 0 ? 0 : pageIndex * pageSize + 1;
   const to = Math.min(total, (pageIndex + 1) * pageSize);
+  // Kartu memakai baris yang sudah dicari & diurutkan, tanpa pembagian halaman.
+  const cardRows = renderCard ? table.getPrePaginatedRowModel().rows.slice(0, cardLimit) : [];
+  const hasMoreCards = cardRows.length < total;
 
   return (
     <div className="flex flex-col gap-3">
@@ -151,6 +174,7 @@ export function DataTable<TData extends RowData>({
             onChange={(event) => {
               const value = event.target.value;
               setSearch(value);
+              setCardLimit(CARD_BATCH);
               table.setGlobalFilter(value.trim().length >= SEARCH_MIN_LENGTH ? value.trim() : "");
             }}
             className="pl-8"
@@ -182,8 +206,37 @@ export function DataTable<TData extends RowData>({
         </div>
       )}
 
+      {renderCard && (
+        <div className={cn("flex flex-col gap-3 transition-opacity md:hidden", pending && "opacity-60")} aria-busy={pending}>
+          {cardRows.length === 0 ? (
+            <p className="rounded-lg border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">
+              {data.length === 0 ? emptyMessage : "Tidak ada data yang cocok."}
+            </p>
+          ) : (
+            <ul className="flex flex-col gap-2">
+              {cardRows.map((row) => (
+                <li key={row.id}>{renderCard(row.original)}</li>
+              ))}
+            </ul>
+          )}
+          <div className="flex flex-col items-center gap-2 text-sm text-muted-foreground">
+            <p>{total === 0 ? "0 data" : `${cardRows.length} dari ${total} data`}</p>
+            {hasMoreCards && (
+              // key: dipasang ulang setiap kali kartu bertambah, sehingga bila
+              // tombol masih terlihat (kartu belum memenuhi layar) langsung
+              // memuat lagi.
+              <LoadMoreTrigger key={cardLimit} onLoadMore={() => setCardLimit((limit) => limit + CARD_BATCH)} />
+            )}
+          </div>
+        </div>
+      )}
+
       <div
-        className={cn("rounded-lg border bg-card transition-opacity", pending && "opacity-60")}
+        className={cn(
+          "rounded-lg border bg-card transition-opacity",
+          renderCard && "hidden md:block",
+          pending && "opacity-60",
+        )}
         aria-busy={pending}
       >
         <Table>
@@ -247,7 +300,12 @@ export function DataTable<TData extends RowData>({
         </Table>
       </div>
 
-      <div className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
+      <div
+        className={cn(
+          "flex items-center justify-between gap-2 text-sm text-muted-foreground",
+          renderCard && "hidden md:flex",
+        )}
+      >
         <p>{total === 0 ? "0 data" : `${from}–${to} dari ${total} data`}</p>
         <div className="flex items-center gap-2">
           <Button
@@ -269,5 +327,36 @@ export function DataTable<TData extends RowData>({
         </div>
       </div>
     </div>
+  );
+}
+
+// Tombol "Tampilkan 10 lagi" yang juga otomatis "ditekan" saat terlihat di
+// layar (IntersectionObserver), sehingga kartu bertambah sendiri ketika
+// daftar di-scroll sampai bawah. rootMargin memuat sedikit lebih awal.
+function LoadMoreTrigger({ onLoadMore }: { onLoadMore: () => void }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const callback = useRef(onLoadMore);
+
+  useEffect(() => {
+    callback.current = onLoadMore;
+  });
+
+  useEffect(() => {
+    const target = ref.current;
+    if (!target) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) callback.current();
+      },
+      { rootMargin: "200px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <Button ref={ref} variant="outline" size="sm" className="bg-card" onClick={() => callback.current()}>
+      Tampilkan {CARD_BATCH} lagi
+    </Button>
   );
 }

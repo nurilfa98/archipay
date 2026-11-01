@@ -33,10 +33,14 @@ import { changePasswordSchema, loginSchema } from "./schemas";
 
 // Dipakai bersama useActionState di login-form.tsx. Karena itu parameter
 // pertamanya adalah state sebelumnya, baru formData.
+// retryAfterSeconds hanya ada saat kena rate limit: form mengunci tombol
+// Masuk dan menampilkan hitungan mundur selama itu.
+type LoginResult = ActionResult & { retryAfterSeconds?: number };
+
 export async function login(
-  _prevState: ActionResult | undefined,
+  _prevState: LoginResult | undefined,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<LoginResult> {
   // 1. Validasi input
   const parsed = loginSchema.safeParse({
     email: formData.get("email"),
@@ -61,6 +65,7 @@ export async function login(
     return {
       success: false,
       message: `Terlalu banyak percobaan login. Coba lagi dalam ${rateLimit.retryAfterMinutes} menit.`,
+      retryAfterSeconds: rateLimit.retryAfterSeconds,
     };
   }
 

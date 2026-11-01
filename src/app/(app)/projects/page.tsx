@@ -8,7 +8,8 @@
 //   langsung membuka daftar yang sudah terikat ke project itu; pojok kanan
 //   bawah = status project (informasi saja, diubah di halaman detail).
 // - OWNER: melihat nilai kontrak & pengeluaran di kartu dan menambah project
-//   (halaman /projects/new).
+//   (halaman /projects/new). Superadmin melihat hal yang sama tetapi baca saja
+//   (tanpa project:manage, tombol tambah tidak tampil).
 //   Semua project tampil, termasuk yang selesai tanpa uang muka.
 // - FINANCE & karyawan: hitungan uang muka saja (karyawan miliknya sendiri).
 //   Project selesai / "Tanpa project" hanya muncul bila ada uang mukanya.
@@ -71,7 +72,7 @@ async function HeaderAction() {
 async function ProjectsContent() {
   const user = await requirePermission("advance:view-own");
   const tiles = (
-    can(user, "project:manage")
+    can(user, "project:view-finance")
       ? await ownerTiles(user.company.id)
       : await viewerTiles(user.company.id, user.id, can(user, "advance:view-all"))
   ).sort(byNewest);

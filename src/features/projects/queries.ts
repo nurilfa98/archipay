@@ -1,7 +1,7 @@
 // Query database untuk project. Hasilnya DTO (hanya kolom yang dibutuhkan).
 //
 // Nilai kontrak hanya dikembalikan oleh listProjectsForManage(), yang
-// pemanggilnya WAJIB sudah memeriksa project:manage (OWNER). Query lain
+// pemanggilnya WAJIB sudah memeriksa project:view-finance (OWNER/superadmin). Query lain
 // (kartu pilihan project, banner) tidak pernah membawa angka itu, sehingga
 // tidak bisa bocor ke Finance atau karyawan. Semua fungsi menerima companyId
 // (company yang sedang dibuka).

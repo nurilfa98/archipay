@@ -1,7 +1,7 @@
 // Beranda khusus Owner: pengeluaran & keuntungan per project, hal yang perlu
 // perhatian, dan grafik pengeluaran. Server Component.
 //
-// Pemanggil WAJIB sudah memeriksa project:manage (OWNER): halaman ini memuat
+// Pemanggil WAJIB sudah memeriksa project:view-finance (OWNER/superadmin): halaman ini memuat
 // nilai kontrak dan keuntungan.
 
 import { getOwnerDashboard } from "../finance-queries";

@@ -27,7 +27,7 @@ export function FinanceKpis({ totals, scope = "all" }: { totals: FinanceTotals; 
           single
             ? totals.valuedCount > 0
               ? "Pendapatan project ini"
-              : "Isi lewat tombol Ubah project"
+              : "Diisi Owner lewat tombol Ubah project"
             : totals.valuedCount > 0
             ? `Dari ${totals.valuedCount} project${
                 totals.activeWithoutValue > 0 ? `, ${totals.activeWithoutValue} project aktif belum diisi` : ""

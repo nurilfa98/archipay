@@ -1,6 +1,7 @@
 // Form di halaman Pengaturan platform (Superadmin): komponen harga paket
 // (dengan kalkulasi otomatis), masa gratis & tenggang + batas pengguna masa
-// gratis + WhatsApp admin, rekening bank tujuan transfer, dan QRIS statis.
+// gratis + WhatsApp admin, masa simpan nota, rekening bank tujuan transfer,
+// dan QRIS statis.
 
 "use client";
 
@@ -16,10 +17,19 @@ import { PhoneInput } from "@/components/phone-input";
 import { bankAccentClass, formatAccountNumber } from "@/lib/bank";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { addBankAccount, deleteBankAccount, removeQris, updatePlatformSettings, updatePricing, uploadQris } from "../actions";
+import {
+  addBankAccount,
+  deleteBankAccount,
+  removeQris,
+  updatePlatformSettings,
+  updatePricing,
+  updateReceiptRetention,
+  uploadQris,
+} from "../actions";
 import { PLAN_LABELS, PLAN_MONTHS } from "../constants";
 import { discountOf, MAX_USERS, planPrice, type Pricing } from "../pricing";
 import type { BankAccount } from "../queries";
+import { RECEIPT_RETENTION_MAX_MONTHS } from "../schemas";
 import { RupiahInput } from "./rupiah-input";
 import { useFormAction } from "./use-form-action";
 
@@ -215,6 +225,27 @@ export function PlatformSettingsForm({
           error={fieldError("adminPhone")}
         />
         <SubmitButton pending={pending} label="Simpan pengaturan" />
+      </FieldGroup>
+    </form>
+  );
+}
+
+export function ReceiptRetentionForm({ months }: { months: number }) {
+  const { pending, handleSubmit, fieldError } = useFormAction(updateReceiptRetention, "Masa simpan nota tersimpan.");
+  return (
+    <form onSubmit={handleSubmit} className="max-w-xl">
+      <FieldGroup>
+        <NumberField
+          name="receiptRetentionMonths"
+          label="Masa simpan file nota"
+          unit="bulan"
+          defaultValue={months}
+          min={1}
+          max={RECEIPT_RETENTION_MAX_MONTHS}
+          description="Dihitung sejak uang muka berstatus Selesai. Berlaku juga untuk nota lama."
+          error={fieldError("receiptRetentionMonths")}
+        />
+        <SubmitButton pending={pending} label="Simpan masa simpan" />
       </FieldGroup>
     </form>
   );

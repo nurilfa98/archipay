@@ -6,6 +6,7 @@
 // - Sisa saldo baru terisi setelah diverifikasi: saldo TERKINI dari ledger
 //   (berkurang saat sisa dikembalikan, dipotong gaji, atau penggantian dibayar).
 // - Seluruh baris bisa diklik lewat link di kolom No.
+// - HP (< md): kartu (SettlementCard), 10 dulu lalu +10 saat di-scroll.
 
 "use client";
 
@@ -263,6 +264,7 @@ export function SettlementsTable({
       }
       activeFilterCount={activeFilterCount}
       pending={pending}
+      renderCard={(row) => <SettlementCard row={row} showRecipient={showRecipient} />}
       filters={
         <DataTableFilters
           canReset={activeFilterCount > 0}
@@ -297,5 +299,64 @@ export function SettlementsTable({
         </DataTableFilters>
       }
     />
+  );
+}
+
+// Kartu satu pertanggungjawaban untuk HP. Seluruh kartu bisa diklik (link
+// dibentangkan lewat ::after); tanda alasan terlambat diletakkan di atas link
+// (relative z-10) agar tooltip-nya tetap bisa ditekan.
+function SettlementCard({ row, showRecipient }: { row: SettlementRow; showRecipient: boolean }) {
+  const balance = row.balanceAmount;
+  return (
+    <div className="relative flex flex-col gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50">
+      <div className="flex items-start justify-between gap-2">
+        <span className="flex items-center gap-1.5">
+          <Link
+            href={`/settlements/${row.id}`}
+            className={cn(
+              "font-medium after:absolute after:inset-0 hover:underline",
+              row.status === "DRAFT" && "text-muted-foreground",
+            )}
+          >
+            {row.numberLabel}
+          </Link>
+          {row.lateReason && (
+            <span className="relative z-10 inline-flex">
+              <LateReasonIndicator reason={row.lateReason} />
+            </span>
+          )}
+        </span>
+        <SettlementStatusBadge status={row.status} />
+      </div>
+      <p className="line-clamp-2 text-sm">{row.purpose}</p>
+      <p className="text-xs text-muted-foreground">
+        {row.advanceNumber}
+        {showRecipient && ` · ${row.recipientName}`}
+        {` · ${row.submittedAtLabel ? `Dikirim ${row.submittedAtLabel}` : "Belum dikirim"}`}
+      </p>
+      {row.returnOverdue && (
+        <p className="text-xs font-medium text-amber-700 dark:text-amber-300">lewat batas pengembalian</p>
+      )}
+      <dl className="grid grid-cols-2 gap-2 border-t pt-2 text-xs">
+        <div className="flex flex-col">
+          <dt className="text-muted-foreground">Total nota</dt>
+          <dd className="text-sm font-medium tabular-nums">{formatRupiah(row.itemTotal)}</dd>
+          <dd className="text-muted-foreground">{row.itemCount} nota</dd>
+        </div>
+        <div className="flex flex-col items-end text-right">
+          <dt className="text-muted-foreground">Sisa saldo</dt>
+          {balance === null ? (
+            <dd className="text-sm text-muted-foreground">-</dd>
+          ) : (
+            <>
+              <dd className="text-sm font-medium tabular-nums">{formatRupiah(Math.abs(balance))}</dd>
+              <dd className="text-muted-foreground">
+                {balance === 0 ? "lunas" : balance > 0 ? "belum dikembalikan" : "belum diganti kantor"}
+              </dd>
+            </>
+          )}
+        </div>
+      </dl>
+    </div>
   );
 }

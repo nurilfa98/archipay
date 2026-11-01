@@ -241,6 +241,7 @@ function toItemRow(item: SettlementItem): SettlementItemRow {
     hasReceipt: item.hasReceipt,
     noReceiptReason: item.noReceiptReason,
     isPdf: item.fileContentType === "application/pdf",
+    fileDeleted: item.fileDeleted,
     verificationStatus: item.verificationStatus,
     rejectionReason: item.rejectionReason,
   };

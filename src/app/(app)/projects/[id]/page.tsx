@@ -2,9 +2,10 @@
 //
 // - Semua role yang bisa melihat uang muka: identitas project dan kartu akses
 //   Uang Muka & Pertanggungjawaban (hitungan sesuai hak lihat masing-masing).
-// - OWNER (project:manage): ubah project (halaman /projects/[id]/edit),
-//   tandai selesai / aktifkan lagi,
-//   unduh PDF, serta ringkasan keuangan & pengeluaran per kategori.
+// - OWNER (project:manage): ubah project (halaman /projects/[id]/edit) dan
+//   tandai selesai / aktifkan lagi.
+// - OWNER & superadmin (project:view-finance): unduh PDF, serta ringkasan
+//   keuangan & pengeluaran per kategori. Superadmin baca saja.
 //
 // params (Promise) baru di-await di dalam <Suspense> agar kerangka halaman
 // (tombol kembali) tetap statis.
@@ -54,12 +55,13 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
   if (!parsed.success) notFound();
   const id = parsed.data;
   const canManage = can(user, "project:manage");
+  const canViewFinance = can(user, "project:view-finance");
 
   // OWNER: baris keuangan (sudah berisi hitungan uang muka). Lainnya: hanya
   // hitungan, karyawan sebatas miliknya sendiri.
   let card: ProjectCardData | undefined;
   let finance: ProjectFinanceRow | undefined;
-  if (canManage) {
+  if (canViewFinance) {
     finance = (await listProjectFinance(user.company.id, { includeAll: true })).find((row) => row.id === id);
     card = finance;
   } else {
@@ -93,11 +95,15 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
         </div>
         {finance && (
           <div className="flex flex-wrap gap-2 sm:justify-end">
-            <Button variant="outline" nativeButton={false} render={<Link href={`/projects/${id}/edit`} />}>
-              <PencilIcon />
-              Ubah project
-            </Button>
-            <ProjectStatusButton project={{ id, name: card.name, status: card.status }} />
+            {canManage && (
+              <>
+                <Button variant="outline" nativeButton={false} render={<Link href={`/projects/${id}/edit`} />}>
+                  <PencilIcon />
+                  Ubah project
+                </Button>
+                <ProjectStatusButton project={{ id, name: card.name, status: card.status }} />
+              </>
+            )}
             <ProjectReportButton projectId={id} projectName={card.name} />
           </div>
         )}

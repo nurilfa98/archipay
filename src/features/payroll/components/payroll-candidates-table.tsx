@@ -2,6 +2,8 @@
 // Pola sama dengan tabel uang muka (DataTable + pencarian). Kolom Aksi
 // berisi tombol "Tandai dipotong"; tombol itu diberi `relative z-10` agar
 // tetap bisa diklik di atas link baris (after:absolute inset-0).
+// HP (< md): kartu (PayrollCandidateCard) dengan pola yang sama, 10 dulu lalu
+// +10 saat di-scroll.
 
 "use client";
 
@@ -102,6 +104,51 @@ export function PayrollCandidatesTable({ rows }: { rows: PayrollCandidateRow[] }
       searchableColumns={SEARCHABLE}
       searchPlaceholder="Cari karyawan atau nomor"
       emptyMessage="Tidak ada sisa uang muka yang lewat batas pengembalian."
+      renderCard={(row) => <PayrollCandidateCard row={row} />}
     />
+  );
+}
+
+// Kartu satu sisa uang muka untuk HP. Seluruh kartu membuka pertanggungjawaban
+// (link dibentangkan lewat ::after); tombol "Tandai dipotong" berada di atas
+// link (relative z-10) agar tetap bisa ditekan.
+function PayrollCandidateCard({ row }: { row: PayrollCandidateRow }) {
+  return (
+    <div className="relative flex flex-col gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium">{row.recipientName}</span>
+          <span className="truncate text-xs text-muted-foreground">{row.recipientEmail}</span>
+        </div>
+        <span className="shrink-0 font-semibold whitespace-nowrap tabular-nums">{formatRupiah(row.outstanding)}</span>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        <Link
+          href={`/settlements/${row.settlementId}`}
+          className="font-medium text-foreground after:absolute after:inset-0 hover:underline"
+        >
+          {row.settlementNumber}
+        </Link>
+        {` · ${row.advanceNumber}`}
+      </p>
+      <div className="flex items-center justify-between gap-2 border-t pt-2 text-xs">
+        <div className="flex flex-col">
+          <span className="text-muted-foreground">Batas pengembalian</span>
+          <span className="font-medium text-amber-700 dark:text-amber-300">{row.returnDueLabel}</span>
+        </div>
+        {row.canRecord ? (
+          <div className="relative z-10">
+            <PayrollDeductionAction
+              settlementId={row.settlementId}
+              outstanding={row.outstanding}
+              defaultPeriod={row.defaultPeriod}
+              summary={`${row.settlementNumber} · ${row.recipientName}`}
+            />
+          </div>
+        ) : (
+          <span className="text-muted-foreground">{row.isOwn ? "Milik Anda" : "-"}</span>
+        )}
+      </div>
+    </div>
   );
 }

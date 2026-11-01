@@ -9,6 +9,7 @@
 // - Filter Tahun/Bulan/Status ada di panel "Filter" dan diterapkan server
 //   lewat URL; pencarian berjalan di browser atas data yang sudah dimuat.
 // - Seluruh baris bisa diklik lewat link di kolom No.
+// - HP (< md): kartu (AdvanceCard), 10 dulu lalu +10 saat di-scroll.
 
 "use client";
 
@@ -231,6 +232,7 @@ export function AdvancesTable({
       }
       activeFilterCount={activeFilterCount}
       pending={pending}
+      renderCard={(row) => <AdvanceCard row={row} showRecipient={showRecipient} />}
       filters={
         <DataTableFilters
           canReset={activeFilterCount > 0}
@@ -265,5 +267,46 @@ export function AdvancesTable({
         </DataTableFilters>
       }
     />
+  );
+}
+
+// Kartu satu uang muka untuk HP. Seluruh kartu bisa diklik (link dibentangkan
+// lewat ::after). Isinya sama dengan kolom tabel.
+function AdvanceCard({ row, showRecipient }: { row: AdvanceRow; showRecipient: boolean }) {
+  return (
+    <div className="relative flex flex-col gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50">
+      <div className="flex items-start justify-between gap-2">
+        <Link
+          href={`/advances/${row.id}`}
+          className="font-medium after:absolute after:inset-0 hover:underline"
+        >
+          {row.numberLabel}
+        </Link>
+        <AdvanceStatusBadge status={row.status} disputed={row.disputed} />
+      </div>
+      <p className="line-clamp-2 text-sm">{row.purpose}</p>
+      <p className="text-xs text-muted-foreground">
+        {showRecipient && `${row.recipientName} · `}Dibuat {row.createdAtLabel}
+      </p>
+      <div className="flex items-end justify-between gap-2 border-t pt-2">
+        <div className="flex flex-col text-xs">
+          <span className="text-muted-foreground">Batas nota</span>
+          {row.settlementDueLabel ? (
+            <span
+              className={cn(
+                "font-medium",
+                row.settlementOverdue && "text-amber-700 dark:text-amber-300",
+              )}
+            >
+              {row.settlementDueLabel}
+              {row.settlementOverdue && " (terlewati)"}
+            </span>
+          ) : (
+            <span className="text-muted-foreground">-</span>
+          )}
+        </div>
+        <span className="font-semibold whitespace-nowrap tabular-nums">{formatRupiah(row.amount)}</span>
+      </div>
+    </div>
   );
 }

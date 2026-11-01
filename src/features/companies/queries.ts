@@ -6,7 +6,7 @@
 // Referensi: node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md
 
 import "server-only";
-import { and, asc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, not, sql } from "drizzle-orm";
 import { io } from "next/cache";
 import { hasPaidSubscription } from "@/features/subscriptions/queries";
 import { db } from "@/lib/db";
@@ -41,15 +41,23 @@ export type CompanyDetail = CompanyListItem & {
   inactiveUserCount: number;
 };
 
-const userCount = sql`(select count(*) from ${users} where ${users.companyId} = ${companies.id} and ${users.isActive})`.mapWith(
-  Number,
-);
-const inactiveUserCount = sql`(select count(*) from ${users} where ${users.companyId} = ${companies.id} and not ${users.isActive})`.mapWith(
-  Number,
-);
-const projectCount = sql`(select count(*) from ${projects} where ${projects.companyId} = ${companies.id})`.mapWith(
-  Number,
-);
+// Hitungan per company memakai subquery builder Drizzle, BUKAN template sql``
+// mentah. Query daftar company tidak memakai join, sehingga Drizzle menulis
+// kolom tanpa nama tabel: `${companies.id}` di template mentah menjadi "id",
+// yang di dalam subquery terbaca sebagai users.id / projects.id (hasilnya
+// selalu 0). Subquery builder selalu menulis "tabel"."kolom" lengkap.
+const userCount = sql`(${db
+  .select({ total: count() })
+  .from(users)
+  .where(and(eq(users.companyId, companies.id), users.isActive))})`.mapWith(Number);
+const inactiveUserCount = sql`(${db
+  .select({ total: count() })
+  .from(users)
+  .where(and(eq(users.companyId, companies.id), not(users.isActive)))})`.mapWith(Number);
+const projectCount = sql`(${db
+  .select({ total: count() })
+  .from(projects)
+  .where(eq(projects.companyId, companies.id))})`.mapWith(Number);
 
 const listColumns = {
   id: companies.id,

@@ -1,6 +1,7 @@
 // Tabel "Riwayat potongan" (Client Component): potongan gaji yang sudah
 // dicatat, dengan panel Filter Tahun/Bulan periode gaji yang diterapkan
 // server lewat URL, sama seperti tabel uang muka.
+// HP (< md): kartu (PayrollDeductionCard), 10 dulu lalu +10 saat di-scroll.
 
 "use client";
 
@@ -112,6 +113,7 @@ export function PayrollDeductionsTable({
       emptyMessage={activeFilterCount > 0 ? "Tidak ada potongan pada periode ini." : "Belum ada potongan gaji."}
       activeFilterCount={activeFilterCount}
       pending={pending}
+      renderCard={(row) => <PayrollDeductionCard row={row} />}
       filters={
         <DataTableFilters
           canReset={activeFilterCount > 0}
@@ -135,5 +137,33 @@ export function PayrollDeductionsTable({
         </DataTableFilters>
       }
     />
+  );
+}
+
+// Kartu satu potongan gaji untuk HP. Seluruh kartu membuka pertanggungjawaban
+// (link dibentangkan lewat ::after).
+function PayrollDeductionCard({ row }: { row: PayrollDeductionRow }) {
+  return (
+    <div className="relative flex flex-col gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium">{row.recipientName}</span>
+          <span className="text-xs text-muted-foreground">Periode {row.periodLabel}</span>
+        </div>
+        <span className="shrink-0 font-semibold whitespace-nowrap tabular-nums">{formatRupiah(row.amount)}</span>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        <Link
+          href={`/settlements/${row.settlementId}`}
+          className="font-medium text-foreground after:absolute after:inset-0 hover:underline"
+        >
+          {row.settlementNumber}
+        </Link>
+        {` · ${row.advanceNumber}`}
+      </p>
+      <p className="border-t pt-2 text-xs text-muted-foreground">
+        Dicatat {row.createdByName}, {row.createdAtLabel}
+      </p>
+    </div>
   );
 }

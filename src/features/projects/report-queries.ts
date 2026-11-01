@@ -1,6 +1,6 @@
 // Data untuk laporan PDF satu project (khusus OWNER).
 //
-// Pemanggil WAJIB sudah memeriksa project:manage: laporan memuat nilai kontrak
+// Pemanggil WAJIB sudah memeriksa project:view-finance: laporan memuat nilai kontrak
 // dan keuntungan. Definisi angkanya sama dengan Beranda Owner (lihat
 // finance-queries.ts): pengeluaran = nota yang DISETUJUI saat verifikasi.
 //

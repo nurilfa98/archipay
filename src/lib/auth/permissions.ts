@@ -31,7 +31,9 @@ export const PERMISSIONS = [
   "settlement:verify", // memverifikasi struk & mencatat pengembalian/penggantian selisih
   "payroll:view", // melihat daftar potong gaji & mengekspornya ke Excel
   "payroll:manage", // menandai sisa uang muka sudah dipotong dari gaji
-  "project:manage", // kelola project: nilai kontrak, status, menetapkan project uang muka lama
+  "project:view-finance", // melihat nilai kontrak, keuntungan, Beranda Owner & PDF laporan project
+  "project:manage", // kelola project: tambah, ubah, status, menetapkan project uang muka lama
+  "settings:view", // membuka halaman Pengaturan (baca saja)
   "settings:manage", // ubah kebijakan uang muka & kategori biaya
   "user:manage", // tambah/nonaktifkan user & atur role Finance/Karyawan
   "user:manage-owner", // tambah/kelola akun Owner & memberi/mencabut role Owner
@@ -50,7 +52,8 @@ const ROLE_PERMISSIONS = {
   // (lib/auth/active-company.ts) ia membuka semua menu dan melihat semua
   // data company itu, tetapi TIDAK melakukan transaksi uang (mencairkan, menyetujui, memverifikasi,
   // mencatat potong gaji): tindakannya tidak dicatat ke audit log, jadi
-  // jejak uang harus selalu milik Owner/Finance/Karyawan. Langganan company
+  // jejak uang harus selalu milik Owner/Finance/Karyawan. Project dan
+  // Pengaturan company juga baca saja (dikelola Owner). Langganan company
   // dikelola dari halaman Company/Tagihan (subscription:manage), bukan dari
   // menu Langganan milik Owner.
   SUPERADMIN: PERMISSIONS.filter(
@@ -64,6 +67,8 @@ const ROLE_PERMISSIONS = {
         "settlement:submit",
         "settlement:verify",
         "payroll:manage",
+        "project:manage",
+        "settings:manage",
       ].includes(permission),
   ),
   // Owner boleh semuanya, kecuali mengajukan uang muka untuk dirinya sendiri

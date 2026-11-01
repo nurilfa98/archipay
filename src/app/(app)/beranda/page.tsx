@@ -45,7 +45,7 @@ async function DashboardContent() {
   const viewAll = can(user, "advance:view-all");
   const recipientId = viewAll ? undefined : user.id;
   // Owner melihat keuangan per project; Finance & karyawan tetap ringkasan uang muka.
-  const isOwner = can(user, "project:manage");
+  const isOwner = can(user, "project:view-finance");
   const [summary, recent] = await Promise.all([
     isOwner ? null : getAdvanceSummary({ companyId: user.company.id, recipientId }),
     listAdvances({ companyId: user.company.id, recipientId, limit: RECENT_LIMIT }),

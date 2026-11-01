@@ -3,6 +3,7 @@
 // - pengingat uang muka lewat WhatsApp (features/reminders/run.ts)
 // - pengingat masa aktif langganan H-3/H-1 ke Owner lewat WhatsApp & email
 //   (features/subscriptions/reminders.ts)
+// - hapus file nota yang lewat masa simpan (features/settlements/receipt-retention.ts)
 //
 // Keamanan: wajib header `Authorization: Bearer <CRON_SECRET>`. Vercel Cron
 // mengirim header ini otomatis bila env CRON_SECRET diisi (jadwal di
@@ -18,6 +19,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { runReminders } from "@/features/reminders/run";
+import { purgeExpiredReceipts } from "@/features/settlements/receipt-retention";
 import { sendSubscriptionReminders } from "@/features/subscriptions/reminders";
 import { env } from "@/lib/env";
 
@@ -31,7 +33,15 @@ export async function GET(request: Request) {
 
   const sent = await runReminders();
   const subscriptionReminders = await sendSubscriptionReminders();
-  return NextResponse.json({ ok: true, sent, subscriptionReminders }, { headers: { "Cache-Control": "no-store" } });
+  // Gagal hapus nota tidak boleh menggagalkan pengingat yang sudah terkirim.
+  const receipts = await purgeExpiredReceipts().catch((error: unknown) => {
+    console.error("[cron] hapus nota lewat masa simpan:", error);
+    return null;
+  });
+  return NextResponse.json(
+    { ok: true, sent, subscriptionReminders, receipts },
+    { headers: { "Cache-Control": "no-store" } },
+  );
 }
 
 // Perbandingan waktu-konstan agar secret tidak bisa ditebak dari lama respons.

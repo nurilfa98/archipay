@@ -58,6 +58,7 @@ import {
   directPaymentSchema,
   idSchema,
   platformSettingsSchema,
+  receiptRetentionSchema,
   pricingSchema,
   rejectPaymentSchema,
 } from "./schemas";
@@ -457,7 +458,8 @@ export async function saveCompanyPricing(
 }
 
 // ---------------------------------------------------------------------------
-// Pengaturan platform: masa gratis/tenggang, WhatsApp admin, rekening, QRIS
+// Pengaturan platform: masa gratis/tenggang, WhatsApp admin, masa simpan nota,
+// rekening, QRIS
 // ---------------------------------------------------------------------------
 
 export async function updatePlatformSettings(
@@ -472,6 +474,23 @@ export async function updatePlatformSettings(
     trialMaxUsers: formData.get("trialMaxUsers"),
     adminPhone: formData.get("adminPhone") ?? "",
   });
+  if (!parsed.success) return invalid(parsed.error);
+
+  await upsertPlatformSettings(parsed.data);
+
+  revalidateSubscriptionPages();
+  return { success: true, data: undefined };
+}
+
+// Masa simpan file nota (bulan sejak uang muka Selesai), dipakai cron harian
+// (features/settlements/receipt-retention.ts) untuk semua company aktif.
+export async function updateReceiptRetention(
+  _prevState: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!(await getSubscriptionAdmin())) return FORBIDDEN;
+
+  const parsed = receiptRetentionSchema.safeParse({ receiptRetentionMonths: formData.get("receiptRetentionMonths") });
   if (!parsed.success) return invalid(parsed.error);
 
   await upsertPlatformSettings(parsed.data);

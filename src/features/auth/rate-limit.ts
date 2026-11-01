@@ -22,7 +22,11 @@ const WINDOW_MS = 15 * 60 * 1000; // 15 menit
 const MAX_FAILURES_PER_EMAIL = 5;
 const MAX_FAILURES_PER_IP = 20;
 
-type RateLimitResult = { limited: false } | { limited: true; retryAfterMinutes: number };
+// retryAfterSeconds dipakai form login untuk mengunci tombol Masuk dengan
+// hitungan mundur; retryAfterMinutes untuk teks pesan.
+type RateLimitResult =
+  | { limited: false }
+  | { limited: true; retryAfterMinutes: number; retryAfterSeconds: number };
 
 export async function checkLoginRateLimit(email: string, ip: string | null): Promise<RateLimitResult> {
   const since = new Date(Date.now() - WINDOW_MS);
@@ -45,8 +49,12 @@ export async function checkLoginRateLimit(email: string, ip: string | null): Pro
 
   for (const { result, max } of checks) {
     if (result.total >= max && result.oldest) {
-      const unlockAt = result.oldest.getTime() + WINDOW_MS;
-      return { limited: true, retryAfterMinutes: Math.max(1, Math.ceil((unlockAt - Date.now()) / 60_000)) };
+      const remainingMs = result.oldest.getTime() + WINDOW_MS - Date.now();
+      return {
+        limited: true,
+        retryAfterMinutes: Math.max(1, Math.ceil(remainingMs / 60_000)),
+        retryAfterSeconds: Math.max(1, Math.ceil(remainingMs / 1000)),
+      };
     }
   }
 

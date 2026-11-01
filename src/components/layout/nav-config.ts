@@ -83,7 +83,7 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: SettingsIcon,
     description: "Batas waktu, kategori biaya, dan lainnya",
     keywords: ["setting", "kategori", "batas"],
-    permission: "settings:manage",
+    permission: "settings:view",
   },
   {
     title: "Langganan",

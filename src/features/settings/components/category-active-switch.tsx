@@ -5,6 +5,7 @@
 //   nota baru.
 // Saklar langsung berpindah saat diklik (useOptimistic); bila server menolak,
 // kembali ke posisi semula dan pesan error tampil sebagai toast.
+// readOnly (superadmin): saklar hanya menampilkan status, tidak bisa diklik.
 
 "use client";
 
@@ -25,7 +26,17 @@ import { setExpenseCategoryActive } from "@/features/settings/actions";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 
-export function CategoryActiveSwitch({ id, name, isActive }: { id: string; name: string; isActive: boolean }) {
+export function CategoryActiveSwitch({
+  id,
+  name,
+  isActive,
+  readOnly = false,
+}: {
+  id: string;
+  name: string;
+  isActive: boolean;
+  readOnly?: boolean;
+}) {
   const labelId = useId();
   const [pending, startTransition] = useTransition();
   const [optimisticActive, setOptimisticActive] = useOptimistic(isActive);
@@ -55,7 +66,7 @@ export function CategoryActiveSwitch({ id, name, isActive }: { id: string; name:
         <Switch
           checked={optimisticActive}
           onCheckedChange={handleChange}
-          disabled={pending}
+          disabled={pending || readOnly}
           aria-labelledby={labelId}
           className="data-checked:bg-emerald-600 dark:data-checked:bg-emerald-500"
         />

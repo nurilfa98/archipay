@@ -1,6 +1,6 @@
 // Query keuangan project untuk Beranda Owner (pengeluaran, keuntungan, grafik).
 //
-// Pemanggil WAJIB sudah memeriksa project:manage (OWNER): hasilnya memuat
+// Pemanggil WAJIB sudah memeriksa project:view-finance (OWNER/superadmin): hasilnya memuat
 // nilai kontrak dan keuntungan yang tidak boleh dilihat Finance / karyawan.
 //
 // Definisi (disepakati dengan Owner):

@@ -1,6 +1,7 @@
 // Halaman /companies/[id] (platform, khusus Superadmin): ringkasan company,
 // langganan (masa aktif, tagihan, harga khusus, catat pembayaran langsung),
-// daftar Owner, ubah data, aktif/nonaktif, dan tombol masuk ke company.
+// daftar Owner, ubah data, aktif/nonaktif, hapus company (permanen), dan
+// tombol masuk ke company.
 //
 // Owner tambahan & pengguna lain dikelola dari menu Pengguna setelah masuk
 // ke company (Superadmin boleh memberi role Owner, lihat features/users/access.ts).
@@ -21,6 +22,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompanyDeleteAction } from "@/features/companies/components/company-delete-action";
 import { CompanyStatusBadge } from "@/features/companies/components/company-status-badge";
 import { CompanyEditForm } from "@/features/companies/components/company-form";
 import { CompanyStatusAction } from "@/features/companies/components/company-status-action";
@@ -179,6 +181,15 @@ async function CompanyDetailContent({ id }: { id: string }) {
         </CardHeader>
         <CardContent>
           <CompanyStatusAction company={company} />
+        </CardContent>
+      </Card>
+
+      <Card className="ring-destructive/30">
+        <CardHeader>
+          <CardTitle className="text-destructive">Hapus company</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <CompanyDeleteAction company={company} />
         </CardContent>
       </Card>
     </>

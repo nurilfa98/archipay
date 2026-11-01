@@ -1,6 +1,7 @@
 // Tabel Audit Log (Client Component): aktivitas terbaru dengan panel Filter
 // Tahun/Bulan/Kategori/Pelaku yang diterapkan server lewat URL, sama seperti
 // tabel uang muka. Tombol mata membuka detail data yang berubah.
+// HP (< md): kartu (AuditLogCard), 10 dulu lalu +10 saat di-scroll.
 
 "use client";
 
@@ -141,6 +142,7 @@ export function AuditLogTable({
         emptyMessage={activeFilterCount > 0 ? "Tidak ada aktivitas yang cocok dengan filter." : "Belum ada aktivitas."}
         activeFilterCount={activeFilterCount}
         pending={pending}
+        renderCard={(row) => <AuditLogCard row={row} />}
         filters={
           <DataTableFilters
             canReset={activeFilterCount > 0}
@@ -181,6 +183,40 @@ export function AuditLogTable({
           Hanya {rows.length} aktivitas terbaru yang ditampilkan. Gunakan Filter untuk melihat aktivitas yang lebih lama.
         </p>
       )}
+    </div>
+  );
+}
+
+// Kartu satu aktivitas untuk HP. Kartu tidak bisa diklik seluruhnya: link
+// data dan tombol mata (detail) masing-masing tetap terpisah.
+function AuditLogCard({ row }: { row: AuditLogTableRow }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate font-medium">{row.actorName}</span>
+          {row.actorEmail && <span className="truncate text-xs text-muted-foreground">{row.actorEmail}</span>}
+        </div>
+        <div className="-mt-1 -mr-1 shrink-0">
+          <AuditDetailSheet row={row} />
+        </div>
+      </div>
+      <div>
+        <ToneBadge tone={row.tone}>{row.actionLabel}</ToneBadge>
+      </div>
+      <div className="flex items-end justify-between gap-2 border-t pt-2 text-xs">
+        <div className="flex min-w-0 flex-col">
+          <span className="text-muted-foreground">{row.entityKind}</span>
+          {row.entityHref ? (
+            <Link href={row.entityHref} className="truncate text-sm font-medium hover:underline">
+              {row.entityLabel}
+            </Link>
+          ) : (
+            <span className="truncate text-sm font-medium">{row.entityLabel}</span>
+          )}
+        </div>
+        <span className="shrink-0 text-right text-muted-foreground">{row.createdAtLabel}</span>
+      </div>
     </div>
   );
 }

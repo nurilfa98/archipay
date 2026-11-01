@@ -1,7 +1,8 @@
 // Halaman /platform-settings (Pengaturan platform, Superadmin /
 // subscription:manage): komponen harga paket (harga 6 bulan & 1 tahun dihitung
 // otomatis dari harga per bulan & diskon), masa gratis & tenggang + batas
-// pengguna masa gratis, nomor WhatsApp admin, rekening bank, dan QRIS statis.
+// pengguna masa gratis, nomor WhatsApp admin, masa simpan file nota, rekening
+// bank, dan QRIS statis.
 // Harga khusus per company diatur di detail company → Langganan.
 
 import type { Metadata } from "next";
@@ -15,6 +16,7 @@ import {
   PlatformSettingsForm,
   PricingForm,
   QrisForm,
+  ReceiptRetentionForm,
 } from "@/features/subscriptions/components/platform-forms";
 import { getStandardPricing, listBankAccounts } from "@/features/subscriptions/queries";
 import { requirePlatformAdmin } from "@/lib/auth/dal";
@@ -71,6 +73,19 @@ async function PlatformSettingsContent() {
         </CardHeader>
         <CardContent>
           <PlatformSettingsForm settings={settings} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Masa simpan nota</CardTitle>
+          <CardDescription>
+            File foto/PDF nota dihapus otomatis dari penyimpanan setelah masa ini lewat, agar penyimpanan tidak terus
+            menumpuk. Nominal, keterangan, dan riwayat uang muka tetap tersimpan. Nota company nonaktif tidak dihapus.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ReceiptRetentionForm months={settings.receiptRetentionMonths} />
         </CardContent>
       </Card>
 

@@ -1,5 +1,6 @@
-// Halaman /settings (Pengaturan, khusus OWNER): kebijakan uang muka dan
-// kategori biaya. Polanya sama dengan halaman lain: judul statis di luar
+// Halaman /settings (Pengaturan): kebijakan uang muka dan kategori biaya.
+// OWNER mengubahnya (settings:manage); superadmin hanya melihat (settings:view),
+// semua isian & tombol ubah dinonaktifkan/disembunyikan. Polanya sama dengan halaman lain: judul statis di luar
 // <Suspense>, cek permission & data di dalamnya.
 
 import type { Metadata } from "next";
@@ -11,6 +12,7 @@ import { CompanySettingsForm } from "@/features/settings/components/company-sett
 import { ExpenseCategoriesManager } from "@/features/settings/components/expense-categories-manager";
 import { getCompanySettings, getSettingsUpdateInfo, listAllExpenseCategories } from "@/features/settings/queries";
 import { requirePermission } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/permissions";
 import { formatDateTime } from "@/lib/dates";
 
 export const metadata: Metadata = {
@@ -29,7 +31,8 @@ export default function SettingsPage() {
 }
 
 async function SettingsContent() {
-  const user = await requirePermission("settings:manage");
+  const user = await requirePermission("settings:view");
+  const readOnly = !can(user, "settings:manage");
   const [settings, updateInfo, categories] = await Promise.all([
     getCompanySettings(user.company.id),
     getSettingsUpdateInfo(user.company.id),
@@ -49,7 +52,7 @@ async function SettingsContent() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <CompanySettingsForm settings={settings} />
+          <CompanySettingsForm settings={settings} readOnly={readOnly} />
         </CardContent>
       </Card>
 
@@ -59,7 +62,7 @@ async function SettingsContent() {
           <CardDescription>Dipilih karyawan untuk setiap nota di pertanggungjawaban.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ExpenseCategoriesManager categories={categories} />
+          <ExpenseCategoriesManager categories={categories} readOnly={readOnly} />
         </CardContent>
       </Card>
     </>

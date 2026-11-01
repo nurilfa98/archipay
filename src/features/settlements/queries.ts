@@ -353,6 +353,7 @@ export type SettlementItem = {
   hasReceipt: boolean;
   noReceiptReason: string | null;
   fileContentType: string | null;
+  fileDeleted: boolean; // file nota sudah dihapus otomatis (lewat masa simpan)
   verificationStatus: ItemVerificationStatus;
   rejectionReason: string | null;
 };
@@ -369,6 +370,7 @@ export async function listSettlementItems(settlementId: string): Promise<Settlem
       hasReceipt: settlementItems.hasReceipt,
       noReceiptReason: settlementItems.noReceiptReason,
       fileContentType: settlementItems.fileContentType,
+      fileDeleted: sql<boolean>`${settlementItems.fileDeletedAt} is not null`,
       verificationStatus: settlementItems.verificationStatus,
       rejectionReason: settlementItems.rejectionReason,
     })
@@ -442,6 +444,7 @@ export async function getReceiptFile(companyId: string, itemId: string) {
     .select({
       fileKey: settlementItems.fileKey,
       fileContentType: settlementItems.fileContentType,
+      fileDeletedAt: settlementItems.fileDeletedAt,
       recipientId: advanceRequests.recipientId,
     })
     .from(settlementItems)

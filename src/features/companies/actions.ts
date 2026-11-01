@@ -6,8 +6,9 @@
 //
 // - Company dibuat bersama pengaturan awal, kategori biaya awal, dan akun
 //   Owner pertamanya (password sementara dikirim ke email Owner).
-// - Company TIDAK dihapus, hanya dinonaktifkan; semua user company itu
-//   otomatis tidak bisa login (lib/auth/dal.ts mengecek companies.is_active).
+// - Nonaktifkan: semua user company itu otomatis tidak bisa login
+//   (lib/auth/dal.ts mengecek companies.is_active), data tetap tersimpan.
+// - Hapus: company beserta SEMUA datanya dihapus permanen (deleteCompany).
 // - Superadmin bisa "masuk" ke company (cookie, lib/auth/active-company.ts)
 //   untuk melihat semua menunya.
 // - Tindakan Superadmin tidak dicatat ke audit log (lib/audit.ts), jadi di
@@ -19,18 +20,39 @@
 
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
-import { clearActiveCompanyCookie, setActiveCompanyCookie } from "@/lib/auth/active-company";
+import { clearActiveCompanyCookie, readActiveCompanyCookie, setActiveCompanyCookie } from "@/lib/auth/active-company";
 import { verifyAccount } from "@/lib/auth/dal";
 import { generateTemporaryPassword, hashPassword } from "@/lib/auth/password";
 import { can } from "@/lib/auth/permissions";
 import { db, violatedConstraint } from "@/lib/db";
-import { companies, companySettings, expenseCategories, roles, userRoles, users } from "@/lib/db/schema";
+import {
+  advanceLedgerEntries,
+  advanceRequests,
+  auditLogs,
+  companies,
+  companyPricing,
+  companySettings,
+  documentSequences,
+  expenseCategories,
+  loginAttempts,
+  projects,
+  reminderLogs,
+  roles,
+  settlementItems,
+  settlements,
+  subscriptionPayments,
+  subscriptions,
+  userRoles,
+  users,
+} from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email";
 import { getPlatformSettings } from "@/lib/platform-settings";
+import { deleteObject } from "@/lib/storage";
 import { addDays } from "@/lib/subscription-access";
 import type { ActionResult } from "@/types/action-result";
 import { credentialsEmail } from "@/features/users/emails";
@@ -180,6 +202,113 @@ export async function setCompanyActive(companyId: string, active: boolean): Prom
 
   revalidatePath("/", "layout");
   return { success: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Hapus company beserta semua datanya (permanen)
+// ---------------------------------------------------------------------------
+
+// Dipanggil dari event handler. confirmName = nama company yang diketik ulang
+// di dialog konfirmasi; dicek lagi di sini agar penghapusan tidak terjadi
+// karena salah klik atau request yang dikirim langsung.
+//
+// Semua baris dihapus dalam SATU transaksi (semua atau tidak sama sekali),
+// berurutan dari tabel anak ke induk karena foreign key tanpa onDelete
+// cascade. File nota & bukti bayar di penyimpanan dihapus SETELAH transaksi
+// berhasil (after()), sehingga kegagalan hapus file tidak membatalkan apa pun.
+// Berhasil → redirect ke daftar company.
+export async function deleteCompany(companyId: string, confirmName: string): Promise<ActionResult> {
+  if (!(await getPlatformAdmin())) return FORBIDDEN;
+
+  const input = z.object({ companyId: companyIdSchema, confirmName: z.string().max(200) }).safeParse({
+    companyId,
+    confirmName,
+  });
+  if (!input.success) return NOT_FOUND;
+
+  const [company] = await db
+    .select({ id: companies.id, name: companies.name })
+    .from(companies)
+    .where(eq(companies.id, input.data.companyId))
+    .limit(1);
+  if (!company) return NOT_FOUND;
+  if (input.data.confirmName.trim() !== company.name) {
+    return { success: false, message: "Nama company yang diketik tidak sesuai." };
+  }
+
+  const fileKeys = await db.transaction(async (tx) => {
+    const id = company.id;
+    const companyUsers = await tx
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.companyId, id));
+    const userIds = companyUsers.map((user) => user.id);
+
+    // Key file dikumpulkan sebelum barisnya hilang.
+    const [receiptFiles, proofFiles] = await Promise.all([
+      // Nota yang sudah dihapus otomatis (lewat masa simpan) dilewati.
+      tx
+        .select({ key: settlementItems.fileKey })
+        .from(settlementItems)
+        .where(and(eq(settlementItems.companyId, id), isNull(settlementItems.fileDeletedAt))),
+      tx
+        .select({ key: subscriptionPayments.proofKey })
+        .from(subscriptionPayments)
+        .where(eq(subscriptionPayments.companyId, id)),
+    ]);
+
+    // Uang muka & pertanggungjawaban (anak → induk).
+    await tx
+      .delete(reminderLogs)
+      .where(
+        inArray(
+          reminderLogs.advanceId,
+          tx.select({ id: advanceRequests.id }).from(advanceRequests).where(eq(advanceRequests.companyId, id)),
+        ),
+      );
+    await tx.delete(advanceLedgerEntries).where(eq(advanceLedgerEntries.companyId, id));
+    await tx.delete(settlementItems).where(eq(settlementItems.companyId, id));
+    await tx.delete(settlements).where(eq(settlements.companyId, id));
+    await tx.delete(advanceRequests).where(eq(advanceRequests.companyId, id));
+    await tx.delete(projects).where(eq(projects.companyId, id));
+    await tx.delete(documentSequences).where(eq(documentSequences.companyId, id));
+    await tx.delete(expenseCategories).where(eq(expenseCategories.companyId, id));
+
+    // Langganan.
+    await tx.delete(subscriptionPayments).where(eq(subscriptionPayments.companyId, id));
+    await tx.delete(subscriptions).where(eq(subscriptions.companyId, id));
+    await tx.delete(companyPricing).where(eq(companyPricing.companyId, id));
+    await tx.delete(companySettings).where(eq(companySettings.companyId, id));
+
+    // Jejak audit company ini & semua user-nya, catatan percobaan login
+    // akun-akunnya, lalu user (user_roles ikut terhapus: onDelete cascade).
+    const byCompany = eq(auditLogs.companyId, id);
+    await tx.delete(auditLogs).where(userIds.length > 0 ? or(byCompany, inArray(auditLogs.userId, userIds)) : byCompany);
+    if (companyUsers.length > 0) {
+      await tx.delete(loginAttempts).where(inArray(loginAttempts.email, companyUsers.map((user) => user.email)));
+    }
+    await tx.delete(users).where(eq(users.companyId, id));
+
+    await tx.delete(companies).where(eq(companies.id, id));
+
+    return [...receiptFiles, ...proofFiles].map((file) => file.key).filter((key): key is string => key !== null);
+  });
+
+  after(async () => {
+    // 20 file sekaligus agar tidak membuka ratusan request bersamaan.
+    let failed = 0;
+    for (let start = 0; start < fileKeys.length; start += 20) {
+      const results = await Promise.allSettled(fileKeys.slice(start, start + 20).map((key) => deleteObject(key)));
+      failed += results.filter((result) => result.status === "rejected").length;
+    }
+    if (failed > 0) console.error(`[companies] hapus company ${company.id}: ${failed} file gagal dihapus`);
+  });
+
+  // Superadmin sedang membuka company ini: keluarkan dari company tersebut.
+  if ((await readActiveCompanyCookie()) === company.id) await clearActiveCompanyCookie();
+
+  revalidatePath("/", "layout");
+  redirect("/companies");
 }
 
 // ---------------------------------------------------------------------------
