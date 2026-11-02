@@ -9,6 +9,7 @@
 import type { Metadata } from "next";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LoginForm } from "@/features/auth/components/login-form";
+import { InstallAppButton } from "@/features/pwa/components/install-app-button";
 
 export const metadata: Metadata = {
   title: "Masuk",
@@ -29,6 +30,8 @@ export default function LoginPage() {
       <p className="px-6 text-center text-xs text-muted-foreground">
         Lupa password atau belum punya akun? Hubungi Owner.
       </p>
+      {/* Hanya tampil di HP yang belum memasang ArchiPay ke layar utama. */}
+      <InstallAppButton />
     </>
   );
 }

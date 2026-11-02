@@ -52,5 +52,7 @@ export async function proxy(request: NextRequest) {
 export const config = {
   // Jalankan proxy untuk semua path KECUALI file statis & gambar.
   // Tanpa ini, CSS/JS/gambar halaman login ikut diblokir.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  // manifest.webmanifest (src/app/manifest.ts) diambil browser tanpa cookie,
+  // jadi juga harus lolos agar ArchiPay bisa dipasang ke layar utama HP.
+  matcher:["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
 };

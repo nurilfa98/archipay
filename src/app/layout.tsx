@@ -7,11 +7,12 @@
 //
 // Referensi: node_modules/next/dist/docs/01-app/01-getting-started/03-layouts-and-pages.md
 
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { InstallAppListener } from "@/features/pwa/components/install-app-listener";
 import "./globals.css";
 
 // globals.css (dari shadcn) memakai variabel --font-sans, jadi nama
@@ -30,6 +31,21 @@ export const metadata: Metadata = {
   // Halaman cukup menulis `title: "Masuk"`, hasilnya "Masuk | ArchiPay".
   title: { default: "ArchiPay", template: "%s | ArchiPay" },
   description: "Project Financial Control & Petty Cash Management System",
+  applicationName: "ArchiPay",
+  // Untuk iPhone/iPad: saat dipasang lewat Share → "Tambahkan ke Layar Utama",
+  // ArchiPay terbuka layar penuh dengan nama ini di bawah ikonnya.
+  // Ikon iOS diambil dari src/app/apple-icon.png (otomatis oleh Next.js).
+  appleWebApp: { capable: true, title: "ArchiPay", statusBarStyle: "default" },
+};
+
+// Warna status bar HP (dan bar judul saat dibuka sebagai aplikasi) mengikuti
+// latar aplikasi: slate-50 di mode terang, slate-950 di mode gelap.
+// Referensi: node_modules/next/dist/docs/01-app/03-api-reference/04-functions/generate-viewport.md
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f8fafc" },
+    { media: "(prefers-color-scheme: dark)", color: "#020617" },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -49,6 +65,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               notify.* (src/lib/notify.ts). Diletakkan di root agar tetap tampil
               walau halaman berpindah. */}
           <Toaster />
+          {/* Menangkap event "pasang aplikasi" dari browser sedini mungkin;
+              tombolnya ada di halaman login dan menu user. */}
+          <InstallAppListener />
         </ThemeProvider>
       </body>
     </html>
