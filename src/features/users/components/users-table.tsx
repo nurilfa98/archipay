@@ -1,8 +1,9 @@
 // Tabel daftar pengguna. Server Component: hanya menampilkan data, tidak ada
 // interaksi selain link, jadi tidak perlu JavaScript tambahan di browser.
 //
-// Responsif: di HP kolom WhatsApp & Role disembunyikan; email tampil di
-// bawah nama dan role ikut di baris yang sama agar tabel tidak meluber.
+// Responsif: layar lebar memakai tabel (di tablet kolom WhatsApp
+// disembunyikan); HP (< md) memakai kartu seperti AdvanceCard di
+// advances-table.tsx, supaya tidak perlu geser ke samping.
 //
 // Referensi: https://ui.shadcn.com/docs/components/table
 
@@ -32,8 +33,8 @@ export function UsersTable({ users, search }: { users: UserListItem[]; search?: 
     );
   }
 
-  return (
-    <div className="rounded-lg border bg-card">
+  const table = (
+    <div className="hidden rounded-lg border bg-card md:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -78,6 +79,40 @@ export function UsersTable({ users, search }: { users: UserListItem[]; search?: 
         </TableBody>
       </Table>
     </div>
+  );
+
+  return (
+    <>
+      {table}
+      <ul className="flex flex-col gap-2 md:hidden">
+        {users.map((user) => (
+          // Seluruh kartu bisa diklik (link dibentangkan lewat ::after).
+          <li
+            key={user.id}
+            className="relative flex flex-col gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-col">
+                <Link
+                  href={`/users/${user.id}`}
+                  className="truncate font-medium after:absolute after:inset-0 hover:underline"
+                >
+                  {user.fullName}
+                </Link>
+                <span className="truncate text-xs text-muted-foreground">{user.email}</span>
+              </div>
+              <StatusBadge user={user} />
+            </div>
+            <div className="flex items-center justify-between gap-2 border-t pt-2">
+              <span className="text-xs text-muted-foreground tabular-nums">
+                {user.phoneNumber ? formatPhone(user.phoneNumber) : "WhatsApp belum diisi"}
+              </span>
+              <RoleBadges roles={user.roles} className="justify-end" />
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }
 

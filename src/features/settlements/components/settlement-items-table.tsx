@@ -3,6 +3,9 @@
 //
 // File nota dibuka lewat /api/receipts/<id> yang mengecek hak akses dulu,
 // lalu menampilkan file dari penyimpanan privat.
+//
+// Layar lebar: tabel. HP (< md): satu kartu per nota (pola sama dengan
+// AdvanceCard di advances-table.tsx), supaya tidak perlu geser ke samping.
 
 "use client";
 
@@ -58,8 +61,8 @@ export function SettlementItemsTable({
   const total = items.reduce((sum, item) => sum + item.amount, 0);
   const extraColumns = (showVerification ? 1 : 0) + (editable ? 1 : 0);
 
-  return (
-    <div className="rounded-lg border bg-card">
+  const table = (
+    <div className="hidden rounded-lg border bg-card md:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -95,16 +98,7 @@ export function SettlementItemsTable({
               )}
               {editable && (
                 <TableCell className="text-center align-top">
-                  <ActionDialog
-                    label="Hapus nota"
-                    icon={<Trash2Icon className="size-[18px]" />}
-                    variant="destructive"
-                    title="Hapus nota ini?"
-                    description={`${item.description} · ${formatRupiah(item.amount)}`}
-                    confirmLabel="Hapus nota"
-                    successMessage="Nota dihapus."
-                    onConfirm={() => removeSettlementItem(settlementId, item.id)}
-                  />
+                  <RemoveItemButton settlementId={settlementId} item={item} />
                 </TableCell>
               )}
             </TableRow>
@@ -121,6 +115,57 @@ export function SettlementItemsTable({
         </TableFooter>
       </Table>
     </div>
+  );
+
+  return (
+    <>
+      {table}
+      <ul className="flex flex-col gap-2 md:hidden">
+        {items.map((item) => (
+          <li key={item.id} className="flex flex-col gap-2 rounded-lg border bg-card p-3">
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex min-w-0 flex-col">
+                <span className="font-medium break-words">{item.description}</span>
+                <span className="text-xs text-muted-foreground">
+                  {item.categoryName} · {item.receiptDateLabel}
+                </span>
+              </div>
+              <span className="font-semibold whitespace-nowrap tabular-nums">{formatRupiah(item.amount)}</span>
+            </div>
+            {item.verificationStatus === "REJECTED" && item.rejectionReason && (
+              <p className="text-xs text-destructive">Ditolak: {item.rejectionReason}</p>
+            )}
+            <div className="flex items-center justify-between gap-2 border-t pt-2">
+              <ReceiptLink item={item} />
+              <div className="flex shrink-0 items-center gap-1">
+                {showVerification && <ItemVerificationBadge status={item.verificationStatus} />}
+                {editable && <RemoveItemButton settlementId={settlementId} item={item} />}
+              </div>
+            </div>
+          </li>
+        ))}
+        <li className="flex items-center justify-between gap-2 rounded-lg border bg-muted/50 p-3 font-semibold">
+          <span>Total {items.length} nota</span>
+          <span className="whitespace-nowrap tabular-nums">{formatRupiah(total)}</span>
+        </li>
+      </ul>
+    </>
+  );
+}
+
+// Tombol hapus satu nota (dipakai tabel dan kartu HP).
+function RemoveItemButton({ settlementId, item }: { settlementId: string; item: SettlementItemRow }) {
+  return (
+    <ActionDialog
+      label="Hapus nota"
+      icon={<Trash2Icon className="size-[18px]" />}
+      variant="destructive"
+      title="Hapus nota ini?"
+      description={`${item.description} · ${formatRupiah(item.amount)}`}
+      confirmLabel="Hapus nota"
+      successMessage="Nota dihapus."
+      onConfirm={() => removeSettlementItem(settlementId, item.id)}
+    />
   );
 }
 

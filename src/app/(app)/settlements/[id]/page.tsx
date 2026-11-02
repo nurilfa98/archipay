@@ -400,10 +400,12 @@ function SettlementSummary({
   );
 }
 
+// Riwayat saldo. Layar lebar: tabel. HP (< md): satu kartu per transaksi
+// (pola sama dengan project-finance-list.tsx), supaya tidak perlu geser ke samping.
 function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
   const balance = entries.reduce((sum, entry) => sum + entry.amount, 0);
-  return (
-    <div className="rounded-lg border bg-card">
+  const table = (
+    <div className="hidden rounded-lg border bg-card md:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -418,17 +420,7 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
               <TableCell className="align-top whitespace-nowrap">{formatDateTime(entry.createdAt)}</TableCell>
               <TableCell className="min-w-48 align-top whitespace-normal">
                 <span className="block font-medium">{LEDGER_ENTRY_LABELS[entry.type] ?? entry.type}</span>
-                <span className="block text-xs text-muted-foreground">
-                  {[
-                    entry.method && LEDGER_METHOD_LABELS[entry.method],
-                    entry.payrollPeriod && `periode ${entry.payrollPeriod}`,
-                    entry.reference && `ref. ${entry.reference}`,
-                    entry.note,
-                    `oleh ${entry.createdByName}`,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
+                <span className="block text-xs text-muted-foreground">{ledgerDetail(entry)}</span>
               </TableCell>
               <TableCell
                 className={cn(
@@ -454,6 +446,52 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
       </Table>
     </div>
   );
+
+  return (
+    <>
+      {table}
+      <ul className="flex flex-col gap-2 md:hidden">
+        {entries.map((entry) => (
+          <li key={entry.id} className="flex flex-col gap-1 rounded-lg border bg-card p-3">
+            <div className="flex items-start justify-between gap-2">
+              <span className="font-medium">{LEDGER_ENTRY_LABELS[entry.type] ?? entry.type}</span>
+              <span
+                className={cn(
+                  "font-semibold whitespace-nowrap tabular-nums",
+                  entry.amount < 0 && "text-muted-foreground",
+                )}
+              >
+                {entry.amount > 0 ? "+" : "−"}
+                {formatRupiah(Math.abs(entry.amount))}
+              </span>
+            </div>
+            <p className="text-xs break-words text-muted-foreground">{ledgerDetail(entry)}</p>
+            <p className="text-xs text-muted-foreground">{formatDateTime(entry.createdAt)}</p>
+          </li>
+        ))}
+        <li className="flex items-center justify-between gap-2 rounded-lg border bg-muted/50 p-3 font-semibold">
+          <span>Saldo</span>
+          <span className="whitespace-nowrap tabular-nums">
+            {balance < 0 && "−"}
+            {formatRupiah(Math.abs(balance))}
+          </span>
+        </li>
+      </ul>
+    </>
+  );
+}
+
+// "Transfer · ref. 123 · oleh Budi": rincian satu transaksi saldo.
+function ledgerDetail(entry: LedgerEntry) {
+  return [
+    entry.method && LEDGER_METHOD_LABELS[entry.method],
+    entry.payrollPeriod && `periode ${entry.payrollPeriod}`,
+    entry.reference && `ref. ${entry.reference}`,
+    entry.note,
+    `oleh ${entry.createdByName}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 }
 
 function Item({ label, children }: { label: string; children: ReactNode }) {

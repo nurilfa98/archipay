@@ -10,6 +10,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdvanceCreateForm } from "@/features/advances/components/advance-create-form";
+import { MissingPhoneNotice } from "@/features/advances/components/missing-phone-notice";
 import { countOverdueAdvances, getActiveRecipient } from "@/features/advances/queries";
 import { BackToProjectList } from "@/features/projects/components/back-to-list";
 import { ProjectBanner } from "@/features/projects/components/project-banner";
@@ -50,6 +51,18 @@ async function RequestAdvanceContent({ searchParams }: Pick<PageProps<"/advances
   ]);
   // verifySession sudah memastikan user aktif; ini hanya pengaman tipe.
   if (!self) redirect("/login");
+
+  // Belum ada nomor WhatsApp (misal halaman dibuka langsung lewat URL): form
+  // tidak ditampilkan, cukup info + link ke Profil.
+  if (!self.phoneNumber) {
+    return (
+      <>
+        <ProjectBanner project={scope.project} />
+        <MissingPhoneNotice />
+      </>
+    );
+  }
+
   const overdueCounts = await countOverdueAdvances(companyId, [self.id]);
 
   return (

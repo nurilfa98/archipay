@@ -1,6 +1,7 @@
 // Tabel ringkas "Uang muka terbaru" di Beranda. Server Component dengan
 // <Table> shadcn biasa: hanya beberapa baris, jadi tidak perlu pencarian,
 // urutan, maupun halaman seperti data table di /advances.
+// Layar lebar: tabel. HP (< md): kartu seperti AdvanceCard di advances-table.tsx.
 
 import { ChevronRightIcon } from "lucide-react";
 import Link from "next/link";
@@ -31,8 +32,8 @@ export function RecentAdvancesTable({
     );
   }
 
-  return (
-    <div className="rounded-lg border bg-card">
+  const table = (
+    <div className="hidden rounded-lg border bg-card md:block">
       <Table>
         <TableHeader>
           <TableRow>
@@ -78,5 +79,34 @@ export function RecentAdvancesTable({
         </TableBody>
       </Table>
     </div>
+  );
+
+  return (
+    <>
+      {table}
+      <ul className="flex flex-col gap-2 md:hidden">
+        {advances.map((advance) => (
+          // Seluruh kartu bisa diklik (link dibentangkan lewat ::after).
+          <li
+            key={advance.id}
+            className="relative flex flex-col gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50"
+          >
+            <div className="flex items-start justify-between gap-2">
+              <Link href={`/advances/${advance.id}`} className="font-medium after:absolute after:inset-0 hover:underline">
+                {advance.number}
+              </Link>
+              <AdvanceStatusBadge status={advance.status} disputed={!!advance.disputedAt} />
+            </div>
+            <p className="line-clamp-2 text-sm">{advance.purpose}</p>
+            <div className="flex items-end justify-between gap-2 border-t pt-2">
+              <span className="min-w-0 truncate text-xs text-muted-foreground">
+                {showRecipient ? advance.recipientName : ""}
+              </span>
+              <span className="font-semibold whitespace-nowrap tabular-nums">{formatRupiah(advance.amount)}</span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

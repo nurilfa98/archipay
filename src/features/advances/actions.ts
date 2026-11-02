@@ -38,7 +38,7 @@ import { getClientIp } from "@/lib/request";
 import type { ActionResult } from "@/types/action-result";
 import { getActiveProject } from "@/features/projects/queries";
 import { getCompanySettings } from "@/features/settings/queries";
-import { ADVANCE_NUMBER_PREFIX, type AdvanceStatus, type DisbursementMethod } from "./constants";
+import { ADVANCE_NUMBER_PREFIX, MISSING_PHONE_MESSAGE, type AdvanceStatus, type DisbursementMethod } from "./constants";
 import {
   notifyAcknowledged,
   notifyApprovalRequested,
@@ -120,6 +120,11 @@ export async function createAdvance(
   }
   const recipient = await getActiveRecipient(companyId, input.recipientId);
   if (!recipient) return fieldError("recipientId", "Karyawan tidak ditemukan atau sudah nonaktif");
+
+  // Pengajuan sendiri (pull) wajib punya nomor WhatsApp: status persetujuan,
+  // pencairan, dan pengingat nota dikirim lewat WhatsApp. Tombolnya sudah
+  // disembunyikan di UI; ini pengaman bila form dikirim langsung.
+  if (isRequest && !recipient.phoneNumber) return { success: false, message: MISSING_PHONE_MESSAGE };
 
   // Karyawan yang masih punya uang muka tertunda (lewat batas unggah nota, belum
   // dipertanggungjawabkan) sampai batas di Pengaturan tidak boleh menerima uang muka baru.

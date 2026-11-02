@@ -86,3 +86,8 @@ export const MAX_ADVANCE_AMOUNT = 1_000_000_000;
 // Awalan nomor transaksi uang muka: "UM-2026-10-0001".
 // Nomornya dibuat lib/document-number.ts saat uang muka disimpan.
 export const ADVANCE_NUMBER_PREFIX = "UM";
+
+// Pengajuan uang muka sendiri (pull) wajib punya nomor WhatsApp untuk notifikasi
+// (components/missing-phone-notice.tsx & createAdvance).
+export const MISSING_PHONE_MESSAGE =
+  "Lengkapi nomor WhatsApp di Profil terlebih dahulu sebelum mengajukan uang muka.";

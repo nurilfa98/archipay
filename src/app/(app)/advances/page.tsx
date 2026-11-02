@@ -34,6 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AdvanceTodoList } from "@/features/advances/components/advance-todo-list";
 import { AdvancesTable, type AdvanceRow } from "@/features/advances/components/advances-table";
+import { MissingPhoneNotice } from "@/features/advances/components/missing-phone-notice";
 import {
   RequestBlockedButton,
   RequestBlockedNotice,
@@ -42,6 +43,7 @@ import {
 import { isAwaitingReceipts } from "@/features/advances/constants";
 import {
   countOverdueAdvances,
+  getActiveRecipient,
   listAdvanceYears,
   listAdvances,
   type AdvanceListItem,
@@ -91,6 +93,8 @@ export default function AdvancesPage({ searchParams }: PageProps<"/advances">) {
 // - OWNER          : Catat pencairan (push)
 // - FINANCE        : Ajukan untuk saya (pull) + Usulkan pencairan (push)
 // - Karyawan       : Ajukan uang muka (pull)
+// Tombol pengajuan (pull) disembunyikan bila user belum mengisi nomor
+// WhatsApp; sebagai gantinya AdvancesContent menampilkan MissingPhoneNotice.
 async function AdvanceHeaderActions({ searchParams }: Pick<PageProps<"/advances">, "searchParams">) {
   const user = await verifySession();
   const companyId = user.company.id;
@@ -107,18 +111,22 @@ async function AdvanceHeaderActions({ searchParams }: Pick<PageProps<"/advances"
   // Karyawan yang sudah mencapai batas uang muka tertunda tidak dibawa ke form;
   // tombolnya hanya menampilkan kartu info di halaman ini.
   let blocked: { overdue: number; limit: number } | null = null;
+  let hasPhone = false;
   if (request) {
-    const [overdueCounts, { maxOverdueAdvances }] = await Promise.all([
+    const [overdueCounts, { maxOverdueAdvances }, self] = await Promise.all([
       countOverdueAdvances(companyId, [user.id]),
       getCompanySettings(companyId),
+      getActiveRecipient(companyId, user.id),
     ]);
     const overdue = overdueCounts[user.id] ?? 0;
     if (overdue >= maxOverdueAdvances) blocked = { overdue, limit: maxOverdueAdvances };
+    hasPhone = !!self?.phoneNumber;
   }
 
   return (
     <div className="flex flex-wrap gap-2">
       {request &&
+        hasPhone &&
         (blocked ? (
           <RequestBlockedButton variant={requestVariant} label={requestLabel} {...blocked} />
         ) : (
@@ -157,8 +165,11 @@ async function AdvancesContent({ searchParams }: Pick<PageProps<"/advances">, "s
   const viewAll = can(user, "advance:view-all");
   const recipientId = viewAll ? undefined : user.id;
   const filters = parseAdvanceFilters(params);
+  // Sama dengan syarat tombol pengajuan di AdvanceHeaderActions.
+  const canRequestHere =
+    can(user, "advance:request") && scope.kind === "project" && scope.project.status === "ACTIVE";
 
-  const [open, history, years] = await Promise.all([
+  const [open, history, years, self] = await Promise.all([
     // "Perlu tindakan" tidak ikut filter periode: tugas yang tertunda selalu tampil.
     listAdvances({
       companyId,
@@ -176,7 +187,9 @@ async function AdvancesContent({ searchParams }: Pick<PageProps<"/advances">, "s
       limit: HISTORY_LIMIT,
     }),
     listAdvanceYears({ companyId, recipientId, project: projectFilter }),
+    canRequestHere ? getActiveRecipient(companyId, user.id) : null,
   ]);
+  const missingPhone = canRequestHere && !self?.phoneNumber;
   // Tahun dari URL tetap muncul di pilihan walau belum ada datanya.
   const yearOptions =
     filters.year && !years.includes(filters.year) ? [filters.year, ...years].sort((a, b) => b - a) : years;
@@ -185,6 +198,7 @@ async function AdvancesContent({ searchParams }: Pick<PageProps<"/advances">, "s
   return (
     <div className="flex flex-col gap-6">
       <ProjectBanner project={scope.kind === "project" ? scope.project : null} />
+      {missingPhone && <MissingPhoneNotice />}
       <AdvanceTodoList advances={todo} viewer={user} />
       <section className="flex flex-col gap-2" aria-labelledby="advance-history-title">
         <h2 id="advance-history-title" className="text-sm font-medium">
