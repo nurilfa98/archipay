@@ -37,6 +37,7 @@ import {
 } from "./leave-notifications";
 import { getLeaveQuota, getLeaveRequest, getLeaveSettings, listHolidayDates } from "./leave-queries";
 import { leaveDecisionRight } from "./leave-rules";
+import { anyPeriodLocked, LOCKED_MESSAGE } from "./period-lock";
 import {
   idSchema,
   leaveRequestSchema,
@@ -174,6 +175,10 @@ export async function createLeaveRequest(formData: FormData): Promise<ActionResu
       return fail("startDate", "Anda sudah absen pulang pada tanggal ini");
   }
 
+  if (await anyPeriodLocked(actor.company.id, [start.slice(0, 7), end.slice(0, 7)])) {
+    return { success: false, message: LOCKED_MESSAGE };
+  }
+
   const id = crypto.randomUUID();
   const attachmentKey = attachment ? `${actor.company.id}/leave/${id}.${attachment.extension}` : null;
   if (attachment && attachmentKey) await putObject(attachmentKey, attachment.bytes, attachment.contentType);
@@ -281,6 +286,16 @@ async function decide(requestId: string, approve: boolean, rejectReason: string 
   if (!id.success) return NOT_FOUND;
 
   const settings = await getLeaveSettings(actor.company.id);
+  const pendingRequest = await getLeaveRequest(actor.company.id, id.data);
+  if (
+    pendingRequest &&
+    (await anyPeriodLocked(actor.company.id, [
+      pendingRequest.startDate.slice(0, 7),
+      pendingRequest.endDate.slice(0, 7),
+    ]))
+  ) {
+    return { success: false, message: LOCKED_MESSAGE };
+  }
   const ip = await getClientIp();
   const now = new Date();
   const result = await db.transaction(async (tx) => {
@@ -440,6 +455,9 @@ export async function cancelLeave(requestId: string, fromDateInput?: string): Pr
   const request = await getLeaveRequest(actor.company.id, id.data);
   if (!request || request.userId !== actor.id || !["PENDING", "APPROVED"].includes(request.status)) return NOT_FOUND;
 
+  if (await anyPeriodLocked(actor.company.id, [request.startDate.slice(0, 7), request.endDate.slice(0, 7)])) {
+    return { success: false, message: LOCKED_MESSAGE };
+  }
   const now = new Date();
   const today = zonedDateString(now);
   let newEnd: string | null = null; // null = batal seluruhnya

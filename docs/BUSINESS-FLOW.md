@@ -661,8 +661,8 @@ tidak dicatat.
 > **Status:** desain disetujui 3 November 2026. Dikerjakan bertahap:
 > **A** pengaturan, lokasi & foto acuan (**sudah dibangun**: 18.1–18.4) →
 > **B** absen masuk/pulang (**sudah dibangun**: 18.5–18.8) → **C** cuti & izin (**sudah dibangun**: bagian 19) →
-> **D** review bulanan, Potong Gaji & laporan (18.9–18.10). Bagian yang
-> belum dibangun adalah rencana; perbarui bila keputusan berubah.
+> **D** review bulanan, Potong Gaji & laporan (**sudah dibangun**: 18.9–18.10).
+> Perbarui bagian ini bila keputusan berubah.
 
 Absensi memakai **selfie** yang dicocokkan dengan foto acuan wajah dan **GPS**
 yang dicek terhadap radius lokasi kerja. Satu company boleh punya banyak lokasi
@@ -781,17 +781,21 @@ beberapa tanda sekaligus (misal Terlambat + Di luar radius).
 - **Rekap per karyawan:** hari hadir, terlambat (kali & total menit), pulang cepat, di luar radius, tidak absen pulang, tidak hadir, cuti/sakit/izin (dibayar & tidak dibayar), total denda.
 - **Detail per karyawan:** setiap hari dengan selfie, link peta, jarak, alasan, dan sanggahan.
 - **Bebaskan denda (Waive Penalty):** setiap denda punya centang; mencabut centang = denda dibebaskan, catatan opsional, sekali klik. Bisa dicentang lagi selama periode belum dikunci.
-- **Koreksi** (misal HP mati): Owner menambah atau mengubah absen dengan alasan wajib. Cuti/izin tidak perlu dikoreksi manual karena sudah tercatat dari pengajuan.
-- **Kunci periode:** setelah dikunci, absensi, denda, dan cuti/izin bulan itu tidak bisa diubah. Tidak bisa dikunci selama masih ada **pengajuan cuti/izin yang menunggu** di bulan itu. Kunci bisa dibuka lagi selama belum ada denda yang ditandai dipotong.
-- **Laporan:** PDF (cetak) dan Excel: rekap per karyawan + daftar denda keterlambatan.
+- **Koreksi** (misal HP mati): Owner menambah absen yang terlewat atau mengganti jam masuk/pulang satu tanggal (pilih lokasi, jam, alasan wajib). Terlambat, pulang cepat, dan denda dihitung ulang (bila jadi tidak terlambat, dendanya dibebaskan otomatis). Absen hasil koreksi tidak punya selfie dan ditandai "Dikoreksi Owner" beserta alasannya. Cuti/izin tidak perlu dikoreksi manual karena sudah tercatat dari pengajuan.
+- **Kunci periode:** setelah dikunci, absensi, denda, dan cuti/izin bulan itu tidak bisa diubah (mengajukan, menyetujui, membatalkan cuti/izin, koreksi, dan bebaskan denda ditolak). Hanya bulan yang **sudah berakhir** yang bisa dikunci, dan tidak bisa dikunci selama masih ada **pengajuan cuti/izin yang menunggu** di bulan itu. Kunci bisa dibuka lagi selama belum ada denda yang ditandai dipotong.
+- **Laporan:** PDF (A4 lanskap, untuk cetak) dan Excel (sheet Rekap & Denda): rekap per karyawan + daftar denda keterlambatan, `/api/attendance/review/export?period=&format=pdf|xlsx`.
+- **Halaman:** `/attendance/review?period=2026-11` (rekap, bawaan bulan lalu) dan `/attendance/review/<userId>?period=` (detail, denda, koreksi). Owner mengubah (`attendance:review`); Admin HR & Superadmin melihat.
 - Semua bebaskan denda, koreksi, dan kunci/buka kunci tercatat di Audit Log.
 
 ### 18.10 Denda di Potong Gaji
 
 Denda yang masih tercentang di periode yang sudah dikunci masuk menu **Potong
 Gaji** sebagai sumber kedua, **Denda keterlambatan**, di samping sisa uang muka
-(bagian 8.2). Ekspor Excel tetap satu file dengan dua sheet. Finance/Owner
-menandai **dipotong** setelah gaji dibayar, sama seperti sisa uang muka.
+(bagian 8.2), dikelompokkan per karyawan per bulan absensi. Ekspor Excel tetap
+satu file dengan dua sheet (Sisa uang muka & Denda keterlambatan). Finance/Owner
+menandai **dipotong** (periode gaji) setelah gaji dibayar, sama seperti sisa
+uang muka; tidak bisa untuk diri sendiri. Tanpa WhatsApp ke karyawan (hemat
+kuota); riwayatnya tampil di menu Potong Gaji.
 
 ### 18.11 Penyimpanan
 

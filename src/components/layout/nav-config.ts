@@ -123,6 +123,7 @@ export const SUB_PAGES: { title: string; href: string; parent?: string }[] = [
   { title: "Absen", href: "/attendance/check", parent: "/attendance" },
   { title: "Hari ini", href: "/attendance/today", parent: "/attendance" },
   { title: "Cuti & izin", href: "/attendance/leave", parent: "/attendance" },
+  { title: "Review bulanan", href: "/attendance/review", parent: "/attendance" },
 ];
 
 // Halaman platform Superadmin (tidak terikat company), berpindah lewat tab di

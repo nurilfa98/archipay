@@ -52,6 +52,7 @@ export const PERMISSIONS = [
   // melihat semua pengajuan memakai attendance:view-all.
   "leave:approve", // menyetujui/menolak cuti & izin kapan saja (Owner)
   "leave:approve-delegated", // menyetujui/menolak setelah waktu delegasi lewat (Admin HR)
+  "attendance:review", // review bulanan: koreksi absen, bebaskan denda, kunci periode (Owner)
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -85,6 +86,7 @@ const ROLE_PERMISSIONS = {
         "attendance:approve-face",
         "leave:approve",
         "leave:approve-delegated",
+        "attendance:review",
       ].includes(permission),
   ),
   // Owner boleh semuanya, kecuali mengajukan uang muka untuk dirinya sendiri

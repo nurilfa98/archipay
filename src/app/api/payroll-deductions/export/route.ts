@@ -19,6 +19,8 @@
 
 import { NextResponse } from "next/server";
 import writeXlsxFile, { type Row } from "write-excel-file/node";
+import { periodLabel } from "@/features/attendance/review-data";
+import { listPenaltyCandidates } from "@/features/attendance/review-queries";
 import { listPayrollCandidates } from "@/features/payroll/queries";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
@@ -38,9 +40,12 @@ export async function GET() {
   if (!user || user.mustChangePassword) return new NextResponse("Unauthorized", { status: 401 });
   if (!can(user, "payroll:view") || !user.company) return new NextResponse("Forbidden", { status: 403 });
 
-  const candidates = await listPayrollCandidates(user.company.id);
-  if (candidates.length === 0) {
-    return new NextResponse("Belum ada sisa uang muka yang perlu dipotong dari gaji.", {
+  const [candidates, penaltyGroups] = await Promise.all([
+    listPayrollCandidates(user.company.id),
+    listPenaltyCandidates(user.company.id),
+  ]);
+  if (candidates.length === 0 && penaltyGroups.length === 0) {
+    return new NextResponse("Belum ada sisa uang muka atau denda keterlambatan yang perlu dipotong dari gaji.", {
       status: 409,
       headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "private, no-store" },
     });
@@ -58,11 +63,30 @@ export async function GET() {
     ]),
   ];
 
-  const file = await writeXlsxFile(rows, {
-    sheet: "Potong Gaji",
-    columns: COLUMNS.map((column) => ({ width: column.width })),
-    stickyRowsCount: 1,
-  }).toBuffer();
+  // Sheet kedua: denda keterlambatan dari periode absensi yang sudah dikunci
+  // (BUSINESS-FLOW §18.10), satu baris per karyawan per bulan absensi.
+  const penaltyRows: Row[] = [
+    ["Nama karyawan", "Periode absensi", "Jumlah terlambat", "Denda (Rp)"].map((header) => ({
+      value: header,
+      fontWeight: "bold" as const,
+    })),
+    ...penaltyGroups.map((group): Row => [
+      { value: group.userName, type: String },
+      { value: periodLabel(group.period), type: String },
+      { value: group.count, type: Number },
+      { value: group.total, type: Number, format: "#,##0" },
+    ]),
+  ];
+
+  const file = await writeXlsxFile([
+    { data: rows, sheet: "Sisa uang muka", columns: COLUMNS.map((column) => ({ width: column.width })), stickyRowsCount: 1 },
+    {
+      data: penaltyRows,
+      sheet: "Denda keterlambatan",
+      columns: [{ width: 28 }, { width: 18 }, { width: 18 }, { width: 16 }],
+      stickyRowsCount: 1,
+    },
+  ]).toBuffer();
 
   const today = zonedDateString(new Date());
   return new NextResponse(new Uint8Array(file), {

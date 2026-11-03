@@ -7,6 +7,7 @@
 import {
   CalendarClockIcon,
   ChevronRightIcon,
+  ClipboardCheckIcon,
   ClipboardListIcon,
   PlaneIcon,
   LogInIcon,
@@ -146,6 +147,12 @@ async function AttendanceContent() {
             title="Cuti & izin"
             description={pendingLeaves > 0 ? `${pendingLeaves} menunggu persetujuan` : "Tidak ada yang menunggu"}
             badge={pendingLeaves > 0 ? <ToneBadge tone="warning">{pendingLeaves}</ToneBadge> : null}
+          />
+          <Shortcut
+            href="/attendance/review"
+            icon={<ClipboardCheckIcon />}
+            title="Review bulanan"
+            description="Rekap, sanggahan, bebaskan denda, kunci periode, PDF & Excel"
           />
           <Shortcut
             href="/attendance/today"

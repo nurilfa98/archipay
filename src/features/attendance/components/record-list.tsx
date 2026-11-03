@@ -79,6 +79,11 @@ export function RecordList({
               <p className="text-sm text-muted-foreground">Belum absen pulang.</p>
             )}
           </div>
+          {record.correctionNote && (
+            <p className="rounded-md bg-indigo-50 p-2 text-sm text-indigo-900 dark:bg-indigo-950/40 dark:text-indigo-200">
+              <span className="font-medium">Dikoreksi Owner:</span> {record.correctionNote}
+            </p>
+          )}
           {record.appealNote && (
             <p className="rounded-md bg-amber-50 p-2 text-sm whitespace-pre-line text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
               <span className="font-medium">Sanggahan / catatan khusus:</span> {record.appealNote}
@@ -127,7 +132,7 @@ function CheckSide({
         </a>
       ) : (
         <div className="flex size-16 shrink-0 items-center justify-center rounded-md bg-muted text-center text-[10px] text-muted-foreground">
-          Selfie dihapus
+          Tanpa selfie
         </div>
       )}
       <div className="min-w-0 text-sm">

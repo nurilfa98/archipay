@@ -77,6 +77,12 @@ export const AUDIT_ACTIONS = {
   LEAVE_TYPE_CREATED: { label: "Tambah jenis cuti/izin", category: "ATTENDANCE", tone: "success" },
   LEAVE_TYPE_UPDATED: { label: "Ubah jenis cuti/izin", category: "ATTENDANCE", tone: "active" },
   LEAVE_QUOTA_UPDATED: { label: "Ubah kuota cuti karyawan", category: "ATTENDANCE", tone: "active" },
+  PENALTY_WAIVED: { label: "Bebaskan denda keterlambatan", category: "ATTENDANCE", tone: "success" },
+  PENALTY_REINSTATED: { label: "Berlakukan lagi denda", category: "ATTENDANCE", tone: "warning" },
+  PENALTY_DEDUCTED: { label: "Catat potong gaji denda", category: "ATTENDANCE", tone: "warning" },
+  ATTENDANCE_CORRECTED: { label: "Koreksi absen", category: "ATTENDANCE", tone: "active" },
+  ATTENDANCE_PERIOD_LOCKED: { label: "Kunci periode absensi", category: "ATTENDANCE", tone: "success" },
+  ATTENDANCE_PERIOD_UNLOCKED: { label: "Buka kunci periode absensi", category: "ATTENDANCE", tone: "warning" },
 } as const satisfies Record<AuditAction, ActionInfo>;
 
 // Aksi lama yang tidak (lagi) dikenal tetap ditampilkan apa adanya.

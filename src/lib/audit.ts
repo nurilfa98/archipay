@@ -79,7 +79,13 @@ export type AuditAction =
   | "LEAVE_CANCELLED"
   | "LEAVE_TYPE_CREATED"
   | "LEAVE_TYPE_UPDATED"
-  | "LEAVE_QUOTA_UPDATED";
+  | "LEAVE_QUOTA_UPDATED"
+  | "PENALTY_WAIVED"
+  | "PENALTY_REINSTATED"
+  | "PENALTY_DEDUCTED"
+  | "ATTENDANCE_CORRECTED"
+  | "ATTENDANCE_PERIOD_LOCKED"
+  | "ATTENDANCE_PERIOD_UNLOCKED";
 
 type AuditEntry = {
   // Company tempat kejadian (halaman Audit Log menyaring per company).

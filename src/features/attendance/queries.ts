@@ -439,3 +439,20 @@ export async function getApprovedFace(companyId: string, userId: string) {
     .limit(1);
   return row ?? null;
 }
+
+// Semua absen company dalam satu bulan ("2026-11"), untuk review bulanan.
+export async function listMonthRecords(companyId: string, period: string): Promise<AttendanceRecordRow[]> {
+  await io();
+  const [year, month] = period.split("-").map(Number);
+  const next = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, "0")}-01`;
+  const rows = await recordQuery()
+    .where(
+      and(
+        eq(attendanceRecords.companyId, companyId),
+        gte(attendanceRecords.workDate, `${period}-01`),
+        lt(attendanceRecords.workDate, next),
+      ),
+    )
+    .orderBy(asc(attendanceRecords.workDate));
+  return rows.map(toRow);
+}

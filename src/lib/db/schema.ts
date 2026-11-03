@@ -973,6 +973,11 @@ export const attendanceRecords = pgTable(
     appealNote: varchar("appeal_note", { length: 1000 }),
     // File selfie dihapus otomatis setelah masa simpan; data absen tetap ada.
     selfieDeletedAt: timestamptz("selfie_deleted_at"),
+    // Koreksi Owner saat review bulanan (§18.9), misal HP karyawan mati.
+    // Absen yang DIBUAT lewat koreksi tidak punya selfie & skor wajah 0.
+    correctionNote: varchar("correction_note", { length: 500 }),
+    correctedById: userRef("corrected_by_id"),
+    correctedAt: timestamptz("corrected_at"),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1005,6 +1010,11 @@ export const attendancePenalties = pgTable(
     waivedAt: timestamptz("waived_at"),
     waivedById: userRef("waived_by_id"),
     waiveNote: varchar("waive_note", { length: 300 }),
+    // Ditandai sudah dipotong di menu Potong Gaji (§18.10).
+    deductedAt: timestamptz("deducted_at"),
+    deductedById: userRef("deducted_by_id"),
+    // Periode gaji tempat denda dipotong, "2026-12".
+    payrollPeriod: varchar("payroll_period", { length: 7 }),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1093,4 +1103,18 @@ export const leaveRequests = pgTable(
     check("leave_requests_status", sql`${t.status} IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')`),
     check("leave_requests_dates", sql`${t.endDate} >= ${t.startDate}`),
   ],
+);
+
+// Kunci periode bulanan absensi (BUSINESS-FLOW §18.9). Setelah dikunci,
+// absensi, denda, dan cuti/izin bulan itu tidak bisa diubah, dan denda yang
+// masih berlaku masuk menu Potong Gaji. Baris dihapus saat kunci dibuka.
+export const attendancePeriods = pgTable(
+  "attendance_periods",
+  {
+    companyId: companyRef(),
+    period: varchar("period", { length: 7 }).notNull(), // "2026-11"
+    lockedAt: timestamptz("locked_at").notNull().defaultNow(),
+    lockedById: userRef("locked_by_id"),
+  },
+  (t) => [primaryKey({ columns: [t.companyId, t.period] })],
 );

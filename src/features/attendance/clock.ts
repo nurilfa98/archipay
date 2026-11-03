@@ -47,3 +47,14 @@ export function formatLocalClock(date: Date, timeZone: string) {
   const { minutes } = localTime(date, timeZone);
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}.${String(minutes % 60).padStart(2, "0")}`;
 }
+
+// Selisih zona waktu Indonesia terhadap UTC (tanpa musim panas).
+const UTC_OFFSET_HOURS: Record<string, number> = { "Asia/Jakarta": 7, "Asia/Makassar": 8, "Asia/Jayapura": 9 };
+
+// "2026-11-04" + 480 menit di Asia/Jakarta → Date (UTC) 2026-11-04T01:00Z.
+// Dipakai koreksi absen oleh Owner.
+export function zonedToDate(date: string, minutes: number, timeZone: string) {
+  const [year, month, day] = date.split("-").map(Number);
+  const offset = UTC_OFFSET_HOURS[timeZone] ?? 7;
+  return new Date(Date.UTC(year, month - 1, day, 0, minutes - offset * 60));
+}
