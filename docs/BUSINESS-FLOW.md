@@ -17,6 +17,7 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 | Pengingat otomatis | `src/features/reminders/run.ts` |
 | Project (kartu pilihan, kelola, menetapkan project) | `src/features/projects/` |
 | Company (klien), masuk company untuk Superadmin | `src/features/companies/`, `src/lib/auth/dal.ts` |
+| Absensi: lokasi, jam kerja, hari libur, foto acuan wajah | `src/features/attendance/` |
 
 ---
 
@@ -40,8 +41,9 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 ## 2. Peran & hak akses
 
 Satu user boleh punya lebih dari satu role; haknya digabung. Urutan
-pendaftaran akun: **Superadmin → Company + Owner → karyawan** (Finance &
-Karyawan). Owner, Finance, dan Karyawan selalu milik satu company; Superadmin
+pendaftaran akun: **Superadmin → Company + Owner → karyawan** (Finance,
+Admin HR & Karyawan). Hak akses absensi (termasuk role **Admin HR**) ada di
+bagian 18.1. Owner, Finance, dan Karyawan selalu milik satu company; Superadmin
 tidak terikat company mana pun.
 
 | Kemampuan | Superadmin | Owner | Finance | Karyawan |
@@ -60,6 +62,7 @@ tidak terikat company mana pun.
 | Potong Gaji: lihat daftar & ekspor Excel | ✓ | ✓ | ✓ | |
 | Potong Gaji: tandai dipotong | | ✓ | ✓ | |
 | Pengguna: kelola akun Finance & Karyawan | ✓ | ✓ | | |
+| Pengguna: kelola akun Karyawan saja, tanpa rekening bank (juga **Admin HR**, bagian 18.1) | | ✓ | | |
 | Pengguna: kelola akun Owner (termasuk memberi/mencabut role Owner) | ✓ | | | |
 | Pengaturan: melihat | ✓ | ✓ | | |
 | Pengaturan: mengubah kebijakan uang muka & kategori biaya | | ✓ | | |
@@ -312,37 +315,62 @@ tertunda dihitung dari status *Menunggu konfirmasi*, *Diterima karyawan*, dan
 muka saat terjadi, jadi perubahan pengaturan tidak mengubah uang muka yang
 sudah berjalan.
 
-Pengingat WhatsApp dikirim oleh cron harian (`/api/cron/reminders`, pukul
-08.00 WIB). Setiap jenis hanya dikirim **sekali** per uang muka:
+Pengingat WhatsApp ke **karyawan** dikirim oleh cron harian
+(`/api/cron/reminders`, pukul 08.00 WIB). Setiap jenis hanya dikirim **sekali**
+per uang muka, dan semua pengingat untuk karyawan yang sama di satu jalannya
+cron **digabung menjadi satu pesan** (hemat kuota WhatsApp). Owner & Finance
+tidak lagi dikirimi WhatsApp pengingat: yang baru lewat batas masuk ringkasan
+email harian mereka (bagian 10).
 
-| Pengingat | Kondisi | Penerima |
-|---|---|---|
-| Batas nota besok | Nota belum dikirim, batasnya besok | Karyawan |
-| Batas nota terlewati | Nota belum dikirim, batas lewat | Karyawan + Owner |
-| Batas pengembalian besok | Sisa belum lunas, batasnya besok | Karyawan |
-| Batas pengembalian terlewati | Sisa belum lunas, batas lewat (masuk daftar Potong Gaji) | Karyawan + Owner |
+| Pengingat | Kondisi | WhatsApp ke | Ringkasan email |
+|---|---|---|---|
+| Batas nota besok | Nota belum dikirim, batasnya besok | Karyawan | |
+| Batas nota terlewati | Nota belum dikirim, batas lewat | Karyawan | Owner & Finance |
+| Batas pengembalian besok | Sisa belum lunas, batasnya besok | Karyawan | |
+| Batas pengembalian terlewati | Sisa belum lunas, batas lewat (masuk daftar Potong Gaji) | Karyawan | Owner & Finance |
 
 ---
 
 ## 10. Notifikasi
 
-WhatsApp dikirim lewat Fonnte; email lewat Resend. Pengguna tanpa nomor
-WhatsApp dilewati. Saat development (token kosong), pesan hanya dicetak di
-terminal `pnpm dev`.
+WhatsApp dikirim lewat Fonnte; email lewat Resend. Saat development (token
+kosong), pesan hanya dicetak di terminal `pnpm dev`; kosongkan
+`FONNTE_TOKEN` saat development agar kuota tidak terpakai.
+
+**Hemat kuota WhatsApp** (kuota Fonnte dipakai bersama semua company):
+WhatsApp hanya untuk hal yang butuh tindakan segera. Informasi & antrean kerja
+Owner/Finance dikirim sebagai **ringkasan email harian** (pukul 08.00 WIB,
+`features/digest`), hanya bila ada isinya, maksimal sekali per orang per hari.
+Isinya: perlu persetujuan (uang muka & foto wajah, khusus Owner),
+pertanggungjawaban menunggu verifikasi (tanda terlambat), sudah disetujui
+belum dicairkan, baru lewat batas (24 jam terakhir), dan "Kemarin"
+(karyawan yang mengonfirmasi terima dana). Owner yang juga Finance menerima
+versi Owner.
+
+**Nomor WhatsApp wajib & terverifikasi.** Setiap pengguna company (termasuk
+Owner) wajib mengisi nomor WhatsApp dan memverifikasinya dengan kode OTP 6
+angka lewat WhatsApp sebelum bisa memakai aplikasi (`/verify-phone`, setelah
+ganti password pertama). Kode berlaku 10 menit, kirim ulang tiap 60 detik,
+maks. 3 kode per hari, maks. 5 kali coba per kode. Nomor hanya tersimpan
+setelah kode cocok, dan hanya bisa diganti pengguna sendiri lewat Profil
+(dengan OTP lagi). Nomor yang sudah ada sebelum fitur ini dianggap
+terverifikasi.
 
 | Kejadian | Penerima | Kanal |
 |---|---|---|
-| Pengajuan karyawan / usulan Finance baru | Penyetuju sah (Owner) | WhatsApp |
+| Pengajuan karyawan / usulan Finance baru | Penyetuju sah (Owner) | WhatsApp (langsung, karena perlu persetujuan segera) |
 | Pengajuan/usulan ditolak | Pengaju/pengusul | WhatsApp |
 | Dana dicairkan | Karyawan penerima | WhatsApp |
 | Uang muka cair dibatalkan | Karyawan penerima | WhatsApp |
-| Karyawan konfirmasi terima | Owner + pencair dana | WhatsApp |
+| Karyawan konfirmasi terima | Owner & Finance | Ringkasan email harian (bagian "Kemarin") |
 | Karyawan laporkan tidak sesuai | Owner + pencair dana | WhatsApp |
-| Pertanggungjawaban dikirim | Owner + pencair dana | WhatsApp |
+| Pertanggungjawaban dikirim | Owner & Finance | Ringkasan email harian (menunggu verifikasi) |
 | Dikembalikan untuk diperbaiki | Karyawan | WhatsApp |
 | Verifikasi selesai | Karyawan | WhatsApp |
-| Pengembalian / penggantian / potong gaji dicatat | Karyawan | WhatsApp |
+| Penggantian / potong gaji / pengembalian lewat transfer dicatat | Karyawan | WhatsApp (pengembalian **tunai** tidak dikabarkan) |
 | Pengingat batas waktu | Lihat bagian 9 | WhatsApp |
+| Foto acuan wajah baru menunggu persetujuan (cron harian, sekali per foto, digabung per company) | Owner + Admin HR | WhatsApp |
+| Kode verifikasi nomor WhatsApp (OTP) | Pengguna | WhatsApp |
 | Akun dibuat / password di-reset | Pengguna | Email (password sementara) |
 | User menekan **Hubungi admin platform** di halaman error | Nomor admin di Pengaturan platform | WhatsApp |
 
@@ -365,7 +393,8 @@ beranda, tanpa tombol lapor.
 - Akun superadmin dibuat lewat script `pnpm db:create-superadmin`. Superadmin membuat company beserta Owner pertamanya (menu **Company**); Owner tambahan dibuat Superadmin dari menu **Pengguna** setelah membuka company itu. Owner lalu mendaftarkan Finance & Karyawan di menu **Pengguna** (nama, email, role awal); password sementara dikirim lewat email dan wajib diganti saat login pertama.
 - Pengguna baru selalu masuk ke company yang sedang dibuka. Email unik di seluruh ArchiPay: satu email = satu akun = satu company, sehingga layar login tetap email + password.
 - Owner hanya bisa mengelola akun tanpa role Owner. Akun Owner (termasuk miliknya sendiri) tampil baca saja; data sendiri diubah lewat menu **Profil**. Role Owner hanya bisa diberikan/dicabut superadmin.
-- Nomor WhatsApp dan rekening bank diisi Owner di halaman edit pengguna. Tanpa nomor, pengguna tidak menerima WhatsApp; tanpa rekening, pencairan Transfer menampilkan peringatan.
+- Nomor WhatsApp diisi & diverifikasi **pengguna sendiri** dengan kode OTP (bagian 10); pengelola pengguna hanya melihatnya. Rekening bank diisi Owner di halaman edit pengguna atau pengguna sendiri di Profil; tanpa rekening, pencairan Transfer menampilkan peringatan.
+- **Admin HR** ikut mengelola akun di menu Pengguna, tetapi hanya akun yang role-nya **Karyawan saja**: tambah, ubah nama/email, aktif/nonaktif, reset password, dan hanya bisa memberi role Karyawan. Rekening bank tidak bisa diubah Admin HR (tujuan transfer uang muka). Akun Finance, Admin HR, dan Owner tampil baca saja untuknya, karena mengganti email lalu me-reset password akun pemegang uang sama dengan mengambil alih akun itu.
 - **Reset password**: password sementara baru dikirim lewat email, dan pengguna keluar dari semua perangkat.
 - **Nonaktifkan**: pengguna tidak bisa login dan sesi berjalan langsung berhenti. Data dan riwayat tetap tersimpan. Tidak ada yang bisa menonaktifkan atau me-reset akunnya sendiri.
 - Sesi login: dengan centang **"Ingat saya"** (14 hari), sesi bertahan di perangkat itu sampai 14 hari sejak login. Tanpa centang, sesi berakhir saat browser ditutup, dan paling lama 12 jam. Sesi tidak diperpanjang karena aktivitas. Sesi berakhir lebih cepat bila user logout, mengganti/mereset password, atau akunnya dinonaktifkan. Login dikunci sementara setelah 5 kali gagal per email (atau 20 kali per IP) dalam 15 menit; selama terkunci tombol **Masuk** tidak bisa ditekan dan menampilkan hitungan mundur sisa waktunya.
@@ -627,7 +656,230 @@ tidak dicatat.
 
 ---
 
-## 18. Catatan terbuka
+## 18. Absensi
+
+> **Status:** desain disetujui 3 November 2026. Dikerjakan bertahap:
+> **A** pengaturan, lokasi & foto acuan (**sudah dibangun**: 18.1–18.4) →
+> **B** absen masuk/pulang (**sudah dibangun**: 18.5–18.8) → **C** cuti & izin (**sudah dibangun**: bagian 19) →
+> **D** review bulanan, Potong Gaji & laporan (18.9–18.10). Bagian yang
+> belum dibangun adalah rencana; perbarui bila keputusan berubah.
+
+Absensi memakai **selfie** yang dicocokkan dengan foto acuan wajah dan **GPS**
+yang dicek terhadap radius lokasi kerja. Satu company boleh punya banyak lokasi
+(kantor, cabang, lokasi project), jadi karyawan absen di tempat ia bertugas hari
+itu. Termasuk dalam paket dasar Langganan (bukan add-on).
+
+### 18.1 Peran
+
+Role baru **Admin HR** (`HR_ADMIN`) untuk urusan absensi dan akun Karyawan. Bila seorang Admin HR
+juga perlu mengajukan uang muka, ia diberi role Karyawan juga (hak digabung,
+bagian 2). Admin HR dihitung sebagai pengguna aktif di Langganan.
+
+| Kemampuan | Owner | Admin HR | Finance | Karyawan | Superadmin |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Wajib absen masuk/pulang | | ✓ | ✓ | ✓ | |
+| Mengajukan cuti/izin (bagian 19) | | ✓ | ✓ | ✓ | |
+| Kelola akun Karyawan (tanpa rekening bank, bagian 11) | ✓ | ✓ | | | |
+| Kelola lokasi absensi | ✓ | ✓ | | | lihat |
+| Menyetujui foto acuan wajah | ✓ | ✓ | | | |
+| Melihat absensi & cuti/izin semua orang | ✓ | ✓ | | | lihat |
+| Pengaturan absensi (jam kerja, toleransi, denda, hari kerja/libur, jenis cuti, kuota) | ✓ | | | | lihat |
+| Menyetujui/menolak cuti/izin | ✓ | | | | |
+| Review bulanan: koreksi, bebaskan denda (waive), kunci periode | ✓ | | | | |
+| Denda keterlambatan di Potong Gaji: lihat & ekspor / tandai dipotong | ✓ | | ✓ | | lihat |
+
+Owner **tidak** absen. User dengan role Owner tidak wajib absen walaupun juga
+punya role lain.
+
+### 18.2 Pengaturan (Owner)
+
+| Pengaturan | Bawaan |
+|---|---|
+| Jam masuk – jam pulang | 08.00 – 17.00 |
+| Toleransi keterlambatan | 15 menit |
+| Denda per kejadian terlambat | Rp0 (belum dipakai sampai diisi) |
+| Hari kerja | Senin – Sabtu |
+| Hari libur | daftar tanggal + nama, diisi Owner |
+
+- Denda disimpan sebagai **snapshot** saat terlambat terjadi; mengubah nominal tidak mengubah denda yang sudah tercatat.
+- Denda keterlambatan wajib sudah diatur di Perjanjian Kerja / Peraturan Perusahaan klien (PP 36/2021). Total potongan gaji per periode tetap maks. 50% upah (bagian 8.2), dicek bagian penggajian.
+
+### 18.3 Lokasi absensi (Owner / Admin HR)
+
+- Isi: nama, **project tertaut** (opsional), titik koordinat, **radius** (10–5.000 m), **zona waktu** (WIB / WITA / WIT), dan **jam kerja khusus lokasi** (opsional; kosong = jam company).
+- Titik dipilih tanpa membuka Google Maps: **cari alamat** (Nominatim/OpenStreetMap, lewat server ArchiPay, maks. 1 pencarian/detik, hasil di-cache), **"Pakai lokasi saya sekarang"** (GPS perangkat, paling akurat untuk lahan proyek), klik di peta lalu geser pin, atau menempel koordinat / link Google Maps. Data alamat OSM di Indonesia belum selengkap Google, jadi pin tetap perlu dicek.
+- Radius di bawah 50 m diberi peringatan (GPS HP bisa meleset 5–20 m).
+- **Tambah banyak lokasi** (`/attendance/locations/import`): setiap klik di peta menambah satu baris, atau **unggah file .xlsx** dari tombol "Unduh template" (kolom: Nama lokasi, Koordinat, Radius (meter), Zona waktu, Project, Jam masuk, Jam pulang; sheet "Petunjuk" berisi cara mengisi). File .csv juga diterima (pemisah koma atau titik koma). Koordinat & jam di template berupa teks agar Excel berbahasa Indonesia tidak mengubah titik desimal.
+- Isi file tampil sebagai **pratinjau** yang bisa diperbaiki. Semua baris disimpan sekaligus atau tidak sama sekali (maks. 200 baris); baris yang salah ditandai beserta alasannya. **Nama lokasi yang sudah ada ditolak** (tidak menimpa data lama). Project diisi dengan nama project persis.
+- Lokasi tidak dihapus, hanya **dinonaktifkan**, agar riwayat absen tetap utuh. Nama unik per company.
+- Semua perubahan tercatat di Audit Log (kategori **Absensi**).
+
+### 18.4 Foto acuan wajah & persetujuan data pribadi
+
+1. Saat pertama membuka Absensi, user mencentang **pernyataan persetujuan** pengolahan data wajah & lokasi (UU PDP 27/2022). Teks persis, waktu, dan IP disimpan, sama seperti persetujuan di konfirmasi uang muka (bagian 5).
+2. User mengambil **selfie acuan** dari kamera (bukan galeri) dengan cek liveness (kedip). HP menghitung *face embedding*; foto disimpan di R2 dan embedding di database. Status: **Menunggu persetujuan**.
+3. Owner atau Admin HR mencocokkan foto dengan orangnya lalu **Setujui** / **Tolak** (alasan wajib). Sebelum disetujui, user belum bisa absen.
+4. Mengganti foto acuan memakai alur yang sama; foto lama dipakai sampai foto baru disetujui, lalu filenya dihapus.
+5. Foto acuan & embedding **dihapus saat user dinonaktifkan**; bila diaktifkan lagi, user mendaftar ulang.
+6. Tidak ada yang bisa menyetujui foto wajahnya sendiri. Foto yang ditolak langsung dihapus filenya; hanya alasan penolakan terakhir yang disimpan.
+7. **Kabar ke Owner & Admin HR:** cron harian (bagian 9) mengirim WhatsApp ke semua Owner dan Admin HR aktif bila ada foto baru yang menunggu persetujuan (Admin HR tidak dikabari foto miliknya sendiri). Hemat kuota: semua foto baru dalam satu company digabung jadi **satu pesan per penerima**, dan setiap foto hanya dikabarkan **sekali** (`face_profiles.owner_notified_at`); foto yang belum diproses tidak dikirim ulang, jumlahnya tetap tampil di menu Absensi. Foto yang diganti karyawan dihitung sebagai foto baru.
+8. Liveness saat pendaftaran: tepat satu wajah, cukup dekat, lolos model anti-spoof & liveness (skor ≥ 0,5), lalu berkedip; foto diambil otomatis setelah kedipan. Foto disimpan JPEG maks. 640 px.
+
+### 18.5 Absen masuk
+
+1. HP mengambil GPS. **Akurasi > 100 m ditolak** ("coba di tempat terbuka").
+2. Server mengurutkan lokasi aktif dari yang terdekat:
+   - satu lokasi dalam radius → dipilih otomatis;
+   - beberapa lokasi dalam radius → karyawan memilih;
+   - tidak ada → karyawan memilih lokasi, **wajib mengisi alasan**, dan absen ditandai **Di luar radius** untuk review.
+3. Kamera depan terbuka (tanpa pilihan galeri), cek liveness, HP menghitung embedding dan mengirim selfie terkompres.
+4. Server menghitung ulang jarak dan membandingkan embedding dengan foto acuan (ambang di Pengaturan platform). **Tidak cocok → absen ditolak.** Percobaan gagal dicatat di Audit Log (waktu & skor, foto tidak disimpan).
+5. Waktu absen = **jam server** menurut **zona waktu lokasi**, bukan jam HP. Tanggal kerja juga dihitung dari zona waktu itu.
+6. Bila lewat jam masuk + toleransi → **Terlambat**. Menit terlambat dihitung dari jam masuk (bukan dari akhir toleransi), dan **denda** tercatat bila nominalnya > 0. Alasan terlambat tidak wajib.
+7. Absen ditolak bila hari itu user sedang **cuti/izin seharian yang sudah disetujui** ("Anda sedang cuti; batalkan dulu bila ternyata masuk", bagian 19). Izin datang terlambat yang disetujui menggeser jam masuk hari itu; izin pulang cepat memajukan jam pulang.
+8. Hari libur atau di luar hari kerja: absen tetap boleh (misal lembur), tetapi tidak dihitung terlambat/pulang cepat dan tidak didenda.
+9. Jadwal hari itu (jam masuk/pulang lokasi atau company, toleransi) **disalin ke absen** saat absen masuk; perubahan pengaturan tidak mengubah absen yang sudah ada. Denda dicatat di `attendance_penalties` dengan nominal saat itu (periode = bulan tanggal kerja).
+10. Mode masuk/pulang ditentukan otomatis dari absen terakhir: belum ada absen di tanggal kerja hari ini → masuk; sudah masuk & belum pulang → pulang.
+
+Satu kali masuk dan satu kali pulang per hari. Shift malam (melewati tengah
+malam) belum didukung. Absen harus online.
+
+### 18.6 Absen pulang
+
+- Alur GPS, selfie, dan cocok wajah sama dengan absen masuk. Lokasi pulang boleh berbeda dari lokasi masuk.
+- Pulang sebelum jam pulang (jadwal lokasi absen masuk) → **Pulang cepat**, alasan **wajib**, tanpa denda.
+- Di luar radius → alasan wajib, ditandai untuk review.
+- Absen pulang paling lambat pukul 23.59 waktu lokasi (zona waktu lokasi absen masuk); lewat itu, absen tercatat **Tidak absen pulang**.
+
+### 18.7 Alasan & sanggahan
+
+Setiap form alasan (terlambat, pulang cepat, di luar radius) punya tombol
+**"Ajukan Sanggahan / Catatan Khusus"** untuk penjelasan tambahan (misal
+"banjir, sudah izin atasan"). Sanggahan tampil di review bulanan sebagai bahan
+Owner memutuskan bebaskan denda atau tidak.
+
+### 18.8 Status harian
+
+Dihitung saat halaman dibuka (seperti "lewat batas" di bagian 3), bukan oleh cron:
+
+| Status | Kondisi |
+|---|---|
+| Hadir | absen masuk tepat waktu |
+| Terlambat | absen masuk lewat jam masuk + toleransi |
+| Pulang cepat | absen pulang sebelum jam pulang |
+| Di luar radius | masuk atau pulang di luar radius lokasi |
+| Tidak absen pulang | ada absen masuk, tanpa absen pulang sampai hari berganti |
+| Cuti / Sakit / Izin | ada pengajuan yang disetujui (bagian 19) |
+| Tidak hadir | hari kerja tanpa absen masuk dan tanpa cuti/izin; **hanya ditandai, tanpa denda** |
+| Libur | bukan hari kerja atau tercantum di hari libur |
+
+Hari sebelum akun user dibuat tidak dihitung Tidak hadir. Satu hari bisa punya
+beberapa tanda sekaligus (misal Terlambat + Di luar radius).
+
+### 18.9 Review bulanan (Owner)
+
+- **Rekap per karyawan:** hari hadir, terlambat (kali & total menit), pulang cepat, di luar radius, tidak absen pulang, tidak hadir, cuti/sakit/izin (dibayar & tidak dibayar), total denda.
+- **Detail per karyawan:** setiap hari dengan selfie, link peta, jarak, alasan, dan sanggahan.
+- **Bebaskan denda (Waive Penalty):** setiap denda punya centang; mencabut centang = denda dibebaskan, catatan opsional, sekali klik. Bisa dicentang lagi selama periode belum dikunci.
+- **Koreksi** (misal HP mati): Owner menambah atau mengubah absen dengan alasan wajib. Cuti/izin tidak perlu dikoreksi manual karena sudah tercatat dari pengajuan.
+- **Kunci periode:** setelah dikunci, absensi, denda, dan cuti/izin bulan itu tidak bisa diubah. Tidak bisa dikunci selama masih ada **pengajuan cuti/izin yang menunggu** di bulan itu. Kunci bisa dibuka lagi selama belum ada denda yang ditandai dipotong.
+- **Laporan:** PDF (cetak) dan Excel: rekap per karyawan + daftar denda keterlambatan.
+- Semua bebaskan denda, koreksi, dan kunci/buka kunci tercatat di Audit Log.
+
+### 18.10 Denda di Potong Gaji
+
+Denda yang masih tercentang di periode yang sudah dikunci masuk menu **Potong
+Gaji** sebagai sumber kedua, **Denda keterlambatan**, di samping sisa uang muka
+(bagian 8.2). Ekspor Excel tetap satu file dengan dua sheet. Finance/Owner
+menandai **dipotong** setelah gaji dibayar, sama seperti sisa uang muka.
+
+### 18.11 Penyimpanan
+
+- Selfie absen: R2 `<companyId>/attendance/<recordId>-in|out.jpg`, dihapus otomatis setelah **masa simpan selfie** (Pengaturan platform, bawaan **3 bulan** sejak absen) oleh cron harian (`features/attendance/selfie-retention.ts`, maks. 1.000 absen per hari). Data absen (jam, jarak, skor, alasan) tetap ada. Selfie dibuka lewat `/api/attendance/records/<id>/selfie/<in|out>` (pemilik, Owner, Admin HR, Superadmin).
+- Halaman: `/attendance` (tombol absen, riwayat bulan ini, status foto), `/attendance/check` (alur absen di HP), `/attendance/today` (Owner/Admin HR: siapa sudah/belum absen hari ini).
+- Foto acuan: R2 `<companyId>/faces/<userId>/<id>.jpg` (lihat 18.4 untuk penghapusan).
+- Hapus company (bagian 16) ikut menghapus semua data & file absensi.
+
+### 18.12 Teknologi
+
+| Kebutuhan | Pilihan |
+|---|---|
+| Deteksi wajah, embedding, liveness | `@vladmandic/human` 3.3.6 (TensorFlow.js) di browser, dimuat hanya di halaman foto/absen. Model (±12 MB) diambil dari CDN jsDelivr dengan versi terkunci, lalu di-cache browser. Library ini dirawat satu orang (rilis terakhir Agustus 2025); `FACE_MODEL_VERSION` di `features/attendance/constants.ts` wajib ikut diganti bila versinya berubah. |
+| Perbandingan wajah | Di server (`features/attendance/face-match.ts`), rumus similarity yang sama dengan library (0–100, di atas 50 = cocok). Ambang di Pengaturan platform (bawaan 50, rentang 30–95). Percobaan yang ditolak tercatat di Audit Log beserta skornya. |
+| GPS | Geolocation API browser; jarak haversine dihitung di server |
+| Peta | Leaflet + OpenStreetMap |
+| Laporan | `@react-pdf/renderer` & `write-excel-file` (sudah dipakai) |
+
+Kamera dan GPS hanya jalan di HTTPS (atau `localhost`); untuk mencoba dari HP
+saat development pakai tunnel (misal `cloudflared`). Pencocokan wajah di HP
+bisa diakali oleh orang yang paham teknis; selfie tetap disimpan sebagai bukti
+review. Jalur upgrade bila perlu verifikasi di server: AWS Rekognition
+CompareFaces (berbayar).
+
+---
+
+## 19. Cuti & izin
+
+> **Status:** dibangun 3 November 2026 (irisan C di bagian 18). Kode:
+> `features/attendance/leave-*.ts`, halaman `/attendance/leave` &
+> `/attendance/leave/new`, pengaturan di Pengaturan → **Cuti & izin**.
+
+### 19.1 Jenis pengajuan
+
+Diatur Owner per company. Bawaan untuk setiap company:
+
+| Jenis | Bentuk | Dibayar | Potong kuota | Lampiran | Boleh mundur |
+|---|---|:-:|:-:|---|---|
+| Cuti tahunan | seharian | ✓ | ✓ | – | tidak (sebelum hari H) |
+| Sakit | seharian | ✓ | – | foto surat dokter, opsional | maks. 3 hari |
+| Izin (keperluan pribadi) | seharian | ✓ | – | – | maks. 3 hari |
+| Izin tidak dibayar | seharian | – | – | – | tidak |
+| Cuti khusus (menikah, melahirkan, duka) | seharian | ✓ | – | opsional | maks. 3 hari |
+| Izin datang terlambat | per jam | ✓ | – | – | tidak (sebelum absen masuk) |
+| Izin pulang cepat | per jam | ✓ | – | – | tidak (sebelum absen pulang) |
+
+Owner bisa menambah jenis, mengubah aturannya, atau menonaktifkannya (tidak
+dihapus, seperti kategori biaya). Hanya jenis seharian yang bisa memotong
+kuota. Sifat jenis (dibayar, potong kuota, bentuk) disalin ke pengajuan saat
+diajukan, jadi mengubah jenis tidak mengubah pengajuan lama. Lampiran: foto
+(JPG/PNG/WebP) atau PDF maks. 4 MB, dicek dari isi file.
+
+### 19.2 Kuota cuti tahunan
+
+- Bawaan **12 hari kerja per tahun kalender**; Owner bisa mengubah kuota per karyawan.
+- Sisa = kuota − cuti tahunan yang disetujui − yang masih menunggu. Pengajuan ditolak bila melebihi sisa. Sisa tampil di form pengajuan.
+- Sisa tidak dibawa ke tahun berikutnya (v1).
+
+### 19.3 Mengajukan (Admin HR, Finance, Karyawan)
+
+- **Seharian:** jenis, tanggal mulai–selesai, alasan, lampiran bila ada. Jumlah hari hanya menghitung **hari kerja** (tanpa hari libur & bukan hari kerja). Tidak boleh tumpang tindih dengan pengajuan lain yang menunggu/disetujui, tidak boleh pada tanggal yang sudah diabsen, maks. 90 hari per pengajuan, dan tidak melewati pergantian tahun (ajukan terpisah).
+- **Per jam:** tanggal dan jam (datang paling lambat jam X / pulang mulai jam X), alasan. Hanya untuk hari ini atau ke depan, dan sebelum absen masuk (datang terlambat) / absen pulang (pulang cepat) hari itu.
+- Nomor `IZ-2026-11-0001`, urutan per company per bulan.
+- Owner dan Admin HR (bila ada) menerima **WhatsApp**. Pengajuan yang menunggu tampil di "Perlu perhatian" Beranda Owner.
+
+### 19.4 Persetujuan (Owner)
+
+- **Setujui** atau **Tolak** (alasan wajib). Karyawan menerima **WhatsApp** hasilnya. Cuti seharian tidak bisa disetujui bila karyawan ternyata sudah absen di salah satu tanggalnya.
+- Disetujui → hari itu tampil sebagai Cuti/Sakit/Izin di absensi, bukan Tidak hadir.
+- **Izin datang terlambat** disetujui → absen masuk sampai jam yang diizinkan + toleransi **tidak didenda**. Bila disetujui setelah karyawan terlanjur absen terlambat, dendanya otomatis dibebaskan (tercatat sebagai "dibebaskan karena izin").
+- **Izin pulang cepat** disetujui → pulang mulai jam yang diizinkan tidak ditandai pulang cepat.
+- **Delegasi ke Admin HR** (pengaturan khusus Owner: aktif/nonaktif + waktu tunggu, bawaan 24 jam): pengajuan cuti/izin yang belum diproses Owner setelah waktu tunggu boleh diproses Admin HR; cron mengirim satu WhatsApp ke Admin HR berisi daftar pengajuan yang kini jadi tugasnya. Owner tetap bisa memproses kapan saja (yang lebih dulu berlaku). Admin HR tidak bisa memproses pengajuannya sendiri. Persetujuan uang muka, bebaskan denda, dan kunci periode **tidak** didelegasikan (menyangkut uang).
+
+### 19.5 Pembatalan
+
+- Menunggu → karyawan bebas membatalkan.
+- Disetujui → karyawan bisa membatalkan **sebagian atau seluruh hari yang belum lewat** (misal ternyata masuk). Kuota kembali, Owner menerima WhatsApp.
+- Tidak bisa diubah setelah periode bulan itu dikunci (18.9).
+
+### 19.6 Laporan
+
+Rekap bulanan (18.9) menampilkan jumlah hari per jenis, dipisah **dibayar** dan
+**tidak dibayar**. ArchiPay tidak menyimpan gaji; "tidak dibayar" menjadi
+informasi untuk bagian penggajian di PDF dan Excel.
+
+---
+
+## 20. Catatan terbuka
 
 Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 
@@ -637,3 +889,5 @@ Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 4. **Nota yang tidak pernah dikirim tidak masuk Potong Gaji.** Daftar Potong Gaji hanya memuat sisa setelah verifikasi. Untuk mencegahnya, karyawan dibatasi menerima uang muka baru bila jumlah uang muka tertundanya sudah mencapai batas di Pengaturan (lihat bagian 9). Uang muka yang sudah terlanjur tertunda tetap harus ditagih manual.
 5. **Pengajuan yang sudah terlanjur macet** (dibuat sebelum pengecekan penyetuju sah ditambahkan) tidak berubah otomatis; pengusulnya bisa membatalkan.
 6. **Notifikasi WhatsApp belum menyebut project.** Pesan pengajuan, pencairan, dan pengingat belum memuat nama project.
+7. **Cuti/izin bergantung pada Owner bila tidak ada Admin HR** (bagian 19.4). Dengan Admin HR, pengajuan didelegasikan setelah waktu tunggu; tanpa Admin HR, pengajuan tetap menunggu Owner.
+8. **Zona waktu absensi per lokasi, tetapi fitur lain masih memakai satu `APP_TIMEZONE`** (bagian 16). Batas nota, pengingat, dan audit log belum mengikuti zona waktu lokasi.

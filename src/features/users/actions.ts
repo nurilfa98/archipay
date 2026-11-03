@@ -1,4 +1,5 @@
-// Server Action untuk kelola pengguna (khusus permission "user:manage").
+// Server Action untuk kelola pengguna (permission "user:manage", atau
+// "user:manage-employee" untuk Admin HR yang hanya mengelola akun Karyawan).
 //
 // Setiap action mengecek permission sendiri, walaupun halamannya sudah
 // dilindungi requirePermission(): Server Action bisa dipanggil langsung lewat
@@ -8,7 +9,8 @@
 // - User TIDAK dihapus, hanya dinonaktifkan, agar riwayat (audit log, uang
 //   muka) tetap utuh.
 // - Siapa boleh mengelola akun siapa diatur features/users/access.ts:
-//   superadmin mengelola Owner, Owner mengelola Finance & Karyawan. Akun
+//   superadmin mengelola Owner, Owner mengelola Finance/Admin HR/Karyawan,
+//   Admin HR mengelola akun Karyawan saja (tanpa rekening bank). Akun
 //   superadmin dan akun company lain dijawab "tidak ditemukan".
 // - Pengguna baru selalu masuk ke company yang sedang dibuka.
 // - Tidak ada yang bisa menonaktifkan atau me-reset akunnya sendiri.
@@ -23,19 +25,20 @@
 
 import { eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { verifyAccount, verifySession, type CompanyUser } from "@/lib/auth/dal";
 import { generateTemporaryPassword, hashPassword } from "@/lib/auth/password";
-import { can } from "@/lib/auth/permissions";
 import type { AssignableRole, Role } from "@/lib/auth/roles";
 import { db, isUniqueViolation } from "@/lib/db";
-import { roles, userRoles, users } from "@/lib/db/schema";
+import { faceProfiles, roles, userRoles, users } from "@/lib/db/schema";
 import { assertSeatAvailable, SeatLimitError } from "@/features/subscriptions/seats";
 import { sendEmail } from "@/lib/email";
 import { getClientIp } from "@/lib/request";
+import { deleteObject } from "@/lib/storage";
 import type { ActionResult } from "@/types/action-result";
-import { assignableRolesFor, canManageUser } from "./access";
+import { assignableRolesFor, canEditBankAccount, canManageUser, canManageUsers } from "./access";
 import { credentialsEmail } from "./emails";
 import { getOwnProfile, getUserDetail, type UserDetail } from "./queries";
 import { createUserSchema, profileSchema, updateUserSchema, userIdSchema } from "./schemas";
@@ -142,9 +145,9 @@ export async function updateUser(
   const parsed = updateUserSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
-    phoneNumber: formData.get("phoneNumber"),
-    bankName: formData.get("bankName"),
-    bankAccountNumber: formData.get("bankAccountNumber"),
+    // Isian rekening yang dinonaktifkan (Admin HR) tidak ikut terkirim → "".
+    bankName: formData.get("bankName") ?? "",
+    bankAccountNumber: formData.get("bankAccountNumber") ?? "",
     roles: formData.getAll("roles"),
   });
   if (!parsed.success) return invalid(parsed.error);
@@ -153,7 +156,12 @@ export async function updateUser(
   if (!target.success) return target;
   const before = target.data;
 
-  const { roles: newRoles, ...profile } = parsed.data;
+  const { roles: newRoles, ...input } = parsed.data;
+  // Admin HR tidak boleh mengubah rekening bank (tujuan transfer uang muka):
+  // nilai lama dipertahankan apa pun isian dari browser.
+  const profile = canEditBankAccount(actor)
+    ? input
+    : { ...input, bankName: before.bankName, bankAccountNumber: before.bankAccountNumber };
   const allowedRoles = assignableRolesFor(actor);
   if (!newRoles.every((role) => allowedRoles.includes(role))) {
     return { success: false, message: "Periksa kembali isian Anda.", fieldErrors: { roles: [ROLE_NOT_ALLOWED] } };
@@ -220,7 +228,6 @@ export async function updateOwnProfile(
   const parsed = profileSchema.safeParse({
     fullName: formData.get("fullName"),
     email: formData.get("email"),
-    phoneNumber: formData.get("phoneNumber"),
     bankName: formData.get("bankName"),
     bankAccountNumber: formData.get("bankAccountNumber"),
   });
@@ -294,6 +301,7 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
   // di request berikutnya.
   const { active: activate, userId: targetId } = input.data;
   let updated: boolean;
+  let faceKeys: string[] = [];
   try {
     updated = await db.transaction(async (tx) => {
       // Mengaktifkan kembali ikut dihitung ke batas pengguna paket langganan.
@@ -304,6 +312,16 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
         .where(eq(users.id, targetId))
         .returning({ id: users.id });
       if (!row) return false;
+
+      // Dinonaktifkan: foto acuan wajah & embedding-nya dihapus (data minimal,
+      // UU PDP; BUSINESS-FLOW §18.4). Bila diaktifkan lagi, user mendaftar ulang.
+      if (!activate) {
+        const removed = await tx
+          .delete(faceProfiles)
+          .where(eq(faceProfiles.userId, targetId))
+          .returning({ photoKey: faceProfiles.photoKey });
+        faceKeys = removed.map((face) => face.photoKey).filter((key): key is string => key !== null);
+      }
 
       await logAudit(
         {
@@ -324,7 +342,16 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
   }
   if (!updated) return NOT_FOUND;
 
+  if (faceKeys.length > 0) {
+    after(async () => {
+      const results = await Promise.allSettled(faceKeys.map((key) => deleteObject(key)));
+      const failed = results.filter((result) => result.status === "rejected").length;
+      if (failed > 0) console.error(`[users] ${failed} file foto wajah gagal dihapus`);
+    });
+  }
+
   revalidateUsers();
+  revalidatePath("/attendance", "layout");
   return { success: true, data: undefined };
 }
 
@@ -400,7 +427,7 @@ export async function resetUserPassword(
 
 async function getUserManager() {
   const user = await verifySession();
-  return can(user, "user:manage") ? user : null;
+  return canManageUsers(user) ? user : null;
 }
 
 // Akun target harus berada di company yang sama dan boleh dikelola actor

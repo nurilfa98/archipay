@@ -27,10 +27,11 @@ type Crumb = { title: string; href: string };
 function trailOf(pathname: string): Crumb[] {
   const platform = PLATFORM_PAGES.find((page) => matchesPath(pathname, page.href));
   if (platform) return [platform];
-  const menu = MENU_ITEMS.find((item) => matchesPath(pathname, item.href));
-  if (menu) return [menu];
+  // Sub-halaman dicek lebih dulu karena bisa berada DI BAWAH URL menu
+  // (misal /attendance/locations di bawah menu Absensi).
   const sub = SUB_PAGES.find((page) => matchesPath(pathname, page.href));
-  if (!sub) return [];
+  const menu = MENU_ITEMS.find((item) => matchesPath(pathname, item.href));
+  if (!sub) return menu ? [menu] : [];
   const parent = MENU_ITEMS.find((item) => item.href === sub.parent);
   return parent ? [parent, sub] : [sub];
 }

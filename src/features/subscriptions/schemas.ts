@@ -123,6 +123,20 @@ const days = (label: string, max: number) =>
     .max(max, `${label} maksimal ${max} hari`);
 
 // Sama dengan CHECK constraint platform_settings_receipt_retention_check.
+// Absensi: masa simpan selfie & ambang kecocokan wajah (BUSINESS-FLOW §18).
+export const attendancePlatformSchema = z.object({
+  attendanceSelfieRetentionMonths: z.coerce
+    .number("Masa simpan selfie harus berupa angka")
+    .int("Masa simpan selfie harus bilangan bulat")
+    .min(1, "Masa simpan selfie minimal 1 bulan")
+    .max(24, "Masa simpan selfie maksimal 24 bulan"),
+  faceMatchThreshold: z.coerce
+    .number("Ambang kecocokan harus berupa angka")
+    .int("Ambang kecocokan harus bilangan bulat")
+    .min(30, "Ambang kecocokan minimal 30")
+    .max(95, "Ambang kecocokan maksimal 95"),
+});
+
 export const RECEIPT_RETENTION_MAX_MONTHS = 120;
 export const receiptRetentionSchema = z.object({
   receiptRetentionMonths: z.coerce

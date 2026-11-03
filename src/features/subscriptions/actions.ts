@@ -58,6 +58,7 @@ import {
   directPaymentSchema,
   idSchema,
   platformSettingsSchema,
+  attendancePlatformSchema,
   receiptRetentionSchema,
   pricingSchema,
   rejectPaymentSchema,
@@ -491,6 +492,25 @@ export async function updateReceiptRetention(
   if (!(await getSubscriptionAdmin())) return FORBIDDEN;
 
   const parsed = receiptRetentionSchema.safeParse({ receiptRetentionMonths: formData.get("receiptRetentionMonths") });
+  if (!parsed.success) return invalid(parsed.error);
+
+  await upsertPlatformSettings(parsed.data);
+
+  revalidateSubscriptionPages();
+  return { success: true, data: undefined };
+}
+
+// Absensi: masa simpan selfie & ambang kecocokan wajah, berlaku untuk semua company.
+export async function updateAttendancePlatformSettings(
+  _prevState: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  if (!(await getSubscriptionAdmin())) return FORBIDDEN;
+
+  const parsed = attendancePlatformSchema.safeParse({
+    attendanceSelfieRetentionMonths: formData.get("attendanceSelfieRetentionMonths"),
+    faceMatchThreshold: formData.get("faceMatchThreshold"),
+  });
   if (!parsed.success) return invalid(parsed.error);
 
   await upsertPlatformSettings(parsed.data);

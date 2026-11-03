@@ -8,6 +8,8 @@
 import "server-only";
 import { ADVANCE_STATUS_LABELS, DISBURSEMENT_METHOD_LABELS } from "@/features/advances/constants";
 import { LEDGER_ENTRY_LABELS, LEDGER_METHOD_LABELS } from "@/features/settlements/constants";
+import { timezoneLabel } from "@/features/attendance/constants";
+import { formatMinutes, formatWorkDays } from "@/features/attendance/schedule";
 import { isRole, ROLE_LABELS, type Role } from "@/lib/auth/roles";
 import { formatDateOnly, formatDateTime } from "@/lib/dates";
 import { formatRupiah, MONTH_NAMES } from "@/lib/format";
@@ -26,6 +28,8 @@ const dateTime: Formatter = (value) => {
   const date = typeof value === "string" ? new Date(value) : null;
   return date && !Number.isNaN(date.getTime()) ? formatDateTime(date) : text(value);
 };
+const clock: Formatter = (value) => (typeof value === "number" ? formatMinutes(value) : text(value));
+const minutes: Formatter = (value) => `${text(value)} menit`;
 const label =
   (labels: Record<string, string>): Formatter =>
   (value) =>
@@ -101,6 +105,46 @@ const FIELDS: Record<string, { label: string; format?: Formatter }> = {
   reason: { label: "Alasan", format: label(LOGIN_FAILED_REASONS) },
   note: { label: "Catatan" },
   acknowledgmentText: { label: "Pernyataan karyawan" },
+  // Absensi
+  workStartMinute: { label: "Jam masuk", format: clock },
+  workEndMinute: { label: "Jam pulang", format: clock },
+  lateToleranceMinutes: { label: "Toleransi terlambat", format: minutes },
+  latePenaltyAmount: { label: "Denda per keterlambatan", format: rupiah },
+  workDays: { label: "Hari kerja", format: (value) => (typeof value === "number" ? formatWorkDays(value) : text(value)) },
+  holidayDate: {
+    label: "Tanggal libur",
+    format: (value) => (typeof value === "string" ? formatDateOnly(value) : text(value)),
+  },
+  latitude: { label: "Latitude" },
+  longitude: { label: "Longitude" },
+  radiusMeters: { label: "Radius", format: (value) => `${text(value)} m` },
+  timezone: { label: "Zona waktu", format: (value) => (typeof value === "string" ? timezoneLabel(value) : text(value)) },
+  locationCount: { label: "Jumlah lokasi" },
+  locationNames: { label: "Nama lokasi" },
+  employeeName: { label: "Karyawan" },
+  rejectReason: { label: "Alasan ditolak" },
+  replacedPrevious: { label: "Mengganti foto lama" },
+  consentText: { label: "Pernyataan persetujuan" },
+  locationName: { label: "Lokasi" },
+  distanceMeters: { label: "Jarak dari lokasi", format: (value) => `${text(value)} m` },
+  inRadius: { label: "Di dalam radius" },
+  lateMinutes: { label: "Terlambat", format: minutes },
+  earlyMinutes: { label: "Pulang lebih awal", format: minutes },
+  faceScore: { label: "Skor kecocokan wajah" },
+  faceThreshold: { label: "Ambang kecocokan" },
+  checkMode: { label: "Jenis absen", format: label({ in: "Masuk", out: "Pulang" }) },
+  leaveType: { label: "Jenis cuti/izin" },
+  leaveKind: { label: "Bentuk izin" },
+  startDate: { label: "Mulai", format: (value) => (typeof value === "string" ? formatDateOnly(value) : text(value)) },
+  endDate: { label: "Selesai", format: (value) => (typeof value === "string" ? formatDateOnly(value) : text(value)) },
+  days: { label: "Hari kerja" },
+  delegated: { label: "Diproses Admin HR (delegasi)" },
+  cancelledAll: { label: "Dibatalkan seluruhnya" },
+  isPaid: { label: "Dibayar" },
+  usesQuota: { label: "Memotong kuota cuti" },
+  annualLeaveQuota: { label: "Kuota cuti tahunan", format: (value) => (value === null ? "Ikut kuota company" : `${text(value)} hari`) },
+  leaveDelegationEnabled: { label: "Delegasi ke Admin HR" },
+  leaveDelegationHours: { label: "Waktu tunggu delegasi", format: (value) => `${text(value)} jam` },
   userAgent: { label: "Perangkat (browser)" },
 };
 

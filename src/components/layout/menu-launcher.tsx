@@ -15,9 +15,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
-import { can } from "@/lib/auth/permissions";
 import type { Role } from "@/lib/auth/roles";
-import { MENU_ITEMS, type MenuItem } from "./nav-config";
+import { canSeeMenu, MENU_ITEMS, type MenuItem } from "./nav-config";
 
 function matches(item: MenuItem, query: string) {
   const text = [item.title, item.description, ...(item.keywords ?? [])].join(" ").toLowerCase();
@@ -32,7 +31,7 @@ export function MenuLauncher({ roles }: { roles: Role[] }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
 
-  const allowed = MENU_ITEMS.filter((item) => !item.permission || can({ roles }, item.permission));
+  const allowed = MENU_ITEMS.filter((item) => canSeeMenu({ roles }, item));
   const visible = allowed.filter((item) => matches(item, query));
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {

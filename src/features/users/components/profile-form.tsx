@@ -1,19 +1,21 @@
 // Form profil sendiri (menu Profil). Isinya sama dengan form data pengguna di
 // halaman detail OWNER, tetapi tanpa pilihan role, karena role hanya diatur OWNER.
+// Nomor WhatsApp tampil baca saja; menggantinya lewat /verify-phone (kode OTP).
 // Polanya sama dengan user-edit-form.tsx (onSubmit + startTransition agar isian
 // tidak hilang saat validasi gagal). Hasil simpan tampil sebagai toast.
 
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
+import Link from "next/link";
 import { startTransition, useActionState, type FormEvent } from "react";
 import { useActionResult } from "@/hooks/use-action-result";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup } from "@/components/ui/field";
+import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { updateOwnProfile } from "@/features/users/actions";
 import type { UserDetail } from "@/features/users/queries";
 import { BankAccountFields } from "@/components/bank-account-fields";
-import { PhoneInput } from "@/components/phone-input";
+import { formatPhone } from "@/lib/phone";
 import { notify } from "@/lib/notify";
 import { TextField } from "./text-field";
 
@@ -54,14 +56,20 @@ export function ProfileForm({ user }: { user: UserDetail }) {
           required
           error={fieldError("email")}
         />
-        <PhoneInput
-          name="phoneNumber"
-          label="Nomor WhatsApp"
-          description="Dipakai untuk notifikasi uang muka dan pengingat."
-          defaultValue={user.phoneNumber}
-          required
-          error={fieldError("phoneNumber")}
-        />
+        {/* Nomor WhatsApp hanya bisa diganti lewat verifikasi kode OTP. */}
+        <Field>
+          <FieldLabel>Nomor WhatsApp</FieldLabel>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-sm tabular-nums">{user.phoneNumber ? formatPhone(user.phoneNumber) : "Belum diisi"}</span>
+            <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/verify-phone?from=profile" />}>
+              Ganti nomor
+            </Button>
+          </div>
+          <FieldDescription>
+            Dipakai untuk notifikasi uang muka, pengingat, dan absensi. Nomor baru wajib diverifikasi dengan kode
+            yang dikirim lewat WhatsApp.
+          </FieldDescription>
+        </Field>
 
         {/* Rekening dipakai Finance/Owner saat mencairkan uang muka lewat transfer */}
         <div className="grid gap-5 sm:grid-cols-2">

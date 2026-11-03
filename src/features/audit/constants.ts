@@ -5,7 +5,7 @@
 import type { Tone } from "@/components/tone-badge";
 import type { AuditAction } from "@/lib/audit";
 
-export const AUDIT_CATEGORIES = ["AUTH", "USER", "PROJECT", "ADVANCE", "SETTLEMENT", "SETTINGS"] as const;
+export const AUDIT_CATEGORIES = ["AUTH", "USER", "PROJECT", "ADVANCE", "SETTLEMENT", "ATTENDANCE", "SETTINGS"] as const;
 export type AuditCategory = (typeof AUDIT_CATEGORIES)[number];
 
 export const AUDIT_CATEGORY_LABELS: Record<AuditCategory, string> = {
@@ -14,6 +14,7 @@ export const AUDIT_CATEGORY_LABELS: Record<AuditCategory, string> = {
   PROJECT: "Project",
   ADVANCE: "Uang muka",
   SETTLEMENT: "Pertanggungjawaban",
+  ATTENDANCE: "Absensi",
   SETTINGS: "Pengaturan",
 };
 
@@ -32,6 +33,7 @@ export const AUDIT_ACTIONS = {
   USER_ACTIVATED: { label: "Aktifkan pengguna", category: "USER", tone: "success" },
   USER_DEACTIVATED: { label: "Nonaktifkan pengguna", category: "USER", tone: "danger" },
   USER_PASSWORD_RESET: { label: "Reset password", category: "USER", tone: "warning" },
+  PHONE_VERIFIED: { label: "Verifikasi nomor WhatsApp", category: "USER", tone: "success" },
   ADVANCE_PROPOSED: { label: "Usulkan pencairan", category: "ADVANCE", tone: "pending" },
   ADVANCE_REQUESTED: { label: "Ajukan uang muka", category: "ADVANCE", tone: "pending" },
   ADVANCE_APPROVED: { label: "Setujui uang muka", category: "ADVANCE", tone: "success" },
@@ -55,6 +57,26 @@ export const AUDIT_ACTIONS = {
   EXPENSE_CATEGORY_CREATED: { label: "Tambah kategori biaya", category: "SETTINGS", tone: "success" },
   EXPENSE_CATEGORY_UPDATED: { label: "Ubah kategori biaya", category: "SETTINGS", tone: "active" },
   SUBSCRIPTION_PAYMENT_CLAIMED: { label: "Kirim bukti bayar langganan", category: "SETTINGS", tone: "active" },
+  ATTENDANCE_SETTINGS_UPDATED: { label: "Ubah jam kerja & denda", category: "ATTENDANCE", tone: "active" },
+  HOLIDAY_CREATED: { label: "Tambah hari libur", category: "ATTENDANCE", tone: "success" },
+  HOLIDAY_DELETED: { label: "Hapus hari libur", category: "ATTENDANCE", tone: "danger" },
+  ATTENDANCE_LOCATION_CREATED: { label: "Tambah lokasi absensi", category: "ATTENDANCE", tone: "success" },
+  ATTENDANCE_LOCATION_UPDATED: { label: "Ubah lokasi absensi", category: "ATTENDANCE", tone: "active" },
+  ATTENDANCE_LOCATIONS_IMPORTED: { label: "Impor lokasi absensi", category: "ATTENDANCE", tone: "success" },
+  ATTENDANCE_CONSENT_GIVEN: { label: "Setujui pengolahan data wajah & lokasi", category: "ATTENDANCE", tone: "pending" },
+  FACE_PROFILE_SUBMITTED: { label: "Kirim foto acuan wajah", category: "ATTENDANCE", tone: "pending" },
+  FACE_PROFILE_APPROVED: { label: "Setujui foto acuan wajah", category: "ATTENDANCE", tone: "success" },
+  FACE_PROFILE_REJECTED: { label: "Tolak foto acuan wajah", category: "ATTENDANCE", tone: "danger" },
+  ATTENDANCE_CHECKED_IN: { label: "Absen masuk", category: "ATTENDANCE", tone: "success" },
+  ATTENDANCE_CHECKED_OUT: { label: "Absen pulang", category: "ATTENDANCE", tone: "success" },
+  ATTENDANCE_FACE_REJECTED: { label: "Absen ditolak: wajah tidak cocok", category: "ATTENDANCE", tone: "danger" },
+  LEAVE_REQUESTED: { label: "Ajukan cuti/izin", category: "ATTENDANCE", tone: "pending" },
+  LEAVE_APPROVED: { label: "Setujui cuti/izin", category: "ATTENDANCE", tone: "success" },
+  LEAVE_REJECTED: { label: "Tolak cuti/izin", category: "ATTENDANCE", tone: "danger" },
+  LEAVE_CANCELLED: { label: "Batalkan cuti/izin", category: "ATTENDANCE", tone: "warning" },
+  LEAVE_TYPE_CREATED: { label: "Tambah jenis cuti/izin", category: "ATTENDANCE", tone: "success" },
+  LEAVE_TYPE_UPDATED: { label: "Ubah jenis cuti/izin", category: "ATTENDANCE", tone: "active" },
+  LEAVE_QUOTA_UPDATED: { label: "Ubah kuota cuti karyawan", category: "ATTENDANCE", tone: "active" },
 } as const satisfies Record<AuditAction, ActionInfo>;
 
 // Aksi lama yang tidak (lagi) dikenal tetap ditampilkan apa adanya.

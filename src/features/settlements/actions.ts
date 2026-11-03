@@ -26,7 +26,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
-import { getActiveRecipient, getOwnerContacts } from "@/features/advances/queries";
+import { getActiveRecipient } from "@/features/advances/queries";
 import { getCompanySettings } from "@/features/settings/queries";
 import { logAudit } from "@/lib/audit";
 import { verifySession, type CompanyUser } from "@/lib/auth/dal";
@@ -55,7 +55,6 @@ import { postBalanceEntry } from "./ledger";
 import {
   notifyBalanceRecorded,
   notifyRevisionRequested,
-  notifySubmitted,
   notifyVerified,
 } from "./notifications";
 import { getSettlementDetail, listSettlementItems, type SettlementDetail } from "./queries";
@@ -331,23 +330,9 @@ export async function submitSettlement(settlementId: string, lateReason: string)
   });
   if (!number) return STALE;
 
-  after(async () => {
-    const contacts = await getOwnerContacts(actor.company.id, [settlement.disbursedById]);
-    await notifySubmitted(
-      {
-        id: settlement.id,
-        number,
-        advanceNumber: settlement.advanceNumber,
-        itemTotal: sum(items),
-        itemCount: items.length,
-        late,
-        lateReason: lateReasonText,
-      },
-      settlement.recipientName,
-      // Penerima tidak perlu diberi tahu tentang laporannya sendiri.
-      contacts.filter((contact) => contact.id !== settlement.recipientId),
-    );
-  });
+  // Tanpa WhatsApp ke Owner/pencair (hemat kuota): laporan yang menunggu
+  // verifikasi (termasuk tanda terlambat) tampil di ringkasan email harian
+  // (features/digest).
   revalidateSettlements();
   return done();
 }
@@ -587,8 +572,10 @@ async function recordBalancePayment(
       : STALE;
   }
 
+  // Pengembalian TUNAI tidak dikabarkan lewat WhatsApp (hemat kuota): uangnya
+  // diserahkan langsung oleh karyawan. Transfer & penggantian tetap dikabarkan.
   const recipient = await getActiveRecipient(actor.company.id, settlement.recipientId);
-  if (recipient && settlement.number) {
+  if (recipient && settlement.number && !(type === "RETURN" && input.method === "CASH")) {
     const summary = { id: settlement.id, number: settlement.number, advanceNumber: settlement.advanceNumber };
     after(() => notifyBalanceRecorded(summary, recipient, { type, ...result }));
   }

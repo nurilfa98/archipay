@@ -37,10 +37,21 @@ export const PERMISSIONS = [
   "settings:manage", // ubah kebijakan uang muka & kategori biaya
   "user:manage", // tambah/nonaktifkan user & atur role Finance/Karyawan
   "user:manage-owner", // tambah/kelola akun Owner & memberi/mencabut role Owner
+  "user:manage-employee", // tambah/kelola akun yang role-nya Karyawan saja, tanpa rekening bank (Admin HR)
   "audit:view", // melihat audit log
   "company:manage", // kelola company (klien) & masuk ke company mana pun (platform)
   "subscription:view", // menu Langganan company sendiri: pilih paket & kirim bukti bayar
   "subscription:manage", // verifikasi tagihan semua company, harga paket, Pengaturan platform
+  // Absensi (BUSINESS-FLOW §18). Jam kerja, toleransi, denda & hari libur
+  // memakai settings:view / settings:manage.
+  "attendance:check-in", // wajib absen: daftar foto acuan wajah, absen masuk/pulang
+  "attendance:view-all", // melihat absensi, lokasi & foto acuan semua orang
+  "attendance:manage-locations", // tambah/ubah/nonaktifkan/impor lokasi absensi
+  "attendance:approve-face", // menyetujui/menolak foto acuan wajah
+  // Cuti & izin (BUSINESS-FLOW §19). Mengajukan memakai attendance:check-in;
+  // melihat semua pengajuan memakai attendance:view-all.
+  "leave:approve", // menyetujui/menolak cuti & izin kapan saja (Owner)
+  "leave:approve-delegated", // menyetujui/menolak setelah waktu delegasi lewat (Admin HR)
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -69,15 +80,27 @@ const ROLE_PERMISSIONS = {
         "payroll:manage",
         "project:manage",
         "settings:manage",
+        "attendance:check-in",
+        "attendance:manage-locations",
+        "attendance:approve-face",
+        "leave:approve",
+        "leave:approve-delegated",
       ].includes(permission),
   ),
   // Owner boleh semuanya, kecuali mengajukan uang muka untuk dirinya sendiri
   // (dana perusahaan memang di tangannya, dan pengajuan Owner tidak bisa
   // disetujui siapa pun karena penyetuju tidak boleh penerimanya sendiri),
   // serta mengelola akun Owner, company, & tagihan semua company (khusus superadmin).
+  // Owner juga tidak absen (BUSINESS-FLOW §18.1).
   OWNER: PERMISSIONS.filter(
     (permission) =>
-      !["advance:request", "user:manage-owner", "company:manage", "subscription:manage"].includes(permission),
+      ![
+        "advance:request",
+        "user:manage-owner",
+        "company:manage",
+        "subscription:manage",
+        "attendance:check-in",
+      ].includes(permission),
   ),
   FINANCE: [
     "advance:view-own",
@@ -88,8 +111,19 @@ const ROLE_PERMISSIONS = {
     "settlement:verify",
     "payroll:view",
     "payroll:manage",
+    "attendance:check-in",
   ],
-  EMPLOYEE: ["advance:view-own", "advance:request", "settlement:submit"],
+  // Admin HR mengurus absensi & akun Karyawan (features/users/access.ts).
+  // Bila perlu mengajukan uang muka, beri juga role Karyawan (permission digabung).
+  HR_ADMIN: [
+    "user:manage-employee",
+    "attendance:check-in",
+    "attendance:view-all",
+    "attendance:manage-locations",
+    "attendance:approve-face",
+    "leave:approve-delegated",
+  ],
+  EMPLOYEE: ["advance:view-own", "advance:request", "settlement:submit", "attendance:check-in"],
 } satisfies Record<Role, readonly Permission[]>;
 
 // User dengan banyak role mendapat gabungan permission dari semua role-nya.

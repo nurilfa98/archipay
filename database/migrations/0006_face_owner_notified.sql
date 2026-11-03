@@ -1,0 +1,1 @@
+ALTER TABLE "face_profiles" ADD COLUMN "owner_notified_at" timestamp with time zone;

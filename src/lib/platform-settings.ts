@@ -1,7 +1,8 @@
 // Pengaturan platform (satu baris, id "default"): kontak admin, QRIS statis,
 // masa gratis & tenggang, batas pengguna masa gratis, dan komponen harga
 // langganan (features/subscriptions/pricing.ts), dan masa simpan file nota
-// (features/settlements/receipt-retention.ts). Di lib/ karena dibaca lib/auth/dal.ts (masa
+// (features/settlements/receipt-retention.ts), serta masa simpan selfie absen
+// & ambang kecocokan wajah (features/attendance). Di lib/ karena dibaca lib/auth/dal.ts (masa
 // tenggang menentukan akses) dan features/companies (masa gratis company
 // baru). Diubah Superadmin di Pengaturan platform (features/subscriptions).
 
@@ -24,6 +25,8 @@ export type PlatformSettings = {
   discount6: number;
   discount12: number;
   receiptRetentionMonths: number;
+  attendanceSelfieRetentionMonths: number;
+  faceMatchThreshold: number;
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
@@ -38,6 +41,8 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   discount6: 10,
   discount12: 20,
   receiptRetentionMonths: 6,
+  attendanceSelfieRetentionMonths: 3,
+  faceMatchThreshold: 50,
 };
 
 // Baris dibuat saat Pengaturan platform pertama kali disimpan; sebelum itu
@@ -56,6 +61,8 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
       discount6: platformSettings.discount6,
       discount12: platformSettings.discount12,
       receiptRetentionMonths: platformSettings.receiptRetentionMonths,
+      attendanceSelfieRetentionMonths: platformSettings.attendanceSelfieRetentionMonths,
+      faceMatchThreshold: platformSettings.faceMatchThreshold,
     })
     .from(platformSettings)
     .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))

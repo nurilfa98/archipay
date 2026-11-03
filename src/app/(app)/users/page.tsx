@@ -14,6 +14,7 @@
 import { PlusIcon, UsersIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,8 +24,9 @@ import { UserSearch } from "@/features/users/components/user-search";
 import { USER_SEARCH_MIN_LENGTH } from "@/features/users/constants";
 import { UsersTable } from "@/features/users/components/users-table";
 import { getSeatUsage } from "@/features/subscriptions/seats";
+import { canManageUsers } from "@/features/users/access";
 import { listUsers } from "@/features/users/queries";
-import { requirePermission } from "@/lib/auth/dal";
+import { verifySession } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 
 export const metadata: Metadata = {
@@ -52,7 +54,8 @@ export default function UsersPage({ searchParams }: PageProps<"/users">) {
 }
 
 async function UsersContent({ searchParams }: Pick<PageProps<"/users">, "searchParams">) {
-  const actor = await requirePermission("user:manage");
+  const actor = await verifySession();
+  if (!canManageUsers(actor)) redirect("/");
 
   const { q } = await searchParams;
   // ?q=a&q=b menghasilkan array; cukup ambil yang pertama.

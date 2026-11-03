@@ -110,17 +110,6 @@ export function notifyDisputed(
   );
 }
 
-// Karyawan mengonfirmasi terima → OWNER & pencair dana.
-export function notifyAcknowledged(advance: AdvanceSummary, recipientName: string, contacts: Person[]) {
-  return send(
-    contacts,
-    (contact) =>
-      `Halo ${contact.fullName},\n\n` +
-      `${recipientName} sudah mengonfirmasi menerima uang muka *${advance.number}* ` +
-      `sebesar ${formatRupiah(advance.amount)} dan menyetujui ketentuan potong gaji.\n\n${link(advance.id)}`,
-  );
-}
-
 function link(advanceId: string) {
   return new URL(`/advances/${advanceId}`, env.NEXT_PUBLIC_APP_URL).toString();
 }

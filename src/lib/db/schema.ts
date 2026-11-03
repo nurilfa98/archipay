@@ -12,11 +12,13 @@ import {
   boolean,
   check,
   date,
+  doublePrecision,
   index,
   integer,
   jsonb,
   pgTable,
   primaryKey,
+  real,
   smallint,
   text,
   timestamp,
@@ -102,6 +104,12 @@ export const users = pgTable(
     fullName: varchar("full_name", { length: 100 }).notNull(),
     email: varchar("email", { length: 100 }).notNull().unique(),
     phoneNumber: varchar("phone_number", { length: 20 }),
+    // Kapan nomor WhatsApp terakhir diverifikasi dengan kode OTP
+    // (features/auth/phone-actions.ts). NULL = belum: user company diarahkan
+    // ke /verify-phone sebelum bisa memakai aplikasi (lib/auth/dal.ts).
+    phoneVerifiedAt: timestamptz("phone_verified_at"),
+    // Kuota cuti tahunan khusus karyawan ini (hari). NULL = kuota company.
+    annualLeaveQuota: integer("annual_leave_quota"),
     passwordHash: varchar("password_hash", { length: 255 }).notNull(),
     bankAccountNumber: varchar("bank_account_number", { length: 50 }),
     bankName: varchar("bank_name", { length: 50 }),
@@ -125,6 +133,25 @@ export const users = pgTable(
   },
   (t) => [index("users_company_id_idx").on(t.companyId)],
 );
+
+// Kode OTP verifikasi nomor WhatsApp yang sedang berjalan, satu baris per
+// user. Kode disimpan sebagai hash (SHA-256), tidak pernah teks asli.
+// Batas: berlaku 10 menit, maks. 5 kali coba per kode, kirim ulang tiap 60
+// detik, maks. 3 kode per hari (hemat kuota WhatsApp).
+export const phoneVerifications = pgTable("phone_verifications", {
+  userId: varchar("user_id", { length: 36 })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  // Nomor yang sedang diverifikasi (format 62…); disalin ke users saat cocok.
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
+  codeHash: varchar("code_hash", { length: 64 }).notNull(),
+  expiresAt: timestamptz("expires_at").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  // Hitungan kirim per tanggal (zona waktu perusahaan).
+  sendDate: date("send_date").notNull(),
+  sendCount: integer("send_count").notNull().default(0),
+  lastSentAt: timestamptz("last_sent_at").notNull(),
+});
 
 // Tabel penghubung many-to-many: satu user bisa punya lebih dari satu role.
 export const userRoles = pgTable(
@@ -219,6 +246,27 @@ export const companySettings = pgTable(
     // Jumlah uang muka yang sudah lewat batas unggah nota tetapi belum
     // dipertanggungjawabkan. Mencapai angka ini, karyawan tidak bisa menerima uang muka baru.
     maxOverdueAdvances: integer("max_overdue_advances").notNull().default(2),
+    // --- Absensi (BUSINESS-FLOW §18.2) ---
+    // Jam kerja disimpan sebagai menit sejak pukul 00.00 waktu LOKASI absen
+    // (480 = 08.00). Lokasi boleh punya jam sendiri (attendance_locations).
+    workStartMinute: integer("work_start_minute").notNull().default(480),
+    workEndMinute: integer("work_end_minute").notNull().default(1020),
+    // Absen masuk lewat jam masuk + toleransi = terlambat.
+    lateToleranceMinutes: integer("late_tolerance_minutes").notNull().default(15),
+    // Denda per kejadian terlambat (0 = belum dipakai). Disalin ke setiap denda
+    // saat terjadi, jadi perubahan nominal tidak mengubah denda lama.
+    latePenaltyAmount: rupiah("late_penalty_amount").notNull().default(0),
+    // Hari kerja sebagai bitmask: bit 0 = Senin … bit 6 = Minggu.
+    // 63 = Senin–Sabtu. Lihat features/attendance/schedule.ts.
+    workDays: smallint("work_days").notNull().default(63),
+    // --- Cuti & izin (BUSINESS-FLOW §19) ---
+    // Kuota cuti tahunan bawaan (hari kerja per tahun kalender); bisa diubah
+    // per karyawan (users.annual_leave_quota).
+    annualLeaveQuota: integer("annual_leave_quota").notNull().default(12),
+    // Delegasi persetujuan cuti/izin ke Admin HR bila Owner belum memproses
+    // setelah sekian jam (§19.4).
+    leaveDelegationEnabled: boolean("leave_delegation_enabled").notNull().default(true),
+    leaveDelegationHours: integer("leave_delegation_hours").notNull().default(24),
     updatedAt: timestamptz("updated_at")
       .notNull()
       .defaultNow()
@@ -230,6 +278,15 @@ export const companySettings = pgTable(
     check("company_settings_return_due_days", sql`${t.returnDueDays} between 1 and 60`),
     check("company_settings_no_receipt_max", sql`${t.noReceiptMaxAmount} >= 0`),
     check("company_settings_max_overdue", sql`${t.maxOverdueAdvances} between 1 and 10`),
+    check(
+      "company_settings_work_hours",
+      sql`${t.workStartMinute} between 0 and 1439 and ${t.workEndMinute} between 1 and 1439 and ${t.workStartMinute} < ${t.workEndMinute}`,
+    ),
+    check("company_settings_late_tolerance", sql`${t.lateToleranceMinutes} between 0 and 180`),
+    check("company_settings_late_penalty", sql`${t.latePenaltyAmount} >= 0`),
+    check("company_settings_work_days", sql`${t.workDays} between 1 and 127`),
+    check("company_settings_leave_quota", sql`${t.annualLeaveQuota} between 0 and 60`),
+    check("company_settings_leave_delegation", sql`${t.leaveDelegationHours} between 1 and 168`),
   ],
 );
 
@@ -546,6 +603,21 @@ export const reminderLogs = pgTable(
   (t) => [uniqueIndex("reminder_logs_advance_kind_unique").on(t.advanceId, t.kind)],
 );
 
+// Ringkasan email harian ke Owner & Finance (features/digest). Satu baris per
+// user per tanggal (zona waktu perusahaan) agar cron yang berjalan dua kali
+// tidak mengirim email ganda.
+export const digestLogs = pgTable(
+  "digest_logs",
+  {
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    digestDate: date("digest_date").notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.digestDate] })],
+);
+
 // ---------------------------------------------------------------------------
 // Langganan & pengaturan platform (BUSINESS-FLOW §17)
 // ---------------------------------------------------------------------------
@@ -578,6 +650,12 @@ export const platformSettings = pgTable(
     // file dihapus otomatis oleh cron harian (features/settlements/receipt-retention.ts)
     // agar penyimpanan R2 tidak terus menumpuk. Company nonaktif dikecualikan.
     receiptRetentionMonths: integer("receipt_retention_months").notNull().default(6),
+    // Absensi (BUSINESS-FLOW §18): masa simpan file selfie absen (bulan sejak
+    // absen), dihapus cron harian (features/attendance/selfie-retention.ts).
+    attendanceSelfieRetentionMonths: integer("attendance_selfie_retention_months").notNull().default(3),
+    // Ambang kecocokan wajah absen terhadap foto acuan, 0–100 (= skor
+    // similarity @vladmandic/human × 100). Di bawah ini absen ditolak.
+    faceMatchThreshold: integer("face_match_threshold").notNull().default(50),
     updatedAt: timestamptz("updated_at")
       .notNull()
       .defaultNow()
@@ -591,6 +669,11 @@ export const platformSettings = pgTable(
     check("platform_settings_prices_check", sql`${t.basePrice} >= 0 AND ${t.extraUserPrice} >= 0`),
     check("platform_settings_discounts_check", sql`${t.discount6} BETWEEN 0 AND 90 AND ${t.discount12} BETWEEN 0 AND 90`),
     check("platform_settings_receipt_retention_check", sql`${t.receiptRetentionMonths} BETWEEN 1 AND 120`),
+    check(
+      "platform_settings_selfie_retention_check",
+      sql`${t.attendanceSelfieRetentionMonths} BETWEEN 1 AND 24`,
+    ),
+    check("platform_settings_face_threshold_check", sql`${t.faceMatchThreshold} BETWEEN 30 AND 95`),
   ],
 );
 
@@ -717,5 +800,297 @@ export const subscriptionPayments = pgTable(
     index("subscription_payments_subscription_idx").on(t.subscriptionId, t.createdAt),
     index("subscription_payments_status_idx").on(t.status),
     check("subscription_payments_status_check", sql`${t.status} IN ('PENDING', 'ACCEPTED', 'REJECTED')`),
+  ],
+);
+
+// ---------------------------------------------------------------------------
+// Absensi (BUSINESS-FLOW §18)
+// ---------------------------------------------------------------------------
+
+// Titik lokasi absensi (kantor, cabang, lokasi project). Dikelola OWNER &
+// Admin HR. Tidak dihapus, hanya dinonaktifkan, agar riwayat absen tetap utuh.
+export const attendanceLocations = pgTable(
+  "attendance_locations",
+  {
+    id: id(),
+    companyId: companyRef(),
+    // Unik per company (lihat index di bawah).
+    name: varchar("name", { length: 100 }).notNull(),
+    // Opsional: lokasi milik project tertentu (informasi untuk laporan).
+    projectId: varchar("project_id", { length: 36 }).references(() => projects.id),
+    // Derajat desimal WGS84 (format GPS & Google Maps).
+    latitude: doublePrecision("latitude").notNull(),
+    longitude: doublePrecision("longitude").notNull(),
+    radiusMeters: integer("radius_meters").notNull(),
+    // Zona waktu IANA (Asia/Jakarta = WIB, Asia/Makassar = WITA,
+    // Asia/Jayapura = WIT). Jam & tanggal absen dihitung menurut zona ini.
+    timezone: varchar("timezone", { length: 40 }).notNull().default("Asia/Jakarta"),
+    // Jam kerja khusus lokasi (menit sejak 00.00). NULL = jam company.
+    workStartMinute: integer("work_start_minute"),
+    workEndMinute: integer("work_end_minute"),
+    isActive: boolean("is_active").notNull().default(true),
+    createdById: userRef("created_by_id"),
+    createdAt: createdAt(),
+    updatedAt: timestamptz("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("attendance_locations_company_name_unique").on(t.companyId, t.name),
+    check("attendance_locations_latitude", sql`${t.latitude} between -90 and 90`),
+    check("attendance_locations_longitude", sql`${t.longitude} between -180 and 180`),
+    check("attendance_locations_radius", sql`${t.radiusMeters} between 10 and 5000`),
+    check("attendance_locations_timezone", sql`${t.timezone} in ('Asia/Jakarta', 'Asia/Makassar', 'Asia/Jayapura')`),
+    check(
+      "attendance_locations_work_hours",
+      sql`(${t.workStartMinute} is null and ${t.workEndMinute} is null) or (${t.workStartMinute} between 0 and 1439 and ${t.workEndMinute} between 1 and 1439 and ${t.workStartMinute} < ${t.workEndMinute})`,
+    ),
+  ],
+);
+
+// Hari libur company (libur nasional, cuti bersama, dll). Hari libur tidak
+// dihitung sebagai hari kerja di rekap absensi dan pengajuan cuti.
+export const attendanceHolidays = pgTable(
+  "attendance_holidays",
+  {
+    id: id(),
+    companyId: companyRef(),
+    date: date("date").notNull(),
+    name: varchar("name", { length: 100 }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [uniqueIndex("attendance_holidays_company_date_unique").on(t.companyId, t.date)],
+);
+
+// Persetujuan pengolahan data wajah & lokasi (UU PDP 27/2022), satu baris
+// per user. Teks yang disetujui disimpan persis sebagai bukti.
+export const attendanceConsents = pgTable("attendance_consents", {
+  userId: varchar("user_id", { length: 36 })
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  companyId: companyRef(),
+  statement: text("statement").notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  acceptedAt: timestamptz("accepted_at").notNull().defaultNow(),
+});
+
+// Foto acuan wajah. Satu user paling banyak punya satu foto DISETUJUI
+// (APPROVED) dan satu foto MENUNGGU (PENDING): foto lama tetap dipakai
+// absen sampai penggantinya disetujui, lalu baris & filenya dihapus.
+// Ditolak = REJECTED (disimpan untuk menampilkan alasan, file dihapus).
+export const faceProfiles = pgTable(
+  "face_profiles",
+  {
+    id: id(),
+    companyId: companyRef(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Key file di lib/storage.ts; NULL setelah file dihapus (ditolak).
+    photoKey: varchar("photo_key", { length: 255 }),
+    // Face embedding dari @vladmandic/human (model faceres, 1024 angka).
+    embedding: real("embedding").array().notNull(),
+    // Versi library/model pembuat embedding. Embedding dari versi berbeda
+    // tidak bisa dibandingkan.
+    modelVersion: varchar("model_version", { length: 40 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+    rejectReason: varchar("reject_reason", { length: 300 }),
+    reviewedById: userRef("reviewed_by_id"),
+    reviewedAt: timestamptz("reviewed_at"),
+    // Kapan Owner diberi tahu lewat WhatsApp oleh cron harian
+    // (features/attendance/reminders.ts). NULL = belum; setiap foto hanya
+    // diberitahukan sekali agar hemat kuota WhatsApp.
+    ownerNotifiedAt: timestamptz("owner_notified_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("face_profiles_company_status_idx").on(t.companyId, t.status),
+    uniqueIndex("face_profiles_one_pending")
+      .on(t.userId)
+      .where(sql`${t.status} = 'PENDING'`),
+    uniqueIndex("face_profiles_one_approved")
+      .on(t.userId)
+      .where(sql`${t.status} = 'APPROVED'`),
+    check("face_profiles_status_check", sql`${t.status} IN ('PENDING', 'APPROVED', 'REJECTED')`),
+  ],
+);
+
+// Satu baris per user per tanggal kerja: absen masuk & pulang
+// (BUSINESS-FLOW §18.5–18.8). Tanggal kerja & menit setempat dihitung dari
+// zona waktu LOKASI absen masuk. Jadwal (jam masuk/pulang, toleransi) disalin
+// saat absen masuk, jadi perubahan pengaturan tidak mengubah absen lama.
+// Status harian (terlambat, pulang cepat, tidak absen pulang, ...) dihitung
+// dari kolom-kolom ini, tidak disimpan.
+export const attendanceRecords = pgTable(
+  "attendance_records",
+  {
+    id: id(),
+    companyId: companyRef(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id),
+    workDate: date("work_date").notNull(),
+    timezone: varchar("timezone", { length: 40 }).notNull(),
+    // false = bukan hari kerja (hari libur / di luar hari kerja): tidak dihitung
+    // terlambat atau pulang cepat.
+    isWorkDay: boolean("is_work_day").notNull(),
+    scheduleStartMinute: integer("schedule_start_minute").notNull(),
+    scheduleEndMinute: integer("schedule_end_minute").notNull(),
+    toleranceMinutes: integer("tolerance_minutes").notNull(),
+
+    checkInLocationId: varchar("check_in_location_id", { length: 36 })
+      .notNull()
+      .references(() => attendanceLocations.id),
+    checkInAt: timestamptz("check_in_at").notNull(),
+    checkInLatitude: doublePrecision("check_in_latitude").notNull(),
+    checkInLongitude: doublePrecision("check_in_longitude").notNull(),
+    checkInAccuracy: integer("check_in_accuracy").notNull(),
+    checkInDistance: integer("check_in_distance").notNull(),
+    checkInInRadius: boolean("check_in_in_radius").notNull(),
+    checkInSelfieKey: varchar("check_in_selfie_key", { length: 255 }),
+    checkInFaceScore: integer("check_in_face_score").notNull(),
+    // 0 = tepat waktu. Dihitung dari jam masuk (bukan dari akhir toleransi).
+    lateMinutes: integer("late_minutes").notNull().default(0),
+    lateReason: varchar("late_reason", { length: 500 }),
+    checkInOutsideReason: varchar("check_in_outside_reason", { length: 500 }),
+
+    checkOutLocationId: varchar("check_out_location_id", { length: 36 }).references(() => attendanceLocations.id),
+    checkOutAt: timestamptz("check_out_at"),
+    checkOutLatitude: doublePrecision("check_out_latitude"),
+    checkOutLongitude: doublePrecision("check_out_longitude"),
+    checkOutAccuracy: integer("check_out_accuracy"),
+    checkOutDistance: integer("check_out_distance"),
+    checkOutInRadius: boolean("check_out_in_radius"),
+    checkOutSelfieKey: varchar("check_out_selfie_key", { length: 255 }),
+    checkOutFaceScore: integer("check_out_face_score"),
+    earlyMinutes: integer("early_minutes"),
+    earlyReason: varchar("early_reason", { length: 500 }),
+    checkOutOutsideReason: varchar("check_out_outside_reason", { length: 500 }),
+
+    // "Ajukan Sanggahan / Catatan Khusus" (§18.7), bisa diisi saat masuk
+    // maupun pulang (digabung). Bahan review bulanan Owner.
+    appealNote: varchar("appeal_note", { length: 1000 }),
+    // File selfie dihapus otomatis setelah masa simpan; data absen tetap ada.
+    selfieDeletedAt: timestamptz("selfie_deleted_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("attendance_records_user_date_unique").on(t.userId, t.workDate),
+    index("attendance_records_company_date_idx").on(t.companyId, t.workDate),
+    check("attendance_records_late", sql`${t.lateMinutes} >= 0`),
+  ],
+);
+
+// Denda keterlambatan, satu per absen terlambat (BUSINESS-FLOW §18.2, §18.10).
+// Nominal disalin dari pengaturan saat terlambat terjadi. Dibebaskan (waive),
+// kunci periode, dan pencatatan potong gaji ditambahkan di irisan D.
+export const attendancePenalties = pgTable(
+  "attendance_penalties",
+  {
+    id: id(),
+    companyId: companyRef(),
+    recordId: varchar("record_id", { length: 36 })
+      .notNull()
+      .references(() => attendanceRecords.id),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id),
+    // "2026-11" (bulan tanggal kerja), untuk review & potong gaji per bulan.
+    period: varchar("period", { length: 7 }).notNull(),
+    amount: rupiah("amount").notNull(),
+    // ACTIVE (berlaku) / WAIVED (dibebaskan Owner, irisan D, atau otomatis
+    // karena izin datang terlambat yang disetujui, §19.4).
+    status: varchar("status", { length: 20 }).notNull().default("ACTIVE"),
+    waivedAt: timestamptz("waived_at"),
+    waivedById: userRef("waived_by_id"),
+    waiveNote: varchar("waive_note", { length: 300 }),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("attendance_penalties_record_unique").on(t.recordId),
+    index("attendance_penalties_company_period_idx").on(t.companyId, t.period),
+    check("attendance_penalties_amount", sql`${t.amount} > 0`),
+    check("attendance_penalties_status", sql`${t.status} IN ('ACTIVE', 'WAIVED')`),
+  ],
+);
+
+// Jenis cuti/izin per company (BUSINESS-FLOW §19.1). Jenis bawaan dibuat
+// bersama company (features/attendance/constants.ts → DEFAULT_LEAVE_TYPES),
+// lalu dikelola Owner di Pengaturan. Tidak dihapus, hanya dinonaktifkan.
+//   kind FULL_DAY      = seharian (rentang tanggal, dihitung hari kerja)
+//        LATE_ARRIVAL  = izin datang terlambat (datang paling lambat jam X)
+//        EARLY_LEAVE   = izin pulang cepat (pulang mulai jam X)
+export const leaveTypes = pgTable(
+  "leave_types",
+  {
+    id: id(),
+    companyId: companyRef(),
+    name: varchar("name", { length: 60 }).notNull(),
+    kind: varchar("kind", { length: 20 }).notNull(),
+    isPaid: boolean("is_paid").notNull().default(true),
+    // Mengurangi kuota cuti tahunan.
+    usesQuota: boolean("uses_quota").notNull().default(false),
+    // NONE / OPTIONAL / REQUIRED (foto atau PDF, misal surat dokter).
+    attachment: varchar("attachment", { length: 10 }).notNull().default("NONE"),
+    // Boleh diajukan mundur sampai N hari ke belakang (0 = harus sebelum hari H).
+    backdateDays: integer("backdate_days").notNull().default(0),
+    sortOrder: integer("sort_order").notNull().default(0),
+    isActive: boolean("is_active").notNull().default(true),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("leave_types_company_name_unique").on(t.companyId, t.name),
+    check("leave_types_kind", sql`${t.kind} IN ('FULL_DAY', 'LATE_ARRIVAL', 'EARLY_LEAVE')`),
+    check("leave_types_attachment", sql`${t.attachment} IN ('NONE', 'OPTIONAL', 'REQUIRED')`),
+    check("leave_types_backdate", sql`${t.backdateDays} between 0 and 30`),
+  ],
+);
+
+// Pengajuan cuti/izin (BUSINESS-FLOW §19.3–19.5). Nomor IZ-2026-11-0001.
+// Status: PENDING → APPROVED / REJECTED, atau CANCELLED (dibatalkan pengaju).
+export const leaveRequests = pgTable(
+  "leave_requests",
+  {
+    id: id(),
+    companyId: companyRef(),
+    number: varchar("number", { length: 20 }).notNull(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id),
+    leaveTypeId: varchar("leave_type_id", { length: 36 })
+      .notNull()
+      .references(() => leaveTypes.id),
+    // Salinan sifat jenis saat diajukan (jenis bisa diubah Owner kemudian).
+    kind: varchar("kind", { length: 20 }).notNull(),
+    isPaid: boolean("is_paid").notNull(),
+    usesQuota: boolean("uses_quota").notNull(),
+    startDate: date("start_date").notNull(),
+    // Seharian: tanggal terakhir. Per jam: sama dengan start_date.
+    endDate: date("end_date").notNull(),
+    // Jumlah HARI KERJA dalam rentang (tanpa hari libur); 0 untuk izin per jam.
+    days: integer("days").notNull(),
+    // Izin per jam: menit setempat (datang paling lambat / pulang mulai).
+    timeMinute: integer("time_minute"),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    attachmentKey: varchar("attachment_key", { length: 255 }),
+    attachmentType: varchar("attachment_type", { length: 50 }),
+    status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+    decidedById: userRef("decided_by_id"),
+    decidedAt: timestamptz("decided_at"),
+    // true = diproses Admin HR lewat delegasi (Owner belum memproses).
+    decidedByDelegate: boolean("decided_by_delegate").notNull().default(false),
+    rejectReason: varchar("reject_reason", { length: 300 }),
+    cancelledAt: timestamptz("cancelled_at"),
+    // Kabar delegasi ke Admin HR sudah dikirim (cron, sekali per pengajuan).
+    delegateNotifiedAt: timestamptz("delegate_notified_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    uniqueIndex("leave_requests_company_number_unique").on(t.companyId, t.number),
+    index("leave_requests_company_status_idx").on(t.companyId, t.status),
+    index("leave_requests_user_dates_idx").on(t.userId, t.startDate),
+    check("leave_requests_status", sql`${t.status} IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED')`),
+    check("leave_requests_dates", sql`${t.endDate} >= ${t.startDate}`),
   ],
 );

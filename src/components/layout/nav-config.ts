@@ -2,7 +2,8 @@
 // setelah login) dan dipakai breadcrumb di header. Saat membuat fitur/halaman
 // baru, cukup tambahkan satu baris di MENU_ITEMS.
 //
-// `permission` (opsional) menentukan siapa yang melihat menu tersebut.
+// `permission` (opsional) menentukan siapa yang melihat menu tersebut. Bila
+// berupa daftar, cukup punya SALAH SATU permission (lihat canSeeMenu).
 // Ini hanya soal tampilan: halamannya sendiri tetap wajib memanggil
 // requirePermission() dari lib/auth/dal.ts.
 //
@@ -16,6 +17,7 @@
 // SUB_PAGES agar breadcrumb tetap bisa menampilkan "Project > Uang Muka".
 
 import {
+  CalendarCheckIcon,
   CreditCardIcon,
   FileClockIcon,
   FolderKanbanIcon,
@@ -25,7 +27,8 @@ import {
   WalletCardsIcon,
   type LucideIcon,
 } from "lucide-react";
-import type { Permission } from "@/lib/auth/permissions";
+import { can, type Permission } from "@/lib/auth/permissions";
+import type { Role } from "@/lib/auth/roles";
 
 export type MenuItem = {
   title: string;
@@ -34,8 +37,14 @@ export type MenuItem = {
   description: string;
   // Kata lain yang ikut dicocokkan oleh kolom pencarian menu.
   keywords?: string[];
-  permission?: Permission;
+  permission?: Permission | Permission[];
 };
+
+export function canSeeMenu(user: { roles: readonly Role[] }, item: MenuItem) {
+  if (!item.permission) return true;
+  const permissions = Array.isArray(item.permission) ? item.permission : [item.permission];
+  return permissions.some((permission) => can(user, permission));
+}
 
 export const MENU_ITEMS: MenuItem[] = [
   {
@@ -54,6 +63,14 @@ export const MENU_ITEMS: MenuItem[] = [
     permission: "advance:view-own",
   },
   {
+    title: "Absensi",
+    href: "/attendance",
+    icon: CalendarCheckIcon,
+    description: "Foto wajah, lokasi & absen kerja",
+    keywords: ["absen", "hadir", "lokasi", "wajah", "selfie", "gps", "kehadiran"],
+    permission: ["attendance:check-in", "attendance:view-all"],
+  },
+  {
     title: "Potong Gaji",
     href: "/payroll-deductions",
     icon: WalletCardsIcon,
@@ -67,7 +84,7 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: UsersIcon,
     description: "Akun karyawan & role",
     keywords: ["user", "karyawan", "akun"],
-    permission: "user:manage",
+    permission: ["user:manage", "user:manage-employee"],
   },
   {
     title: "Audit Log",
@@ -100,6 +117,12 @@ export const SUB_PAGES: { title: string; href: string; parent?: string }[] = [
   { title: "Uang Muka", href: "/advances", parent: "/projects" },
   { title: "Pertanggungjawaban", href: "/settlements", parent: "/projects" },
   { title: "Profil", href: "/profile" },
+  { title: "Lokasi", href: "/attendance/locations", parent: "/attendance" },
+  { title: "Foto wajah", href: "/attendance/faces", parent: "/attendance" },
+  { title: "Daftar foto wajah", href: "/attendance/enroll", parent: "/attendance" },
+  { title: "Absen", href: "/attendance/check", parent: "/attendance" },
+  { title: "Hari ini", href: "/attendance/today", parent: "/attendance" },
+  { title: "Cuti & izin", href: "/attendance/leave", parent: "/attendance" },
 ];
 
 // Halaman platform Superadmin (tidak terikat company), berpindah lewat tab di

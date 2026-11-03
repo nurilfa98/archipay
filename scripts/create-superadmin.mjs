@@ -1,5 +1,5 @@
 // Membuat akun SUPERADMIN, karena belum ada halaman register.
-// Sekaligus mengisi tabel roles (SUPERADMIN, OWNER, FINANCE, EMPLOYEE) bila belum ada.
+// Sekaligus mengisi tabel roles (SUPERADMIN, OWNER, FINANCE, HR_ADMIN, EMPLOYEE) bila belum ada.
 //
 // Cara pakai (jalankan setelah pnpm db:migrate):
 //   pnpm db:create-superadmin admin@archipay.id passwordRahasia "Nama Superadmin"
@@ -29,7 +29,7 @@ const sql = postgres(process.env.DATABASE_URL);
 
 try {
   // ON CONFLICT DO NOTHING membuat script aman dijalankan berulang kali.
-  for (const name of ["SUPERADMIN", "OWNER", "FINANCE", "EMPLOYEE"]) {
+  for (const name of ["SUPERADMIN", "OWNER", "FINANCE", "HR_ADMIN", "EMPLOYEE"]) {
     await sql`insert into roles (id, name) values (${crypto.randomUUID()}, ${name}) on conflict (name) do nothing`;
   }
 

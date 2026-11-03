@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
+  FieldDescription,
   FieldError,
   FieldGroup,
   FieldLabel,
@@ -30,11 +31,21 @@ import { updateUser } from "@/features/users/actions";
 import type { UserDetail } from "@/features/users/queries";
 import { ROLE_LABELS, type AssignableRole } from "@/lib/auth/roles";
 import { BankAccountFields } from "@/components/bank-account-fields";
-import { PhoneInput } from "@/components/phone-input";
+import { formatPhone } from "@/lib/phone";
 import { TextField } from "./text-field";
 
 // `roles` = role yang boleh diberikan pengelola (features/users/access.ts).
-export function UserEditForm({ user, roles }: { user: UserDetail; roles: AssignableRole[] }) {
+// canEditBank = false (Admin HR): rekening bank tampil tetapi tidak bisa diubah;
+// server juga mengabaikan isiannya (features/users/actions.ts).
+export function UserEditForm({
+  user,
+  roles,
+  canEditBank,
+}: {
+  user: UserDetail;
+  roles: AssignableRole[];
+  canEditBank: boolean;
+}) {
   const [state, formAction, pending] = useActionState(updateUser, undefined);
 
   const error = state && !state.success ? state : undefined;
@@ -72,23 +83,28 @@ export function UserEditForm({ user, roles }: { user: UserDetail; roles: Assigna
           required
           error={fieldError("email")}
         />
-        <PhoneInput
-          name="phoneNumber"
-          label="Nomor WhatsApp"
-          defaultValue={user.phoneNumber}
-          required
-          error={fieldError("phoneNumber")}
-        />
+        <Field>
+          <FieldLabel>Nomor WhatsApp</FieldLabel>
+          <p className="text-sm">{user.phoneNumber ? formatPhone(user.phoneNumber) : "Belum diisi"}</p>
+          <FieldDescription>
+            Diisi & diverifikasi pengguna sendiri dengan kode OTP WhatsApp saat login, atau lewat menu Profil.
+          </FieldDescription>
+        </Field>
 
         {/* Rekening dipakai Finance saat mencairkan uang muka lewat transfer */}
-        <div className="grid gap-5 sm:grid-cols-2">
+        <fieldset disabled={!canEditBank} className="grid min-w-0 gap-5 sm:grid-cols-2">
           <BankAccountFields
             defaultBankName={user.bankName}
             defaultAccountNumber={user.bankAccountNumber}
             bankNameError={fieldError("bankName")}
             accountError={fieldError("bankAccountNumber")}
           />
-        </div>
+        </fieldset>
+        {!canEditBank && (
+          <p className="-mt-3 text-sm text-muted-foreground">
+            Rekening bank hanya bisa diubah oleh Owner atau pengguna sendiri lewat menu Profil.
+          </p>
+        )}
 
         <FieldSet data-invalid={!!fieldError("roles")}>
           <FieldLegend variant="label">Role</FieldLegend>

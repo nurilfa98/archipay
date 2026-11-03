@@ -14,18 +14,18 @@
 import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { assignableRolesFor, canManageUser } from "@/features/users/access";
+import { assignableRolesFor, canEditBankAccount, canManageUser, canManageUsers } from "@/features/users/access";
 import { UserAccountActions } from "@/features/users/components/user-account-actions";
 import { UserEditForm } from "@/features/users/components/user-edit-form";
 import { StatusBadge } from "@/features/users/components/users-table";
 import { getUserDetail } from "@/features/users/queries";
-import { requirePermission } from "@/lib/auth/dal";
+import { verifySession } from "@/lib/auth/dal";
 import { ROLE_LABELS } from "@/lib/auth/roles";
 import { formatAccountNumber } from "@/lib/bank";
 import { formatPhone } from "@/lib/phone";
@@ -53,7 +53,8 @@ export default function UserDetailPage({ params }: PageProps<"/users/[id]">) {
 }
 
 async function UserDetailContent({ id }: { id: string }) {
-  const actor = await requirePermission("user:manage");
+  const actor = await verifySession();
+  if (!canManageUsers(actor)) redirect("/");
   const user = await getUserDetail(actor.company.id, id);
   if (!user || user.roles.includes("SUPERADMIN")) notFound();
 
@@ -69,7 +70,9 @@ async function UserDetailContent({ id }: { id: string }) {
             <CardDescription>
               {user.id === actor.id
                 ? "Ubah data Anda sendiri lewat menu Profil."
-                : "Akun Owner hanya bisa diubah oleh superadmin."}
+                : user.roles.includes("OWNER")
+                  ? "Akun Owner hanya bisa diubah oleh superadmin."
+                  : "Akun dengan role Finance, Admin HR, atau Owner hanya bisa diubah oleh Owner."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -96,7 +99,7 @@ async function UserDetailContent({ id }: { id: string }) {
           <CardDescription>Nama, kontak, rekening bank, dan role.</CardDescription>
         </CardHeader>
         <CardContent className="max-w-xl">
-          <UserEditForm user={user} roles={assignableRolesFor(actor)} />
+          <UserEditForm user={user} roles={assignableRolesFor(actor)} canEditBank={canEditBankAccount(actor)} />
         </CardContent>
       </Card>
       <Card>

@@ -40,7 +40,6 @@ import { getActiveProject } from "@/features/projects/queries";
 import { getCompanySettings } from "@/features/settings/queries";
 import { ADVANCE_NUMBER_PREFIX, MISSING_PHONE_MESSAGE, type AdvanceStatus, type DisbursementMethod } from "./constants";
 import {
-  notifyAcknowledged,
   notifyApprovalRequested,
   notifyCancelled,
   notifyDisbursed,
@@ -393,13 +392,8 @@ export async function acknowledgeAdvance(advanceId: string, consent: boolean): P
   });
   if (!updated) return STALE;
 
-  after(async () =>
-    notifyAcknowledged(
-      advance,
-      advance.recipientName,
-      await getOwnerContacts(actor.company.id, [advance.disbursedById]),
-    ),
-  );
+  // Tanpa WhatsApp ke Owner/pencair (hemat kuota): konfirmasi terima tampil di
+  // ringkasan email harian, bagian "Kemarin" (features/digest).
   return done();
 }
 

@@ -36,6 +36,48 @@
       "when": 1793531352773,
       "tag": "0004_receipt_retention",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1793683868094,
+      "tag": "0005_attendance_setup",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793686008212,
+      "tag": "0006_face_owner_notified",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793693084760,
+      "tag": "0007_digest_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793693273308,
+      "tag": "0008_phone_verification",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793694045106,
+      "tag": "0009_attendance_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1793695314442,
+      "tag": "0010_leave_requests",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
+  AttendancePlatformForm,
   BankAccountsManager,
   PlatformSettingsForm,
   PricingForm,
@@ -86,6 +87,22 @@ async function PlatformSettingsContent() {
         </CardHeader>
         <CardContent>
           <ReceiptRetentionForm months={settings.receiptRetentionMonths} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Absensi</CardTitle>
+          <CardDescription>
+            Berlaku untuk semua company. Selfie absen dihapus otomatis setelah masa simpan agar penyimpanan tidak
+            menumpuk dan data wajah tidak disimpan lebih lama dari perlu (UU PDP).
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <AttendancePlatformForm
+            selfieMonths={settings.attendanceSelfieRetentionMonths}
+            faceThreshold={settings.faceMatchThreshold}
+          />
         </CardContent>
       </Card>
 

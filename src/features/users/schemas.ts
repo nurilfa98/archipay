@@ -10,7 +10,6 @@
 
 import { z } from "zod";
 import { ASSIGNABLE_ROLES } from "@/lib/auth/roles";
-import { normalizeIndonesianPhone } from "@/lib/phone";
 
 const fullName = z
   .string()
@@ -25,16 +24,6 @@ const email = z
   .max(100, "Email maksimal 100 karakter")
   .pipe(z.email("Format email tidak valid"));
 
-// transform bisa sekaligus memvalidasi: kembalikan z.NEVER + addIssue bila gagal.
-const phoneNumber = z.string().transform((value, ctx) => {
-  const normalized = normalizeIndonesianPhone(value);
-  if (!normalized) {
-    ctx.addIssue({ code: "custom", message: "Nomor WhatsApp tidak valid, contoh: 0812-3456-7890" });
-    return z.NEVER;
-  }
-  return normalized;
-});
-
 // Kolom opsional: string kosong dari form disimpan sebagai NULL.
 const bankName = z
   .string()
@@ -48,8 +37,9 @@ const bankAccountNumber = z
   .pipe(z.string().regex(/^\d{0,30}$/, "Nomor rekening hanya boleh berisi angka"))
   .transform((value) => value || null);
 
-// Nomor WhatsApp tidak diminta saat tambah pengguna; diisi lewat profil
-// (menu Profil) oleh pengguna sendiri. Role awal dipilih di form; boleh
+// Nomor WhatsApp tidak diminta saat tambah pengguna: pengguna sendiri yang
+// mengisi & memverifikasinya dengan kode OTP saat pertama login
+// (/verify-phone, features/auth/phone-actions.ts). Role awal dipilih di form; boleh
 // tidaknya role itu diberikan dicek di Server Action (features/users/access.ts).
 export const createUserSchema = z.object({
   fullName,
@@ -68,7 +58,8 @@ function bankPairRule(data: { bankName: string | null; bankAccountNumber: string
 }
 
 // Data profil yang boleh diisi pengguna sendiri (menu Profil), tanpa role.
-const profileShape = { fullName, email, phoneNumber, bankName, bankAccountNumber };
+// Nomor WhatsApp TIDAK di sini: hanya bisa diganti lewat verifikasi OTP.
+const profileShape = { fullName, email, bankName, bankAccountNumber };
 
 export const profileSchema = z.object(profileShape).superRefine(bankPairRule);
 

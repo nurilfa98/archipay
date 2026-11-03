@@ -32,6 +32,14 @@ import { can } from "@/lib/auth/permissions";
 import { db, violatedConstraint } from "@/lib/db";
 import {
   advanceLedgerEntries,
+  attendanceConsents,
+  attendanceHolidays,
+  attendanceLocations,
+  attendancePenalties,
+  attendanceRecords,
+  leaveRequests,
+  leaveTypes,
+  faceProfiles,
   advanceRequests,
   auditLogs,
   companies,
@@ -56,6 +64,7 @@ import { deleteObject } from "@/lib/storage";
 import { addDays } from "@/lib/subscription-access";
 import type { ActionResult } from "@/types/action-result";
 import { credentialsEmail } from "@/features/users/emails";
+import { DEFAULT_LEAVE_TYPES } from "@/features/attendance/constants";
 import { DEFAULT_EXPENSE_CATEGORIES } from "./constants";
 import { getCompany } from "./queries";
 import { companyIdSchema, companySchema, createCompanySchema } from "./schemas";
@@ -109,6 +118,9 @@ export async function createCompany(
       await tx
         .insert(expenseCategories)
         .values(DEFAULT_EXPENSE_CATEGORIES.map((name, index) => ({ companyId: created.id, name, sortOrder: index + 1 })));
+      await tx
+        .insert(leaveTypes)
+        .values(DEFAULT_LEAVE_TYPES.map((type, index) => ({ ...type, companyId: created.id, sortOrder: index + 1 })));
 
       const [owner] = await tx
         .insert(users)
@@ -245,7 +257,7 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
     const userIds = companyUsers.map((user) => user.id);
 
     // Key file dikumpulkan sebelum barisnya hilang.
-    const [receiptFiles, proofFiles] = await Promise.all([
+    const [receiptFiles, proofFiles, faceFiles, selfieFiles, leaveFiles] = await Promise.all([
       // Nota yang sudah dihapus otomatis (lewat masa simpan) dilewati.
       tx
         .select({ key: settlementItems.fileKey })
@@ -255,7 +267,23 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
         .select({ key: subscriptionPayments.proofKey })
         .from(subscriptionPayments)
         .where(eq(subscriptionPayments.companyId, id)),
+      tx.select({ key: faceProfiles.photoKey }).from(faceProfiles).where(eq(faceProfiles.companyId, id)),
+      tx
+        .select({ inKey: attendanceRecords.checkInSelfieKey, outKey: attendanceRecords.checkOutSelfieKey })
+        .from(attendanceRecords)
+        .where(eq(attendanceRecords.companyId, id)),
+      tx.select({ key: leaveRequests.attachmentKey }).from(leaveRequests).where(eq(leaveRequests.companyId, id)),
     ]);
+
+    // Absensi (BUSINESS-FLOW §18.11) & cuti/izin (§19).
+    await tx.delete(leaveRequests).where(eq(leaveRequests.companyId, id));
+    await tx.delete(leaveTypes).where(eq(leaveTypes.companyId, id));
+    await tx.delete(attendancePenalties).where(eq(attendancePenalties.companyId, id));
+    await tx.delete(attendanceRecords).where(eq(attendanceRecords.companyId, id));
+    await tx.delete(faceProfiles).where(eq(faceProfiles.companyId, id));
+    await tx.delete(attendanceConsents).where(eq(attendanceConsents.companyId, id));
+    await tx.delete(attendanceHolidays).where(eq(attendanceHolidays.companyId, id));
+    await tx.delete(attendanceLocations).where(eq(attendanceLocations.companyId, id));
 
     // Uang muka & pertanggungjawaban (anak → induk).
     await tx
@@ -291,7 +319,8 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
 
     await tx.delete(companies).where(eq(companies.id, id));
 
-    return [...receiptFiles, ...proofFiles].map((file) => file.key).filter((key): key is string => key !== null);
+    const selfieKeys = selfieFiles.flatMap((row) => [{ key: row.inKey }, { key: row.outKey }]);
+    return [...receiptFiles, ...proofFiles, ...faceFiles, ...selfieKeys, ...leaveFiles].map((file) => file.key).filter((key): key is string => key !== null);
   });
 
   after(async () => {

@@ -23,6 +23,7 @@ import {
   removeQris,
   updatePlatformSettings,
   updatePricing,
+  updateAttendancePlatformSettings,
   updateReceiptRetention,
   uploadQris,
 } from "../actions";
@@ -246,6 +247,46 @@ export function ReceiptRetentionForm({ months }: { months: number }) {
           error={fieldError("receiptRetentionMonths")}
         />
         <SubmitButton pending={pending} label="Simpan masa simpan" />
+      </FieldGroup>
+    </form>
+  );
+}
+
+export function AttendancePlatformForm({
+  selfieMonths,
+  faceThreshold,
+}: {
+  selfieMonths: number;
+  faceThreshold: number;
+}) {
+  const { pending, handleSubmit, fieldError } = useFormAction(
+    updateAttendancePlatformSettings,
+    "Pengaturan absensi tersimpan.",
+  );
+  return (
+    <form onSubmit={handleSubmit} className="max-w-xl">
+      <FieldGroup>
+        <NumberField
+          name="attendanceSelfieRetentionMonths"
+          label="Masa simpan selfie absen"
+          unit="bulan"
+          defaultValue={selfieMonths}
+          min={1}
+          max={24}
+          description="Dihitung sejak tanggal absen. Data absen (jam, jarak, alasan) tetap tersimpan."
+          error={fieldError("attendanceSelfieRetentionMonths")}
+        />
+        <NumberField
+          name="faceMatchThreshold"
+          label="Ambang kecocokan wajah"
+          unit="dari 100"
+          defaultValue={faceThreshold}
+          min={30}
+          max={95}
+          description="Absen ditolak bila skor kemiripan selfie dengan foto acuan di bawah angka ini. Bawaan 50; naikkan bila ada yang bisa menitip absen, turunkan bila karyawan asli sering tertolak."
+          error={fieldError("faceMatchThreshold")}
+        />
+        <SubmitButton pending={pending} label="Simpan pengaturan absensi" />
       </FieldGroup>
     </form>
   );

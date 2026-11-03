@@ -47,6 +47,9 @@ export type CurrentUser = {
   email: string;
   roles: Role[];
   mustChangePassword: boolean;
+  // User company tanpa nomor WhatsApp terverifikasi (OTP) wajib ke
+  // /verify-phone dulu. Selalu false untuk Superadmin.
+  mustVerifyPhone: boolean;
   // Company yang sedang dibuka: untuk Owner/Finance/Karyawan = company-nya
   // sendiri, untuk Superadmin = company yang dipilih di menu Company
   // (lib/auth/active-company.ts), null bila belum memilih.
@@ -106,6 +109,8 @@ async function loadCurrentUser(activeCompanyId: string | null): Promise<CurrentU
       email: users.email,
       isActive: users.isActive,
       mustChangePassword: users.mustChangePassword,
+      phoneNumber: users.phoneNumber,
+      phoneVerifiedAt: users.phoneVerifiedAt,
       sessionVersion: users.sessionVersion,
       companyId: users.companyId,
       companyName: companies.name,
@@ -149,6 +154,7 @@ async function loadCurrentUser(activeCompanyId: string | null): Promise<CurrentU
     email: user.email,
     roles: userRolesList,
     mustChangePassword: user.mustChangePassword,
+    mustVerifyPhone: !!user.companyId && (!user.phoneNumber || !user.phoneVerifiedAt),
     company,
   };
 }
@@ -191,15 +197,17 @@ async function accessOf(subscriptionUntil: Date, hasPaid: boolean) {
 // redirect() bertipe `never`, jadi setelah baris itu TypeScript tahu `user`
 // pasti ada.
 //
-// User yang masih memakai password sementara diarahkan ke /change-password.
+// User yang masih memakai password sementara diarahkan ke /change-password,
+// lalu user company tanpa nomor WhatsApp terverifikasi ke /verify-phone.
 // Karena semua page, layout, dan Server Action lewat fungsi ini (atau
 // verifySession), user tidak bisa membuka/menjalankan apa pun sebelum
 // mengganti password. Halaman /change-password sendiri memakai
-// getCurrentUser() agar tidak redirect loop.
+// getCurrentUser() agar tidak redirect loop (begitu pula /verify-phone).
 export async function verifyAccount() {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
   if (user.mustChangePassword) redirect("/change-password");
+  if (user.mustVerifyPhone) redirect("/verify-phone");
   return user;
 }
 

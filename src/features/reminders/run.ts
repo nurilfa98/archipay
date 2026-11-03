@@ -2,10 +2,15 @@
 // (app/api/cron/reminders/route.ts), misalnya setiap pukul 08.00 WIB.
 //
 //   SETTLEMENT_DUE_SOON  besok batas unggah nota            → karyawan
-//   SETTLEMENT_OVERDUE   batas unggah nota terlewati        → karyawan + OWNER
+//   SETTLEMENT_OVERDUE   batas unggah nota terlewati        → karyawan
 //   RETURN_DUE_SOON      besok batas pengembalian sisa dana → karyawan
-//   RETURN_OVERDUE       batas pengembalian terlewati       → karyawan + OWNER
+//   RETURN_OVERDUE       batas pengembalian terlewati       → karyawan
 //                        (sisa masuk daftar Potong Gaji)
+//
+// Hemat kuota WhatsApp: Owner & Finance TIDAK dikirimi WhatsApp; yang lewat
+// batas masuk ringkasan email harian mereka (features/digest, membaca
+// reminder_logs). Pengingat untuk karyawan yang sama di satu jalannya cron
+// digabung menjadi SATU pesan.
 //
 // "Sistem yang menagih, bukan Owner": pengingat dikirim otomatis agar Owner
 // tidak perlu menagih secara manual.
@@ -19,19 +24,17 @@
 // Status "lewat batas" sendiri tidak bergantung pada cron: halaman selalu
 // menghitungnya dari tanggal. Cron HANYA mengirim pengingat.
 //
-// Multi-tenant: satu cron untuk semua company. Pengingat ke Owner dikirim ke
-// Owner company pemilik uang muka itu saja; company nonaktif dilewati.
+// Multi-tenant: satu cron untuk semua company; company nonaktif dilewati.
 
 import "server-only";
 import { and, eq, inArray, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AWAITING_RECEIPT_STATUSES } from "@/features/advances/constants";
-import { getOwnerContacts, type Contact } from "@/features/advances/queries";
 import { db } from "@/lib/db";
 import { advanceLedgerEntries, advanceRequests, companies, reminderLogs, settlements, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { sendWhatsApp } from "@/lib/whatsapp";
-import { reminderText, type ReminderAudience } from "./notifications";
+import { combinedReminderText, reminderText } from "./notifications";
 
 export const REMINDER_KINDS = [
   "SETTLEMENT_DUE_SOON",
@@ -61,23 +64,9 @@ const tz = env.APP_TIMEZONE;
 // "Besok" menurut tanggal kalender zona waktu perusahaan (WIB), bukan UTC server.
 const tomorrow = sql`((now() at time zone ${tz})::date + 1)`;
 
-const AUDIENCE: Record<ReminderKind, ReminderAudience[]> = {
-  SETTLEMENT_DUE_SOON: ["employee"],
-  SETTLEMENT_OVERDUE: ["employee", "owner"],
-  RETURN_DUE_SOON: ["employee"],
-  RETURN_OVERDUE: ["employee", "owner"],
-};
+type Pending = { kind: ReminderKind; candidate: ReminderCandidate; link: string; logId: string };
 
 export async function runReminders() {
-  // Owner per company, dibaca sekali per company per jalannya cron.
-  const ownersByCompany = new Map<string, Contact[]>();
-  const ownersOf = async (companyId: string) => {
-    const cached = ownersByCompany.get(companyId);
-    if (cached) return cached;
-    const owners = await getOwnerContacts(companyId, []);
-    ownersByCompany.set(companyId, owners);
-    return owners;
-  };
   const summary: Record<ReminderKind, number> = {
     SETTLEMENT_DUE_SOON: 0,
     SETTLEMENT_OVERDUE: 0,
@@ -85,37 +74,41 @@ export async function runReminders() {
     RETURN_OVERDUE: 0,
   };
 
+  // Kumpulkan dulu semua pengingat per nomor karyawan, lalu kirim satu pesan per orang.
+  const byPhone = new Map<string, Pending[]>();
   for (const kind of REMINDER_KINDS) {
     for (const candidate of await listCandidates(kind)) {
-      // Catat dulu; bila sudah ada (pernah dikirim), lewati.
+      // Catat dulu; bila sudah ada (pernah dikirim), lewati. Karyawan tanpa
+      // nomor WhatsApp tetap dicatat agar Owner melihatnya di ringkasan email.
       const [log] = await db
         .insert(reminderLogs)
         .values({ advanceId: candidate.advanceId, kind })
         .onConflictDoNothing()
         .returning({ id: reminderLogs.id });
-      if (!log) continue;
+      if (!log || !candidate.recipientPhone) continue;
 
       const link = new URL(
         candidate.settlementId ? `/settlements/${candidate.settlementId}` : `/advances/${candidate.advanceId}`,
         env.NEXT_PUBLIC_APP_URL,
       ).toString();
-      const owners = AUDIENCE[kind].includes("owner") ? await ownersOf(candidate.companyId) : [];
-      const messages = AUDIENCE[kind].flatMap((audience) =>
-        audience === "employee"
-          ? candidate.recipientPhone
-            ? [{ to: candidate.recipientPhone, text: reminderText(kind, audience, candidate, candidate.recipientName, link) }]
-            : []
-          : owners
-              .filter((owner) => owner.phoneNumber)
-              .map((owner) => ({ to: owner.phoneNumber!, text: reminderText(kind, audience, candidate, owner.fullName, link) })),
-      );
+      byPhone.set(candidate.recipientPhone, [
+        ...(byPhone.get(candidate.recipientPhone) ?? []),
+        { kind, candidate, link, logId: log.id },
+      ]);
+    }
+  }
 
-      const results = await Promise.allSettled(messages.map((message) => sendWhatsApp(message)));
-      const sent = results.some((result) => result.status === "fulfilled" && result.value);
-      if (sent) summary[kind] += 1;
-      // Semua gagal terkirim → hapus catatan agar dicoba lagi di jadwal berikutnya.
-      // (Tanpa nomor WhatsApp sama sekali: tidak dicoba ulang.)
-      else if (messages.length > 0) await db.delete(reminderLogs).where(eq(reminderLogs.id, log.id));
+  for (const [phone, items] of byPhone) {
+    const name = items[0].candidate.recipientName;
+    const text =
+      items.length === 1
+        ? reminderText(items[0].kind, items[0].candidate, name, items[0].link)
+        : combinedReminderText(items, name);
+    if (await sendWhatsApp({ to: phone, text })) {
+      for (const item of items) summary[item.kind] += 1;
+    } else {
+      // Gagal terkirim → hapus catatan agar dicoba lagi di jadwal berikutnya.
+      await db.delete(reminderLogs).where(inArray(reminderLogs.id, items.map((item) => item.logId)));
     }
   }
   return summary;
