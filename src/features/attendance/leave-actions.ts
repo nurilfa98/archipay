@@ -451,7 +451,7 @@ function summaryOf(request: RequestRow, typeName: string): LeaveSummary {
 export async function cancelLeave(requestId: string, fromDateInput?: string): Promise<ActionResult> {
   const actor = await verifySession();
   const id = idSchema.safeParse(requestId);
-  if (!id.success) return NOT_FOUND;
+  if (!id.success || !actor.company.attendance) return NOT_FOUND;
   const request = await getLeaveRequest(actor.company.id, id.data);
   if (!request || request.userId !== actor.id || !["PENDING", "APPROVED"].includes(request.status)) return NOT_FOUND;
 
@@ -522,9 +522,10 @@ export async function cancelLeave(requestId: string, fromDateInput?: string): Pr
 // Pengaturan (Owner)
 // ---------------------------------------------------------------------------
 
+// Pengaturan absensi/cuti hanya bisa diubah selama add-on Absensi aktif.
 async function getSettingsManager() {
   const actor = await verifySession();
-  return can(actor, "settings:manage") ? actor : null;
+  return can(actor, "settings:manage") && actor.company.attendance ? actor : null;
 }
 
 export async function updateLeaveSettings(

@@ -33,7 +33,8 @@ import { accessLabel } from "@/features/companies/components/company-card";
 import { CompanyPricingForm, DirectPaymentAction } from "@/features/subscriptions/components/company-subscription-forms";
 import { InvoiceCard } from "@/features/subscriptions/components/invoice-card";
 import { minPlanUsers } from "@/features/subscriptions/pricing";
-import { getCompanyPricing, listSubscriptions } from "@/features/subscriptions/queries";
+import { getAddonCoverage, getCompanyPricing, listSubscriptions } from "@/features/subscriptions/queries";
+import { ADDON_KEYS, ADDON_LABELS, isTrialOnly } from "@/lib/addons";
 import { companyIdSchema } from "@/features/companies/schemas";
 import { StatusBadge } from "@/features/users/components/users-table";
 import { requirePlatformAdmin } from "@/lib/auth/dal";
@@ -68,9 +69,10 @@ async function CompanyDetailContent({ id }: { id: string }) {
   const company = parsedId.success ? await getCompany(parsedId.data) : null;
   if (!company) notFound();
   const status = companyStatusOf(company);
-  const [pricing, invoices] = await Promise.all([
+  const [pricing, invoices, addons] = await Promise.all([
     getCompanyPricing(company.id),
     listSubscriptions({ companyId: company.id, limit: 24 }),
+    getAddonCoverage(company.id),
   ]);
 
   return (
@@ -106,6 +108,14 @@ async function CompanyDetailContent({ id }: { id: string }) {
           <CardTitle>Langganan</CardTitle>
           <CardDescription>
             {accessLabel(company, status)} · {company.userCount} dari {company.userLimit} pengguna aktif
+            {ADDON_KEYS.map((key) => {
+              const coverage = addons?.[key];
+              const text =
+                coverage?.active && coverage.until
+                  ? `aktif s.d. ${formatDate(coverage.until)}${isTrialOnly(coverage) ? " (masa gratis)" : ""}`
+                  : "tidak aktif";
+              return <span key={key}>{` · Add-on ${ADDON_LABELS[key]} ${text}`}</span>;
+            })}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-6">
@@ -119,6 +129,7 @@ async function CompanyDetailContent({ id }: { id: string }) {
                 companyId={company.id}
                 pricing={pricing.pricing}
                 minUsers={minPlanUsers(pricing.pricing, company.userCount)}
+                defaultAddons={company.addons}
               />
             </div>
           </div>

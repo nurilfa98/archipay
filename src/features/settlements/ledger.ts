@@ -18,6 +18,8 @@ import { advanceLedgerEntries, advanceRequests } from "@/lib/db/schema";
 import { getClientIp } from "@/lib/request";
 import type { LedgerEntryType } from "./constants";
 
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
 type BalanceEntryType = Extract<LedgerEntryType, "RETURN" | "PAYROLL_DEDUCTION" | "REIMBURSEMENT">;
 
 export type BalanceEntryResult =
@@ -36,6 +38,9 @@ export async function postBalanceEntry(input: {
   payrollPeriod?: string | null;
   note: string | null;
   audit: AuditAction;
+  // Dijalankan di transaksi yang sama setelah tercatat (mis. menandai baris
+  // slip gaji tercatat, features/salaries/run-actions.ts).
+  onPosted?: (tx: Transaction) => Promise<void>;
 }): Promise<BalanceEntryResult> {
   const expectedStatus = input.type === "REIMBURSEMENT" ? "REIMBURSE_PENDING" : "RETURN_PENDING";
   const ip = await getClientIp();
@@ -94,6 +99,7 @@ export async function postBalanceEntry(input: {
       },
       tx,
     );
+    await input.onPosted?.(tx);
     return { ok: true, amount: input.amount, remaining, closed: remaining === 0 } as const;
   });
 }

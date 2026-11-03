@@ -1,19 +1,22 @@
-// Menu Langganan (Owner): pilih jumlah pengguna + paket (harga dihitung
-// otomatis, pricing.ts) atau tambah kuota pengguna → panel pembayaran
-// (rekening & QRIS) → form "Saya sudah bayar" + bukti. Memilih paket TIDAK menyimpan apa pun;
-// tagihan baru tercatat saat bukti dikirim (BUSINESS-FLOW §17).
+// Menu Langganan (Owner): pilih jumlah pengguna + add-on + paket (harga
+// dihitung otomatis, pricing.ts), tambah kuota pengguna, atau aktifkan add-on
+// di tengah periode → panel pembayaran (rekening & QRIS) → form "Saya sudah
+// bayar" + bukti. Memilih paket TIDAK menyimpan apa pun; tagihan baru tercatat
+// saat bukti dikirim (BUSINESS-FLOW §17).
 //
 // Client Component: data paket, rekening, dan teks tanggal sudah disiapkan
 // server (app/(app)/subscription/page.tsx).
 
 "use client";
 
-import { ArrowLeftIcon, CheckIcon, LoaderCircleIcon, MinusIcon, PlusIcon, SendIcon, UsersIcon } from "lucide-react";
+import { ArrowLeftIcon, CheckIcon, LoaderCircleIcon, MinusIcon, PlusIcon, PuzzleIcon, SendIcon, UsersIcon } from "lucide-react";
 import { useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { compressImage } from "@/features/settlements/compress-image";
+import { ADDON_DESCRIPTIONS, ADDON_KEYS, ADDON_LABELS, addonKeysOf, type AddonFlags, type AddonKey } from "@/lib/addons";
 import { bankAccentClass, formatAccountNumber } from "@/lib/bank";
 import { formatRupiah } from "@/lib/format";
 import { notify } from "@/lib/notify";
@@ -21,7 +24,7 @@ import { cn } from "@/lib/utils";
 import type { ActionResult } from "@/types/action-result";
 import { claimSubscriptionPaid } from "../actions";
 import { PLAN_LABELS, PLAN_MONTHS, PROOF_MAX_BYTES, type PlanMonths } from "../constants";
-import { discountOf, MAX_USERS, planPrice, topupPrice, type Pricing } from "../pricing";
+import { addonPrice, discountOf, MAX_USERS, planPrice, topupPrice, type Pricing } from "../pricing";
 import type { BankAccount } from "../queries";
 
 type PaymentInfo = { banks: BankAccount[]; hasQris: boolean };
@@ -30,15 +33,19 @@ export function PlanPicker({
   pricing,
   minUsers,
   defaultUsers,
+  defaultAddons,
   payment,
 }: {
   pricing: Pricing;
   minUsers: number; // termasuk harga dasar / pengguna aktif saat ini
   defaultUsers: number;
+  defaultAddons: AddonFlags; // tercentang bila add-on itu sedang aktif
   payment: PaymentInfo;
 }) {
   const [selected, setSelected] = useState<PlanMonths | null>(null);
   const [userCount, setUserCount] = useState(Math.max(defaultUsers, minUsers));
+  const [addons, setAddons] = useState<AddonFlags>(defaultAddons);
+  const chosen = addonKeysOf(addons);
 
   if (selected) {
     return (
@@ -50,10 +57,15 @@ export function PlanPicker({
           </Button>
         </div>
         <PaymentPanel
-          title={`Paket ${PLAN_LABELS[selected]} · ${userCount} pengguna`}
-          amount={planPrice(pricing, selected, userCount)}
+          title={`Paket ${PLAN_LABELS[selected]} · ${userCount} pengguna${chosen.map((key) => ` + ${ADDON_LABELS[key]}`).join("")}`}
+          amount={planPrice(pricing, selected, userCount, chosen)}
           payment={payment}
-          hidden={{ kind: "PLAN", months: String(selected), users: String(userCount) }}
+          hidden={{
+            kind: "PLAN",
+            months: String(selected),
+            users: String(userCount),
+            ...Object.fromEntries(ADDON_KEYS.map((key) => [key, addons[key] ? "1" : "0"])),
+          }}
           onDone={() => setSelected(null)}
         />
       </div>
@@ -78,9 +90,21 @@ export function PlanPicker({
         onChange={setUserCount}
         description={`Owner, Finance, dan Karyawan yang aktif. Minimal ${minUsers}. Harga dasar sudah termasuk ${pricing.includedUsers} pengguna, tambahan ${formatRupiah(pricing.extraUserPrice)}/pengguna/bulan.`}
       />
+      <div className="grid gap-3 sm:grid-cols-2">
+        {ADDON_KEYS.map((key) => (
+          <AddonField
+            key={key}
+            addon={key}
+            checked={addons[key]}
+            onCheckedChange={(checked) => setAddons((current) => ({ ...current, [key]: checked }))}
+            pricing={pricing}
+            users={userCount}
+          />
+        ))}
+      </div>
       <div className="grid gap-4 sm:grid-cols-3">
         {PLAN_MONTHS.map((months) => {
-          const total = planPrice(pricing, months, userCount);
+          const total = planPrice(pricing, months, userCount, chosen);
           const discount = discountOf(pricing, months);
           return (
             <button
@@ -116,6 +140,12 @@ export function PlanPicker({
                   {userCount > pricing.includedUsers &&
                     ` + ${userCount - pricing.includedUsers} × ${formatRupiah(pricing.extraUserPrice)}/bulan`}
                 </li>
+                {chosen.map((key) => (
+                  <li key={key} className="flex items-center gap-1.5">
+                    <PuzzleIcon className="size-3.5" />
+                    {ADDON_LABELS[key]} {userCount} × {formatRupiah(pricing.addonUserPrices[key])}/bulan
+                  </li>
+                ))}
               </ul>
               <span className="mt-auto inline-flex items-center gap-1.5 text-sm font-medium text-brand">
                 <CheckIcon className="size-4" />
@@ -134,17 +164,25 @@ export function PlanPicker({
 export function TopupPicker({
   pricing,
   daysLeft,
+  addonDays,
   untilLabel,
   payment,
 }: {
   pricing: Pricing;
   daysLeft: number;
+  addonDays: Record<AddonKey, number>; // sisa hari add-on yang sudah dibayar (0 = tidak aktif)
   untilLabel: string;
   payment: PaymentInfo;
 }) {
   const [extra, setExtra] = useState(5);
   const [confirmed, setConfirmed] = useState(false);
-  const price = topupPrice(pricing, extra, daysLeft);
+  const price = topupPrice(pricing, extra, daysLeft, addonDays);
+  const addonText = ADDON_KEYS.filter((key) => addonDays[key] > 0)
+    .map(
+      (key) =>
+        ` Ditambah ${ADDON_LABELS[key]} ${formatRupiah(pricing.addonUserPrices[key])}/pengguna/bulan × sisa ${addonDays[key]} hari.`,
+    )
+    .join("");
 
   if (pricing.extraUserPrice <= 0) {
     return <p className="text-sm text-muted-foreground">Hubungi admin ArchiPay untuk menambah kuota pengguna.</p>;
@@ -178,7 +216,7 @@ export function TopupPicker({
         value={extra}
         min={1}
         onChange={setExtra}
-        description={`${formatRupiah(pricing.extraUserPrice)}/pengguna/bulan × sisa ${daysLeft} hari (s.d. ${untilLabel}).`}
+        description={`${formatRupiah(pricing.extraUserPrice)}/pengguna/bulan × sisa ${daysLeft} hari (s.d. ${untilLabel}).${addonText}`}
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-2xl font-semibold tabular-nums">{formatRupiah(price)}</p>
@@ -187,6 +225,103 @@ export function TopupPicker({
         </Button>
       </div>
     </div>
+  );
+}
+
+// Aktifkan satu add-on di tengah masa langganan aktif: semua pengguna paket
+// (batas pengguna saat ini) × harga add-on × sisa hari / 30. Setelah lunas,
+// menunya terbuka sampai akhir periode.
+export function AddonPicker({
+  addon,
+  pricing,
+  users,
+  days,
+  untilLabel,
+  payment,
+}: {
+  addon: AddonKey;
+  pricing: Pricing;
+  users: number;
+  days: number;
+  untilLabel: string;
+  payment: PaymentInfo;
+}) {
+  const [confirmed, setConfirmed] = useState(false);
+  const price = addonPrice(pricing, addon, users, days);
+  const label = ADDON_LABELS[addon];
+
+  if (price <= 0) {
+    return <p className="text-sm text-muted-foreground">Hubungi admin ArchiPay untuk mengaktifkan add-on {label}.</p>;
+  }
+
+  if (confirmed) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div>
+          <Button variant="ghost" size="sm" onClick={() => setConfirmed(false)}>
+            <ArrowLeftIcon />
+            Batal
+          </Button>
+        </div>
+        <PaymentPanel
+          title={`Add-on ${label} · ${users} pengguna s.d. ${untilLabel}`}
+          amount={price}
+          payment={payment}
+          hidden={{ kind: "ADDON", addon }}
+          onDone={() => setConfirmed(false)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
+      <div className="flex flex-col gap-1 text-sm">
+        <p className="font-medium">Add-on {label}</p>
+        <p className="text-muted-foreground">{ADDON_DESCRIPTIONS[addon]}</p>
+        <p className="text-muted-foreground">
+          {users} pengguna × {formatRupiah(pricing.addonUserPrices[addon])}/pengguna/bulan × sisa {days} hari (s.d.{" "}
+          {untilLabel}).
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-2xl font-semibold tabular-nums">{formatRupiah(price)}</p>
+        <Button variant="brand" onClick={() => setConfirmed(true)}>
+          Lanjut bayar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function AddonField({
+  addon,
+  checked,
+  onCheckedChange,
+  pricing,
+  users,
+}: {
+  addon: AddonKey;
+  checked: boolean;
+  onCheckedChange: (checked: boolean) => void;
+  pricing: Pricing;
+  users: number;
+}) {
+  const id = `plan-addon-${addon}`;
+  const price = pricing.addonUserPrices[addon];
+  return (
+    <Field orientation="horizontal" className="rounded-lg border p-3">
+      <Checkbox id={id} checked={checked} onCheckedChange={(value) => onCheckedChange(value === true)} />
+      <div className="flex flex-col gap-0.5">
+        <FieldLabel htmlFor={id}>
+          Add-on {ADDON_LABELS[addon]} (+{formatRupiah(price)}/pengguna/bulan)
+        </FieldLabel>
+        <FieldDescription>
+          {ADDON_DESCRIPTIONS[addon]} Untuk {users} pengguna: +{formatRupiah(users * price)}/bulan sebelum diskon. Tanpa
+          add-on, menunya disembunyikan; datanya tetap tersimpan.
+        </FieldDescription>
+      </div>
+    </Field>
   );
 }
 

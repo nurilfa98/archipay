@@ -1,6 +1,7 @@
 // Skema validasi fitur langganan: input dari browser wajib divalidasi ulang.
 
 import { z } from "zod";
+import { ADDON_KEYS } from "@/lib/addons";
 import { normalizeIndonesianPhone } from "@/lib/phone";
 import { PLAN_MONTHS, type PlanMonths } from "./constants";
 import { MAX_USERS } from "./pricing";
@@ -49,15 +50,26 @@ const userCount = (label: string) =>
     .min(1, `${label} minimal 1`)
     .max(MAX_USERS, `${label} maksimal ${MAX_USERS}`);
 
+// Centang add-on dari form ("1" = dipilih; kosong/"0" = tidak). Nama field =
+// kunci add-on (lib/addons.ts).
+const addonFlag = z
+  .enum(["0", "1"])
+  .optional()
+  .transform((value) => value === "1");
+
 // Owner menekan "Saya sudah bayar", salah satu dari:
-// - paket baru: months + users (jumlah pengguna yang dibeli)
+// - paket baru: months + users (jumlah pengguna yang dibeli) + centang add-on
 // - tambah kuota: kind TOPUP + users (tambahan pengguna)
+// - add-on di tengah periode: kind ADDON + addon (pengguna = batas saat ini)
 // - melengkapi kurang bayar: subscriptionId
 // Bukti (file) divalidasi di action; harga selalu dihitung ulang di server.
 export const claimPaymentSchema = z.object({
-  kind: z.enum(["PLAN", "TOPUP"]).default("PLAN"),
+  kind: z.enum(["PLAN", "TOPUP", "ADDON"]).default("PLAN"),
   months: planMonthsSchema.optional(),
   users: userCount("Jumlah pengguna").optional(),
+  attendance: addonFlag,
+  payroll: addonFlag,
+  addon: z.enum(ADDON_KEYS).optional(),
   subscriptionId: idSchema.optional(),
   note,
 });
@@ -78,6 +90,8 @@ export const directPaymentSchema = z.object({
   companyId: idSchema,
   months: planMonthsSchema,
   users: userCount("Jumlah pengguna"),
+  attendance: addonFlag,
+  payroll: addonFlag,
   note,
 });
 
@@ -96,6 +110,8 @@ export const pricingSchema = z.object({
   extraUserPrice: rupiah("Harga per pengguna tambahan"),
   discount6: percent("Diskon 6 bulan"),
   discount12: percent("Diskon 1 tahun"),
+  attendanceUserPrice: rupiah("Harga add-on Absensi"),
+  payrollUserPrice: rupiah("Harga add-on Penggajian"),
 });
 
 // Harga khusus satu company; kosong = ikut standar.

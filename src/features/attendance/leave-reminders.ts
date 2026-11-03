@@ -7,6 +7,7 @@
 
 import "server-only";
 import { and, eq, inArray, isNull, lte } from "drizzle-orm";
+import { addonActiveSql } from "@/lib/addons-db";
 import { db } from "@/lib/db";
 import { companies, companySettings, leaveRequests, leaveTypes, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
@@ -41,6 +42,7 @@ export async function notifyDelegatedLeaves(now = new Date()) {
         isNull(leaveRequests.delegateNotifiedAt),
         eq(companySettings.leaveDelegationEnabled, true),
         eq(companies.isActive, true),
+        addonActiveSql(db, "attendance"), // add-on Absensi aktif
         lte(leaveRequests.createdAt, now),
       ),
     );

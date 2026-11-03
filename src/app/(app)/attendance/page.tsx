@@ -36,7 +36,7 @@ import {
   listMyRecords,
 } from "@/features/attendance/queries";
 import { formatMinutes, formatWorkDays } from "@/features/attendance/schedule";
-import { verifySession } from "@/lib/auth/dal";
+import { requireAttendanceAddon } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { formatDateTime, zonedDateString } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
@@ -57,7 +57,7 @@ export default function AttendancePage() {
 }
 
 async function AttendanceContent() {
-  const user = await verifySession();
+  const user = await requireAttendanceAddon();
   const checksIn = can(user, "attendance:check-in");
   const viewsAll = can(user, "attendance:view-all");
   if (!checksIn && !viewsAll) {

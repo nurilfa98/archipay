@@ -9,6 +9,8 @@ import "server-only";
 import { and, asc, count, eq, inArray, not, sql } from "drizzle-orm";
 import { io } from "next/cache";
 import { hasPaidSubscription } from "@/features/subscriptions/queries";
+import type { AddonFlags } from "@/lib/addons";
+import { addonFlagColumns } from "@/lib/addons-db";
 import { db } from "@/lib/db";
 import { companies, projects, roles, userRoles, users } from "@/lib/db/schema";
 import { getPlatformSettings } from "@/lib/platform-settings";
@@ -31,6 +33,7 @@ export type CompanyListItem = {
   userCount: number; // pengguna aktif
   projectCount: number;
   userLimit: number; // batas pengguna aktif paket
+  addons: AddonFlags; // add-on yang aktif (lib/addons.ts)
   owners: CompanyOwner[];
   // Masa gratis/langganan (lib/subscription-access.ts).
   access: CompanyAccess;
@@ -68,6 +71,7 @@ const listColumns = {
   userCount,
   projectCount,
   userLimit: companies.userLimit,
+  addons: addonFlagColumns(db),
   subscriptionUntil: companies.subscriptionUntil,
   hasPaid: hasPaidSubscription(),
 };

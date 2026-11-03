@@ -6,10 +6,12 @@
 
 import { ReceiptIcon } from "lucide-react";
 import { useState } from "react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ActionDialog } from "@/features/advances/components/action-dialog";
+import { ADDON_KEYS, ADDON_LABELS, addonKeysOf, type AddonFlags } from "@/lib/addons";
 import { formatRupiah } from "@/lib/format";
 import { recordDirectPayment, saveCompanyPricing } from "../actions";
 import { PLAN_LABELS, PLAN_MONTHS, type PlanMonths } from "../constants";
@@ -73,7 +75,8 @@ export function CompanyPricingForm({ companyId, pricing }: { companyId: string; 
             placeholder="Misal: negosiasi 12 Nov 2026"
           />
           <FieldDescription>
-            Kosongkan isian untuk memakai harga standar. Diskon 6 bulan & 1 tahun selalu mengikuti standar.
+            Kosongkan isian untuk memakai harga standar. Diskon 6 bulan & 1 tahun serta harga add-on Absensi selalu
+            mengikuti standar.
           </FieldDescription>
           <FieldError>{fieldError("note")}</FieldError>
         </Field>
@@ -89,13 +92,17 @@ export function DirectPaymentAction({
   companyId,
   pricing,
   minUsers,
+  defaultAddons,
 }: {
   companyId: string;
   pricing: Pricing;
   minUsers: number;
+  defaultAddons: AddonFlags; // tercentang bila add-on itu sedang aktif di company ini
 }) {
   const [months, setMonths] = useState<PlanMonths>(12);
   const [userCount, setUserCount] = useState(minUsers);
+  const [addons, setAddons] = useState<AddonFlags>(defaultAddons);
+  const chosen = addonKeysOf(addons);
 
   if (pricing.basePrice <= 0) {
     return <p className="text-sm text-muted-foreground">Atur harga dasar paket di Pengaturan platform terlebih dahulu.</p>;
@@ -109,7 +116,7 @@ export function DirectPaymentAction({
       variant="outline"
       title="Catat pembayaran langsung?"
       description="Untuk pembayaran tunai/transfer yang sudah Anda terima sendiri. Tagihan langsung lunas, masa aktif diperpanjang, dan batas pengguna mengikuti jumlah di bawah."
-      confirmLabel={`Catat lunas ${formatRupiah(planPrice(pricing, months, userCount))}`}
+      confirmLabel={`Catat lunas ${formatRupiah(planPrice(pricing, months, userCount, chosen))}`}
       successMessage="Pembayaran tercatat, masa aktif diperpanjang."
       onConfirm={(formData) => recordDirectPayment(undefined, formData)}
     >
@@ -136,6 +143,20 @@ export function DirectPaymentAction({
             <FieldDescription>Minimal {minUsers} (termasuk harga dasar / pengguna aktif saat ini).</FieldDescription>
             <FieldError>{fieldError("users")}</FieldError>
           </Field>
+          {ADDON_KEYS.map((key) => (
+            <Field key={key} orientation="horizontal" className="rounded-lg border p-3">
+              <Checkbox
+                id={`direct-${key}`}
+                name={key}
+                value="1"
+                checked={addons[key]}
+                onCheckedChange={(value) => setAddons((current) => ({ ...current, [key]: value === true }))}
+              />
+              <FieldLabel htmlFor={`direct-${key}`} className="font-normal">
+                Termasuk add-on {ADDON_LABELS[key]} (+{formatRupiah(pricing.addonUserPrices[key])}/pengguna/bulan)
+              </FieldLabel>
+            </Field>
+          ))}
           <FieldSet>
             <FieldLegend variant="label">Paket yang dibayar</FieldLegend>
             <RadioGroup
@@ -150,7 +171,7 @@ export function DirectPaymentAction({
                   <FieldLabel htmlFor={`direct-${option}`} className="flex w-full justify-between font-normal">
                     <span className="font-medium">{PLAN_LABELS[option]}</span>
                     <span className="text-muted-foreground tabular-nums">
-                      {formatRupiah(planPrice(pricing, option, userCount))}
+                      {formatRupiah(planPrice(pricing, option, userCount, chosen))}
                     </span>
                   </FieldLabel>
                 </Field>

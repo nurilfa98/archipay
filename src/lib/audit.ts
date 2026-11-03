@@ -85,7 +85,17 @@ export type AuditAction =
   | "PENALTY_DEDUCTED"
   | "ATTENDANCE_CORRECTED"
   | "ATTENDANCE_PERIOD_LOCKED"
-  | "ATTENDANCE_PERIOD_UNLOCKED";
+  | "ATTENDANCE_PERIOD_UNLOCKED"
+  // Penggajian (BUSINESS-FLOW §20): tanpa nominal, karena Superadmin bisa
+  // membuka audit log tetapi tidak boleh melihat data gaji.
+  | "PAYROLL_SETTINGS_UPDATED"
+  | "SALARY_PROFILE_SAVED"
+  | "SALARY_PROFILE_DELETED"
+  | "PAYROLL_RUN_CREATED"
+  | "PAYROLL_RECALCULATED"
+  | "PAYSLIP_LINE_CHANGED"
+  | "PAYROLL_FINALIZED"
+  | "PAYROLL_REOPENED";
 
 type AuditEntry = {
   // Company tempat kejadian (halaman Audit Log menyaring per company).

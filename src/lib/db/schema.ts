@@ -267,6 +267,15 @@ export const companySettings = pgTable(
     // setelah sekian jam (§19.4).
     leaveDelegationEnabled: boolean("leave_delegation_enabled").notNull().default(true),
     leaveDelegationHours: integer("leave_delegation_hours").notNull().default(24),
+    // --- Penggajian (add-on, BUSINESS-FLOW §20.2) ---
+    // Potong otomatis tidak hadir & cuti/izin tidak dibayar (butuh add-on Absensi).
+    payrollAbsenceDeduction: boolean("payroll_absence_deduction").notNull().default(false),
+    // Tarif per hari: WORKING_DAYS (dasar ÷ hari kerja bulan itu), FIXED_DIVISOR
+    // (dasar ÷ payroll_daily_divisor), FIXED_AMOUNT (salary_profiles.daily_rate).
+    payrollDailyRateMethod: varchar("payroll_daily_rate_method", { length: 20 }).notNull().default("WORKING_DAYS"),
+    payrollDailyDivisor: smallint("payroll_daily_divisor").notNull().default(26),
+    // Dasar tarif: BASE (gaji pokok) atau BASE_ALLOWANCES (+ tunjangan tetap bulanan).
+    payrollDeductionBase: varchar("payroll_deduction_base", { length: 20 }).notNull().default("BASE"),
     updatedAt: timestamptz("updated_at")
       .notNull()
       .defaultNow()
@@ -287,6 +296,12 @@ export const companySettings = pgTable(
     check("company_settings_work_days", sql`${t.workDays} between 1 and 127`),
     check("company_settings_leave_quota", sql`${t.annualLeaveQuota} between 0 and 60`),
     check("company_settings_leave_delegation", sql`${t.leaveDelegationHours} between 1 and 168`),
+    check(
+      "company_settings_payroll_method",
+      sql`${t.payrollDailyRateMethod} IN ('WORKING_DAYS', 'FIXED_DIVISOR', 'FIXED_AMOUNT')`,
+    ),
+    check("company_settings_payroll_divisor", sql`${t.payrollDailyDivisor} between 1 and 31`),
+    check("company_settings_payroll_base", sql`${t.payrollDeductionBase} IN ('BASE', 'BASE_ALLOWANCES')`),
   ],
 );
 
@@ -656,6 +671,10 @@ export const platformSettings = pgTable(
     // Ambang kecocokan wajah absen terhadap foto acuan, 0–100 (= skor
     // similarity @vladmandic/human × 100). Di bawah ini absen ditolak.
     faceMatchThreshold: integer("face_match_threshold").notNull().default(50),
+    // Harga add-on per pengguna per bulan (lib/addons.ts): dikalikan jumlah
+    // pengguna paket; diskon 6/12 bulan ikut berlaku.
+    attendanceUserPrice: rupiah("attendance_user_price").notNull().default(5000),
+    payrollUserPrice: rupiah("payroll_user_price").notNull().default(5000),
     updatedAt: timestamptz("updated_at")
       .notNull()
       .defaultNow()
@@ -674,6 +693,8 @@ export const platformSettings = pgTable(
       sql`${t.attendanceSelfieRetentionMonths} BETWEEN 1 AND 24`,
     ),
     check("platform_settings_face_threshold_check", sql`${t.faceMatchThreshold} BETWEEN 30 AND 95`),
+    check("platform_settings_attendance_price_check", sql`${t.attendanceUserPrice} >= 0`),
+    check("platform_settings_payroll_price_check", sql`${t.payrollUserPrice} >= 0`),
   ],
 );
 
@@ -717,6 +738,13 @@ export const paymentBankAccounts = pgTable("payment_bank_accounts", {
 //          diperpanjang & batas pengguna company = `users`.
 // - TOPUP: tambah `users` pengguna untuk sisa masa aktif (prorata), tanpa
 //          `months`; lunas → batas pengguna company bertambah `users`.
+// - ADDON: mengaktifkan satu add-on di tengah periode untuk `users`
+//          (batas pengguna saat itu), prorata, tanpa `months`; lunas → periode
+//          (starts_at–ends_at) terisi dan add-on itu aktif selama periode itu.
+// `attendance` / `payroll` = tagihan ini termasuk add-on Absensi / Penggajian
+// (lib/addons.ts; nama kolom = kunci add-on): pada PLAN/ADDON yang lunas,
+// periodenya menentukan kapan add-on aktif (ADDON hanya memuat satu add-on);
+// pada TOPUP hanya berarti harganya ikut menghitung add-on untuk pengguna tambahan.
 // Harga = SNAPSHOT saat tagihan dibuat. Baris baru tercipta saat Owner menekan "Saya sudah bayar"
 // (langsung CLAIMED) atau Superadmin mencatat pembayaran langsung (ACTIVE);
 // memilih paket saja tidak menyimpan apa pun.
@@ -733,6 +761,8 @@ export const subscriptions = pgTable(
     months: smallint("months"),
     users: integer("users").notNull(),
     price: rupiah("price").notNull(),
+    attendance: boolean("attendance").notNull().default(false),
+    payroll: boolean("payroll").notNull().default(false),
     status: varchar("status", { length: 20 }).notNull(),
     // Periode terisi saat lunas: mulai dari akhir langganan yang sedang
     // berjalan (bila masih di masa depan) atau saat lunas.
@@ -763,7 +793,7 @@ export const subscriptions = pgTable(
     check("subscriptions_status_check", sql`${t.status} IN ('CLAIMED', 'UNDERPAID', 'ACTIVE', 'REJECTED')`),
     check(
       "subscriptions_kind_check",
-      sql`(${t.kind} = 'PLAN' AND ${t.months} IN (1, 6, 12)) OR (${t.kind} = 'TOPUP' AND ${t.months} IS NULL)`,
+      sql`(${t.kind} = 'PLAN' AND ${t.months} IN (1, 6, 12)) OR (${t.kind} IN ('TOPUP', 'ADDON') AND ${t.months} IS NULL)`,
     ),
     check("subscriptions_users_check", sql`${t.users} > 0`),
   ],
@@ -1117,4 +1147,162 @@ export const attendancePeriods = pgTable(
     lockedById: userRef("locked_by_id"),
   },
   (t) => [primaryKey({ columns: [t.companyId, t.period] })],
+);
+
+// ---------------------------------------------------------------------------
+// Penggajian (add-on, BUSINESS-FLOW §20). Data gaji rahasia: hanya Owner
+// (salary:manage); Superadmin tidak bisa melihat.
+// ---------------------------------------------------------------------------
+
+// Data gaji satu pengguna. Pengguna tanpa baris ini tidak ikut penggajian.
+export const salaryProfiles = pgTable(
+  "salary_profiles",
+  {
+    userId: varchar("user_id", { length: 36 })
+      .primaryKey()
+      .references(() => users.id),
+    companyId: companyRef(),
+    baseSalary: rupiah("base_salary").notNull(),
+    // Hanya untuk cara tarif FIXED_AMOUNT (company_settings.payroll_daily_rate_method).
+    dailyRate: rupiah("daily_rate"),
+    // Masa kerja (opsional): hari kerja di luar rentang ini dipotong prorata.
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    // true = ketidakhadiran karyawan ini tidak dipotong otomatis.
+    absenceExempt: boolean("absence_exempt").notNull().default(false),
+    updatedById: userRef("updated_by_id"),
+    createdAt: createdAt(),
+    updatedAt: timestamptz("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    index("salary_profiles_company_idx").on(t.companyId),
+    check("salary_profiles_amounts", sql`${t.baseSalary} >= 0 AND (${t.dailyRate} IS NULL OR ${t.dailyRate} >= 0)`),
+    check(
+      "salary_profiles_dates",
+      sql`${t.endDate} IS NULL OR ${t.startDate} IS NULL OR ${t.endDate} >= ${t.startDate}`,
+    ),
+  ],
+);
+
+// Tunjangan (ALLOWANCE: tetap bulanan, atau per hari hadir bila per_day) dan
+// potongan tetap (DEDUCTION, mis. BPJS/PPh 21 yang diisi manual) per pengguna.
+export const salaryComponents = pgTable(
+  "salary_components",
+  {
+    id: id(),
+    companyId: companyRef(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id),
+    type: varchar("type", { length: 10 }).notNull(),
+    name: varchar("name", { length: 60 }).notNull(),
+    amount: rupiah("amount").notNull(),
+    perDay: boolean("per_day").notNull().default(false),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("salary_components_user_idx").on(t.userId, t.sortOrder),
+    check("salary_components_type", sql`${t.type} IN ('ALLOWANCE', 'DEDUCTION')`),
+    check("salary_components_amount", sql`${t.amount} > 0`),
+    check("salary_components_per_day", sql`NOT ${t.perDay} OR ${t.type} = 'ALLOWANCE'`),
+  ],
+);
+
+// Penggajian satu bulan. DRAFT bisa diubah & dihitung ulang; FINALIZED =
+// terkunci, slip tampil ke karyawan. Buka kunci → DRAFT lagi (baris yang
+// sudah dicatat ke ledger/denda tetap tercatat).
+export const payrollRuns = pgTable(
+  "payroll_runs",
+  {
+    id: id(),
+    companyId: companyRef(),
+    period: varchar("period", { length: 7 }).notNull(), // "2026-11"
+    status: varchar("status", { length: 20 }).notNull().default("DRAFT"),
+    payDate: date("pay_date"),
+    // Terakhir dihitung (dibuat / Hitung ulang).
+    calculatedAt: timestamptz("calculated_at").notNull().defaultNow(),
+    finalizedAt: timestamptz("finalized_at"),
+    finalizedById: userRef("finalized_by_id"),
+    createdById: userRef("created_by_id").notNull(),
+    createdAt: createdAt(),
+    updatedAt: timestamptz("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [
+    uniqueIndex("payroll_runs_company_period_unique").on(t.companyId, t.period),
+    check("payroll_runs_status", sql`${t.status} IN ('DRAFT', 'FINALIZED')`),
+  ],
+);
+
+// Slip satu karyawan dalam satu penggajian. Nama & rekening disalin (snapshot)
+// agar slip lama tidak berubah bila data pengguna diubah. Total dihitung
+// ulang setiap baris berubah (features/salaries/payslip-math.ts).
+export const payslips = pgTable(
+  "payslips",
+  {
+    id: id(),
+    runId: varchar("run_id", { length: 36 })
+      .notNull()
+      .references(() => payrollRuns.id),
+    companyId: companyRef(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id),
+    fullName: varchar("full_name", { length: 100 }).notNull(),
+    bankName: varchar("bank_name", { length: 50 }),
+    bankAccountNumber: varchar("bank_account_number", { length: 50 }),
+    // Ringkasan hari (untuk dicetak). null = tidak ada data absensi.
+    workingDays: smallint("working_days").notNull().default(0),
+    presentDays: smallint("present_days"),
+    absentDays: smallint("absent_days"),
+    unpaidLeaveDays: smallint("unpaid_leave_days"),
+    dailyRate: rupiah("daily_rate"),
+    totalEarnings: rupiah("total_earnings").notNull().default(0),
+    totalDeductions: rupiah("total_deductions").notNull().default(0),
+    netPay: rupiah("net_pay").notNull().default(0),
+    createdAt: createdAt(),
+    updatedAt: timestamptz("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (t) => [uniqueIndex("payslips_run_user_unique").on(t.runId, t.userId), index("payslips_user_idx").on(t.userId)],
+);
+
+// Baris slip. `source` = asal baris (BUSINESS-FLOW §20.4):
+//   BASE, ALLOWANCE, ALLOWANCE_PER_DAY, FIXED_DEDUCTION, PRORATE, ABSENCE,
+//   ADVANCE (sisa uang muka; ref_id = settlement id), PENALTY (denda; ref_id =
+//   bulan absen "2026-10"), MANUAL (ditambah Owner).
+// Baris selain MANUAL disusun ulang saat "Hitung ulang", kecuali yang sudah
+// dicatat (`posted_at`: ledger potong gaji / denda ditandai dipotong).
+export const payslipLines = pgTable(
+  "payslip_lines",
+  {
+    id: id(),
+    payslipId: varchar("payslip_id", { length: 36 })
+      .notNull()
+      .references(() => payslips.id, { onDelete: "cascade" }),
+    companyId: companyRef(),
+    type: varchar("type", { length: 10 }).notNull(), // EARNING / DEDUCTION
+    source: varchar("source", { length: 20 }).notNull(),
+    label: varchar("label", { length: 150 }).notNull(),
+    amount: rupiah("amount").notNull(),
+    refId: varchar("ref_id", { length: 36 }),
+    // Nominal diubah Owner (baris otomatis).
+    edited: boolean("edited").notNull().default(false),
+    postedAt: timestamptz("posted_at"),
+    sortOrder: integer("sort_order").notNull().default(0),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("payslip_lines_payslip_idx").on(t.payslipId, t.sortOrder),
+    check("payslip_lines_type", sql`${t.type} IN ('EARNING', 'DEDUCTION')`),
+    check("payslip_lines_amount", sql`${t.amount} >= 0`),
+  ],
 );

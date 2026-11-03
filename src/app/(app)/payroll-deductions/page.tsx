@@ -89,42 +89,45 @@ async function PayrollContent({ searchParams }: Pick<PageProps<"/payroll-deducti
         />
       </section>
 
-      <section className="flex flex-col gap-2" aria-labelledby="penalty-pending-title">
-        <h2 id="penalty-pending-title" className="text-sm font-medium">
-          Denda keterlambatan belum dipotong ({penaltyGroups.length})
-        </h2>
-        {penaltyGroups.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            Tidak ada denda dari periode absensi yang sudah dikunci.
-          </p>
-        ) : (
-          <ul className="divide-y rounded-lg border">
-            {penaltyGroups.map((group) => (
-              <li
-                key={`${group.userId}-${group.period}`}
-                className="flex flex-wrap items-center justify-between gap-3 p-3"
-              >
-                <div className="min-w-0 text-sm">
-                  <p className="font-medium">{group.userName}</p>
-                  <p className="text-muted-foreground">
-                    Absensi {attendancePeriodLabel(group.period)} · {group.count}× terlambat ·{" "}
-                    <span className="font-medium text-foreground">{formatRupiah(group.total)}</span>
-                  </p>
-                </div>
-                {canManage && group.userId !== user.id && (
-                  <PenaltyDeductAction
-                    userId={group.userId}
-                    period={group.period}
-                    summary={`${group.userName}, denda keterlambatan ${attendancePeriodLabel(group.period)}`}
-                    total={group.total}
-                    defaultPayrollPeriod={currentPeriod}
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {/* Tanpa add-on Absensi, bagian ini hanya tampil bila masih ada denda yang sudah dikunci. */}
+      {(user.company.attendance || penaltyGroups.length > 0) && (
+        <section className="flex flex-col gap-2" aria-labelledby="penalty-pending-title">
+          <h2 id="penalty-pending-title" className="text-sm font-medium">
+            Denda keterlambatan belum dipotong ({penaltyGroups.length})
+          </h2>
+          {penaltyGroups.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Tidak ada denda dari periode absensi yang sudah dikunci.
+            </p>
+          ) : (
+            <ul className="divide-y rounded-lg border">
+              {penaltyGroups.map((group) => (
+                <li
+                  key={`${group.userId}-${group.period}`}
+                  className="flex flex-wrap items-center justify-between gap-3 p-3"
+                >
+                  <div className="min-w-0 text-sm">
+                    <p className="font-medium">{group.userName}</p>
+                    <p className="text-muted-foreground">
+                      Absensi {attendancePeriodLabel(group.period)} · {group.count}× terlambat ·{" "}
+                      <span className="font-medium text-foreground">{formatRupiah(group.total)}</span>
+                    </p>
+                  </div>
+                  {canManage && group.userId !== user.id && (
+                    <PenaltyDeductAction
+                      userId={group.userId}
+                      period={group.period}
+                      summary={`${group.userName}, denda keterlambatan ${attendancePeriodLabel(group.period)}`}
+                      total={group.total}
+                      defaultPayrollPeriod={currentPeriod}
+                    />
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="flex flex-col gap-2" aria-labelledby="payroll-history-title">
         <h2 id="payroll-history-title" className="text-sm font-medium">

@@ -44,5 +44,6 @@ async function Menu() {
   const user = await verifyAccount();
   if (!user.company) redirect("/companies");
   if (user.company.access.locked && !can(user, "company:manage")) redirect("/subscription");
-  return <MenuLauncher roles={user.roles} />;
+  const { attendance, payroll } = user.company;
+  return <MenuLauncher roles={user.roles} addons={{ attendance, payroll }} />;
 }

@@ -2,7 +2,7 @@
 // masa gratis & tenggang, batas pengguna masa gratis, dan komponen harga
 // langganan (features/subscriptions/pricing.ts), dan masa simpan file nota
 // (features/settlements/receipt-retention.ts), serta masa simpan selfie absen
-// & ambang kecocokan wajah (features/attendance). Di lib/ karena dibaca lib/auth/dal.ts (masa
+// & ambang kecocokan wajah (features/attendance), dan harga add-on (lib/addons.ts). Di lib/ karena dibaca lib/auth/dal.ts (masa
 // tenggang menentukan akses) dan features/companies (masa gratis company
 // baru). Diubah Superadmin di Pengaturan platform (features/subscriptions).
 
@@ -27,6 +27,8 @@ export type PlatformSettings = {
   receiptRetentionMonths: number;
   attendanceSelfieRetentionMonths: number;
   faceMatchThreshold: number;
+  attendanceUserPrice: number;
+  payrollUserPrice: number;
 };
 
 export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
@@ -43,6 +45,8 @@ export const DEFAULT_PLATFORM_SETTINGS: PlatformSettings = {
   receiptRetentionMonths: 6,
   attendanceSelfieRetentionMonths: 3,
   faceMatchThreshold: 50,
+  attendanceUserPrice: 5000,
+  payrollUserPrice: 5000,
 };
 
 // Baris dibuat saat Pengaturan platform pertama kali disimpan; sebelum itu
@@ -63,6 +67,8 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
       receiptRetentionMonths: platformSettings.receiptRetentionMonths,
       attendanceSelfieRetentionMonths: platformSettings.attendanceSelfieRetentionMonths,
       faceMatchThreshold: platformSettings.faceMatchThreshold,
+      attendanceUserPrice: platformSettings.attendanceUserPrice,
+      payrollUserPrice: platformSettings.payrollUserPrice,
     })
     .from(platformSettings)
     .where(eq(platformSettings.id, PLATFORM_SETTINGS_ID))

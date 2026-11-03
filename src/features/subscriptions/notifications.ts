@@ -17,7 +17,8 @@ import { formatRupiah } from "@/lib/format";
 import { sendWhatsApp } from "@/lib/whatsapp";
 
 export type SubscriptionNotice =
-  | { kind: "paid"; until: Date; userLimit: number }
+  // addonsUntil: add-on yang termasuk tagihan ini, berlaku sampai tanggal itu.
+  | { kind: "paid"; until: Date; userLimit: number; addonsUntil: { label: string; until: Date }[] }
   | { kind: "underpaid"; received: number; remaining: number; price: number }
   | { kind: "rejected"; reason: string }
   | { kind: "reminder"; until: Date; daysLeft: number };
@@ -73,7 +74,9 @@ function noticeContent(ownerName: string, companyName: string, notice: Subscript
         lines: [
           hello,
           `pembayaran langganan ${PRODUCT_NAME} untuk ${companyName} sudah kami terima.`,
-          `Masa aktif sampai ${formatDate(notice.until)}, untuk maksimal ${notice.userLimit} pengguna aktif. Terima kasih sudah berlangganan.`,
+          `Masa aktif sampai ${formatDate(notice.until)}, untuk maksimal ${notice.userLimit} pengguna aktif.`,
+          ...notice.addonsUntil.map((addon) => `Add-on ${addon.label} aktif sampai ${formatDate(addon.until)}.`),
+          "Terima kasih sudah berlangganan.",
         ],
       };
     case "underpaid":

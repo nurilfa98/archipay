@@ -1,5 +1,5 @@
 // Halaman /settings (Pengaturan): kebijakan uang muka, kategori biaya, serta
-// jam kerja/denda & hari libur absensi (bagian #absensi, BUSINESS-FLOW §18.2).
+// jam kerja/denda & hari libur absensi (bagian #absensi, BUSINESS-FLOW §18.2; hanya bila add-on Absensi aktif).
 // OWNER mengubahnya (settings:manage); superadmin hanya melihat (settings:view),
 // semua isian & tombol ubah dinonaktifkan/disembunyikan. Polanya sama dengan halaman lain: judul statis di luar
 // <Suspense>, cek permission & data di dalamnya.
@@ -14,6 +14,8 @@ import { AttendanceSettingsForm } from "@/features/attendance/components/attenda
 import { HolidaysManager } from "@/features/attendance/components/holidays-manager";
 import { LeaveSettingsForm, LeaveTypesManager } from "@/features/attendance/components/leave-settings";
 import { getLeaveSettings, listLeaveTypes } from "@/features/attendance/leave-queries";
+import { PayrollSettingsForm } from "@/features/salaries/components/payroll-settings-form";
+import { getPayrollSettings } from "@/features/salaries/queries";
 import { getAttendanceSettings, listHolidays } from "@/features/attendance/queries";
 import { ExpenseCategoriesManager } from "@/features/settings/components/expense-categories-manager";
 import { getCompanySettings, getSettingsUpdateInfo, listAllExpenseCategories } from "@/features/settings/queries";
@@ -39,24 +41,11 @@ export default function SettingsPage() {
 async function SettingsContent() {
   const user = await requirePermission("settings:view");
   const readOnly = !can(user, "settings:manage");
-  // Hari libur tahun ini & tahun depan (tahun menurut zona waktu perusahaan).
-  const year = Number(zonedDateString(new Date()).slice(0, 4));
-  const [settings, updateInfo, categories, attendance, holidaysThisYear, holidaysNextYear] = await Promise.all([
+  const [settings, updateInfo, categories] = await Promise.all([
     getCompanySettings(user.company.id),
     getSettingsUpdateInfo(user.company.id),
     listAllExpenseCategories(user.company.id),
-    getAttendanceSettings(user.company.id),
-    listHolidays(user.company.id, year),
-    listHolidays(user.company.id, year + 1),
   ]);
-  const [leaveSettings, leaveTypes] = await Promise.all([
-    getLeaveSettings(user.company.id),
-    listLeaveTypes(user.company.id),
-  ]);
-  const holidays = [...holidaysThisYear, ...holidaysNextYear].map((holiday) => ({
-    ...holiday,
-    dateText: formatDateOnly(holiday.date),
-  }));
 
   return (
     <>
@@ -85,6 +74,47 @@ async function SettingsContent() {
         </CardContent>
       </Card>
 
+      {/* Penggajian: hanya Owner (data gaji rahasia) & bila add-on Penggajian aktif (lib/addons.ts). */}
+      {can(user, "salary:manage") && (
+        <Card id="penggajian" className="scroll-mt-20">
+          <CardHeader>
+            <CardTitle>Penggajian</CardTitle>
+            <CardDescription>
+              Potong otomatis ketidakhadiran dan cara menghitung tarif per hari untuk slip gaji (menu Penggajian).
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PayrollSettingsForm
+              settings={await getPayrollSettings(user.company.id)}
+              attendanceActive={user.company.attendance}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Tanpa add-on Absensi (lib/addons.ts), pengaturan absensi & cuti disembunyikan. */}
+      {user.company.attendance && <AttendanceSettings companyId={user.company.id} readOnly={readOnly} />}
+    </>
+  );
+}
+
+async function AttendanceSettings({ companyId, readOnly }: { companyId: string; readOnly: boolean }) {
+  // Hari libur tahun ini & tahun depan (tahun menurut zona waktu perusahaan).
+  const year = Number(zonedDateString(new Date()).slice(0, 4));
+  const [attendance, holidaysThisYear, holidaysNextYear, leaveSettings, leaveTypes] = await Promise.all([
+    getAttendanceSettings(companyId),
+    listHolidays(companyId, year),
+    listHolidays(companyId, year + 1),
+    getLeaveSettings(companyId),
+    listLeaveTypes(companyId),
+  ]);
+  const holidays = [...holidaysThisYear, ...holidaysNextYear].map((holiday) => ({
+    ...holiday,
+    dateText: formatDateOnly(holiday.date),
+  }));
+
+  return (
+    <>
       <Card id="absensi" className="scroll-mt-20">
         <CardHeader>
           <CardTitle>Absensi: jam kerja & denda</CardTitle>

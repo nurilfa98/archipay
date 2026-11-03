@@ -17,18 +17,19 @@
 // SUB_PAGES agar breadcrumb tetap bisa menampilkan "Project > Uang Muka".
 
 import {
+  BanknoteIcon,
   CalendarCheckIcon,
   CreditCardIcon,
   FileClockIcon,
   FolderKanbanIcon,
   HouseIcon,
+  ReceiptTextIcon,
   SettingsIcon,
   UsersIcon,
   WalletCardsIcon,
   type LucideIcon,
 } from "lucide-react";
-import { can, type Permission } from "@/lib/auth/permissions";
-import type { Role } from "@/lib/auth/roles";
+import { can, type Permission, type PermissionSubject } from "@/lib/auth/permissions";
 
 export type MenuItem = {
   title: string;
@@ -40,7 +41,7 @@ export type MenuItem = {
   permission?: Permission | Permission[];
 };
 
-export function canSeeMenu(user: { roles: readonly Role[] }, item: MenuItem) {
+export function canSeeMenu(user: PermissionSubject, item: MenuItem) {
   if (!item.permission) return true;
   const permissions = Array.isArray(item.permission) ? item.permission : [item.permission];
   return permissions.some((permission) => can(user, permission));
@@ -77,6 +78,22 @@ export const MENU_ITEMS: MenuItem[] = [
     description: "Sisa uang muka yang dipotong dari gaji",
     keywords: ["payroll", "gaji", "excel"],
     permission: "payroll:view",
+  },
+  {
+    title: "Penggajian",
+    href: "/payroll",
+    icon: BanknoteIcon,
+    description: "Data gaji, penggajian bulanan & slip gaji",
+    keywords: ["gaji", "payroll", "slip", "tunjangan", "bpjs", "thr"],
+    permission: "salary:manage",
+  },
+  {
+    title: "Slip Gaji",
+    href: "/payslips",
+    icon: ReceiptTextIcon,
+    description: "Slip gaji Anda setiap bulan",
+    keywords: ["gaji", "slip", "payslip"],
+    permission: "salary:view-own",
   },
   {
     title: "Pengguna",
@@ -124,6 +141,7 @@ export const SUB_PAGES: { title: string; href: string; parent?: string }[] = [
   { title: "Hari ini", href: "/attendance/today", parent: "/attendance" },
   { title: "Cuti & izin", href: "/attendance/leave", parent: "/attendance" },
   { title: "Review bulanan", href: "/attendance/review", parent: "/attendance" },
+  { title: "Data gaji", href: "/payroll/salaries", parent: "/payroll" },
 ];
 
 // Halaman platform Superadmin (tidak terikat company), berpindah lewat tab di

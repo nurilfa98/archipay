@@ -85,6 +85,20 @@
       "when": 1793696365627,
       "tag": "0011_attendance_review",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1793705633238,
+      "tag": "0012_attendance_addon",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793709800285,
+      "tag": "0013_payroll_addon",
+      "breakpoints": true
     }
   ]
 }

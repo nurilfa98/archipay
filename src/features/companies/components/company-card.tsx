@@ -15,7 +15,8 @@
 // atasnya (relative z-10) agar tetap bisa diklik sendiri. Warna kartu & ikon
 // mengikuti status company (aturan di ../status.ts) lewat kelas .project-accent.
 
-import { CalendarClockIcon, ChevronRightIcon, FolderKanbanIcon, UsersIcon } from "lucide-react";
+import { CalendarClockIcon, ChevronRightIcon, PuzzleIcon, FolderKanbanIcon, UsersIcon } from "lucide-react";
+import { ADDON_LABELS, addonKeysOf } from "@/lib/addons";
 import Link from "next/link";
 import type { CompanyListItem } from "@/features/companies/queries";
 import { formatShortDate } from "@/lib/dates";
@@ -76,6 +77,12 @@ export function CompanyCard({
               <FolderKanbanIcon className="size-4 text-muted-foreground" />
               {company.projectCount} project
             </span>
+            {addonKeysOf(company.addons).map((key) => (
+              <span key={key} className="inline-flex items-center gap-1.5">
+                <PuzzleIcon className="size-4 text-muted-foreground" />
+                {ADDON_LABELS[key]}
+              </span>
+            ))}
           </p>
           <p className="text-xs text-muted-foreground">
             Bergabung {formatShortDate(company.createdAt)}

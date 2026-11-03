@@ -1,5 +1,5 @@
 // Halaman /platform-settings (Pengaturan platform, Superadmin /
-// subscription:manage): komponen harga paket (harga 6 bulan & 1 tahun dihitung
+// subscription:manage): komponen harga paket & add-on Absensi (harga 6 bulan & 1 tahun dihitung
 // otomatis dari harga per bulan & diskon), masa gratis & tenggang + batas
 // pengguna masa gratis, nomor WhatsApp admin, masa simpan file nota, rekening
 // bank, dan QRIS statis.
@@ -55,8 +55,8 @@ async function PlatformSettingsContent() {
           <CardTitle>Harga paket</CardTitle>
           <CardDescription>
             Harga dasar per bulan sudah termasuk sejumlah pengguna; pengguna aktif di atasnya dikenai biaya tambahan.
-            Paket 6 bulan & 1 tahun dihitung otomatis dari harga per bulan dikurangi diskon. Tagihan yang sudah dibuat
-            tidak ikut berubah.
+            Paket 6 bulan & 1 tahun dihitung otomatis dari harga per bulan dikurangi diskon. Add-on Absensi dipilih Owner
+            saat membeli paket (atau diaktifkan di tengah periode, prorata). Tagihan yang sudah dibuat tidak ikut berubah.
           </CardDescription>
         </CardHeader>
         <CardContent>

@@ -61,6 +61,7 @@ export const PLAN_LABELS: Record<PlanMonths, string> = {
   12: "1 tahun",
 };
 
-// PLAN = paket 1/6/12 bulan; TOPUP = tambah kuota pengguna untuk sisa masa aktif.
-export const SUBSCRIPTION_KINDS = ["PLAN", "TOPUP"] as const;
+// PLAN = paket 1/6/12 bulan; TOPUP = tambah kuota pengguna untuk sisa masa aktif;
+// ADDON = mengaktifkan satu add-on untuk sisa periode (BUSINESS-FLOW §17.6).
+export const SUBSCRIPTION_KINDS = ["PLAN", "TOPUP", "ADDON"] as const;
 export type SubscriptionKind = (typeof SUBSCRIPTION_KINDS)[number];

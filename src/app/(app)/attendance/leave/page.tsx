@@ -29,7 +29,7 @@ import {
 } from "@/features/attendance/leave-queries";
 import { delegatedAt, leaveDecisionRight } from "@/features/attendance/leave-rules";
 import { listCheckInPeople } from "@/features/attendance/queries";
-import { verifySession, type CompanyUser } from "@/lib/auth/dal";
+import { requireAttendanceAddon, type CompanyUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { formatDateTime, zonedDateString } from "@/lib/dates";
 
@@ -59,7 +59,7 @@ export default function LeavePage() {
 }
 
 async function LeaveContent() {
-  const user = await verifySession();
+  const user = await requireAttendanceAddon();
   const checksIn = can(user, "attendance:check-in");
   const viewsAll = can(user, "attendance:view-all");
   if (!checksIn && !viewsAll) {

@@ -18,6 +18,8 @@ perbarui dokumen ini juga. Sumber kebenaran aturan:
 | Project (kartu pilihan, kelola, menetapkan project) | `src/features/projects/` |
 | Company (klien), masuk company untuk Superadmin | `src/features/companies/`, `src/lib/auth/dal.ts` |
 | Absensi: lokasi, jam kerja, hari libur, foto acuan wajah | `src/features/attendance/` |
+| Add-on (Absensi, Penggajian): masa aktif & harga | `src/lib/addons.ts`, `src/features/subscriptions/pricing.ts` |
+| Penggajian: data gaji, penggajian bulanan, Slip Gaji | `src/features/salaries/` |
 
 ---
 
@@ -545,9 +547,9 @@ aturan akses `src/lib/subscription-access.ts` & `src/lib/auth/dal.ts`.
   paket N bulan   = harga per bulan × N × (100 − diskon N bulan) / 100
   ```
 
-  Contoh dengan harga dasar Rp149.000 termasuk 10 pengguna, tambahan
-  Rp10.000/pengguna, diskon 6 bulan 10% & 1 tahun 20%: 25 pengguna = Rp299.000
-  per bulan; paket 1 tahun = Rp2.870.400 (setara Rp239.200/bulan). Harga 6
+  Contoh dengan harga dasar Rp199.000 termasuk 10 pengguna, tambahan
+  Rp10.000/pengguna, diskon 6 bulan 10% & 1 tahun 20%: 25 pengguna = Rp349.000
+  per bulan; paket 1 tahun = Rp3.350.400 (setara Rp279.200/bulan). Harga 6
   bulan & 1 tahun **tidak diketik**, selalu hasil hitungan; Pengaturan
   platform menampilkan tabel simulasinya. Harga dasar 0 = paket belum dijual.
 - **Pengguna yang dihitung**: pengguna **aktif** company (Owner, Finance,
@@ -569,6 +571,8 @@ aturan akses `src/lib/subscription-access.ts` & `src/lib/auth/dal.ts`.
   pengguna tambahan; isian kosong mengikuti standar. Diskon selalu standar.
 - **Masa tenggang** (bawaan **3 hari**) setelah masa aktif habis: aplikasi
   tetap bisa dipakai dengan spanduk merah. Lewat itu company **terkunci**.
+- **Add-on Absensi** (bagian 18–19) dan **Penggajian** (bagian 20) dibayar
+  terpisah, lihat 17.6.
 
 ### 17.2 Status company
 
@@ -637,16 +641,75 @@ Dikirim ke semua Owner aktif company: WhatsApp bila nomornya ada, dan email.
   harian yang sama dengan pengingat uang muka (`/api/cron/reminders`).
   `companies.last_reminder_key` mencegah kiriman dobel.
 
-### 17.6 Data
+### 17.6 Add-on (Absensi & Penggajian)
+
+Keputusan 3 November 2026: fitur yang tidak dipakai semua klien dijual
+sebagai **add-on** di atas paket dasar, jadi klien tidak membayar fitur yang
+tidak dipakainya. Saat ini ada dua add-on:
+
+| Add-on | Isi | Bagian |
+|---|---|---|
+| **Absensi** | Absen selfie + GPS, cuti & izin, denda keterlambatan | 18, 19 |
+| **Penggajian** | Data gaji, penggajian bulanan, Slip Gaji PDF | 20 |
+
+Kode: `src/lib/addons.ts` (daftar add-on & aturan masa aktif, murni) dan
+`src/lib/addons-db.ts` (query). Menambah add-on baru = menambah satu kunci di
+daftar itu, kolom boolean di `subscriptions`, dan harga di `platform_settings`.
+
+- **Harga** per add-on per pengguna per bulan (bawaan **Rp5.000** untuk
+  keduanya, diatur di Pengaturan platform, sama untuk semua company; harga
+  khusus company tidak mengubahnya), dikali **jumlah pengguna paket**. Diskon
+  6 bulan & 1 tahun ikut berlaku:
+
+  ```
+  harga per bulan = (rumus 17.1) + pengguna × Σ harga add-on yang dicentang
+  ```
+
+  Contoh 10 pengguna, paket 1 bulan, Absensi + Penggajian: Rp199.000 + 10 ×
+  (Rp5.000 + Rp5.000) = Rp299.000.
+- **Masa aktif ikut paket.** Owner mencentang add-on saat memilih paket
+  (tercentang otomatis bila add-on itu sedang aktif). Add-on aktif selama
+  periode paket itu. Perpanjangan tanpa centang → add-on berhenti saat paket
+  lama habis.
+- **Masa gratis**: semua add-on aktif sampai paket berbayar pertama mulai
+  (Owner yang membayar lebih awal tetap memakainya sampai masa gratis habis).
+- **Di tengah periode** (langganan aktif, add-on itu belum aktif): **Aktifkan
+  add-on** = batas pengguna × harga add-on × sisa hari / 30 (dibulatkan ke
+  atas per Rp100), tagihan jenis `ADDON` untuk satu add-on, diverifikasi
+  seperti biasa. Berlaku sejak lunas sampai akhir masa aktif (atau sampai
+  periode berikutnya yang sudah termasuk add-on itu).
+- **Tambah kuota** ikut menghitung setiap add-on yang aktif untuk pengguna
+  tambahan: `tambahan × (harga per pengguna × sisa hari + Σ harga add-on ×
+  sisa hari add-on berbayar) / 30`.
+- **Tanpa masa tenggang**: begitu periodenya habis, add-on berhenti walau
+  company masih dalam masa tenggang langganan.
+- **Bila tidak aktif**: permission add-on itu dicabut (`can()` di
+  `lib/auth/permissions.ts`): menu, halaman, aksi, dan API tertutup; kartu
+  pengaturannya disembunyikan. **Data tetap tersimpan** dan kembali saat
+  add-on aktif lagi.
+  - Absensi: kartu Absensi, Hari libur, dan Cuti & izin di Pengaturan
+    disembunyikan; cron foto wajah tertunda & delegasi cuti serta digest
+    email (foto wajah, cuti) melewati company itu. Denda yang sudah dikunci
+    tetap tampil di Potong Gaji. Penghapusan selfie lewat masa simpan tetap
+    berjalan (UU PDP). Role **Admin HR** tetap bisa mengelola akun Karyawan.
+  - Penggajian: menu Penggajian & Slip Gaji tertutup; Potong Gaji tetap
+    berjalan seperti biasa (pencatatan manual).
+- **Superadmin**: kartu company menampilkan add-on yang aktif; detail company
+  menampilkan "Add-on … aktif s.d. …"; Catat pembayaran langsung punya centang
+  per add-on.
+- Paket yang sudah dibeli sebelum add-on ada dianggap termasuk Absensi
+  (migrasi `0012_attendance_addon`), tidak termasuk Penggajian.
+
+### 17.7 Data
 
 | Tabel | Isi |
 |---|---|
 | `companies` (+kolom) | `subscription_until` (akhir masa gratis/langganan), `user_limit` (batas pengguna aktif), `last_reminder_key` |
 | `platform_settings` | Satu baris: WhatsApp admin, gambar QRIS, masa gratis, masa tenggang |
 | `payment_bank_accounts` | Rekening tujuan transfer langganan |
-| `platform_settings` (+kolom harga) | Harga dasar, pengguna termasuk, harga per pengguna tambahan, diskon 6 & 12 bulan, batas pengguna masa gratis |
+| `platform_settings` (+kolom harga) | Harga dasar, pengguna termasuk, harga per pengguna tambahan, diskon 6 & 12 bulan, batas pengguna masa gratis, harga add-on Absensi & Penggajian per pengguna |
 | `company_pricing` | Harga khusus per company (per komponen; NULL = standar) |
-| `subscriptions` | Satu baris per tagihan: jenis `PLAN` (paket N bulan untuk N pengguna) atau `TOPUP` (tambah kuota), harga (snapshot), total diterima, periode, status `CLAIMED`/`UNDERPAID`/`ACTIVE`/`REJECTED` |
+| `subscriptions` | Satu baris per tagihan: jenis `PLAN` (paket N bulan untuk N pengguna), `TOPUP` (tambah kuota), atau `ADDON` (satu add-on di tengah periode), `attendance` / `payroll` (termasuk add-on Absensi / Penggajian), harga (snapshot), total diterima, periode, status `CLAIMED`/`UNDERPAID`/`ACTIVE`/`REJECTED` |
 | `subscription_payments` | Satu baris per bukti/pembayaran: bukti (R2, `<companyId>/subscription-proofs/…`), nominal diterima, keterangan/alasan admin |
 
 Bukti transfer hanya bisa dibuka Superadmin dan Owner company tersebut
@@ -667,7 +730,8 @@ tidak dicatat.
 Absensi memakai **selfie** yang dicocokkan dengan foto acuan wajah dan **GPS**
 yang dicek terhadap radius lokasi kerja. Satu company boleh punya banyak lokasi
 (kantor, cabang, lokasi project), jadi karyawan absen di tempat ia bertugas hari
-itu. Termasuk dalam paket dasar Langganan (bukan add-on).
+itu. **Add-on berbayar** di Langganan (bagian 17.6, keputusan 3 November
+2026); tanpa add-on, menu dan pengaturan absensi disembunyikan.
 
 ### 18.1 Peran
 
@@ -883,7 +947,162 @@ informasi untuk bagian penggajian di PDF dan Excel.
 
 ---
 
-## 20. Catatan terbuka
+## 20. Penggajian (add-on)
+
+> **Status:** desain disetujui 3 November 2026. Add-on berbayar (bagian 17.6).
+> Dikerjakan bertahap: **A** mekanisme add-on umum + pengaturan + data gaji →
+> **B** penggajian bulanan → **C** Slip Gaji PDF, rekap, Excel transfer, menu
+> Slip Gaji karyawan. Perbarui bagian ini bila keputusan berubah.
+
+Tujuannya: Owner tidak perlu merekap gaji lagi. ArchiPay menyusun gaji bersih
+setiap karyawan per bulan dari data gaji + potongan yang sudah ada (sisa uang
+muka di Potong Gaji, denda keterlambatan, ketidakhadiran) lalu mencetak **Slip
+Gaji**. Transfernya tetap manual di luar ArchiPay (Excel daftar transfer
+membantu). Kode: `src/features/salaries/`.
+
+### 20.1 Akses
+
+| | Owner | Finance | Admin HR | Karyawan | Superadmin |
+|---|---|---|---|---|---|
+| Data gaji, penggajian bulanan, rekap & Excel | ✓ | | | | |
+| Pengaturan penggajian (Pengaturan → #penggajian) | ✓ | | | | |
+| Slip Gaji milik sendiri (setelah diselesaikan) | ✓ | ✓ | ✓ | ✓ | |
+
+- **Data gaji rahasia: hanya Owner** (`salary:manage`). **Superadmin tidak bisa
+  melihat data gaji sama sekali**, walau sedang membuka company (berbeda dengan
+  data lain yang boleh ia lihat).
+- Setiap pengguna melihat slipnya sendiri (`salary:view-own`) di menu **Slip
+  Gaji**, hanya untuk bulan yang sudah diselesaikan. Tanpa WhatsApp/email
+  (kuota WhatsApp, bagian 10).
+- Audit log mencatat siapa mengubah apa (data gaji, baris slip, selesai/buka
+  kunci) **tanpa nominal**, karena Superadmin bisa membuka audit log.
+
+### 20.2 Pengaturan penggajian (Owner)
+
+Di Pengaturan → **Penggajian** (hanya tampil bila add-on aktif):
+
+- **Potong otomatis ketidakhadiran**: nyala/mati, bawaan **mati**. Hanya
+  berlaku bila add-on **Absensi** aktif (sumber datanya absensi).
+- **Cara menghitung tarif per hari** (dipakai potongan ketidakhadiran dan
+  prorata karyawan masuk/berhenti di tengah bulan), pilih satu:
+  - **Dibagi hari kerja bulan itu** (bawaan): dasar ÷ jumlah hari kerja bulan
+    itu menurut jadwal kerja & hari libur di pengaturan absensi.
+  - **Dibagi angka tetap**: dasar ÷ pembagi yang diisi Owner (bawaan 26, 1–31).
+  - **Nominal tetap per hari**: diisi per karyawan di data gajinya.
+- **Dasar potongan**: **gaji pokok saja** (bawaan) atau **gaji pokok +
+  tunjangan tetap bulanan**.
+
+Contoh "dibagi hari kerja": gaji pokok Rp4.400.000, November 22 hari kerja →
+Rp200.000/hari; tidak hadir 2 hari → potongan Rp400.000.
+
+### 20.3 Data gaji per karyawan (Owner)
+
+Menu Penggajian → **Data gaji**: daftar pengguna aktif company beserta gaji
+pokoknya; yang belum diisi tidak ikut penggajian. Per karyawan:
+
+- **Gaji pokok** per bulan (wajib).
+- **Tunjangan**, masing-masing **tetap bulanan** atau **per hari hadir** (mis.
+  uang makan/transport = nominal × hari hadir).
+- **Potongan tetap** (mis. BPJS Kesehatan, BPJS Ketenagakerjaan, PPh 21,
+  cicilan koperasi). **PPh 21 & BPJS diisi manual** sebagai potongan tetap;
+  hitung otomatis (TER, PTKP, tarif BPJS) adalah tahap berikutnya.
+- **Tanggal mulai kerja** & **tanggal berhenti** (opsional): hari kerja di
+  luar rentang itu dipotong dengan tarif harian yang sama (prorata).
+- **Nominal per hari** (hanya untuk cara "nominal tetap per hari").
+- **Tidak dipotong otomatis** (centang): ketidakhadiran karyawan ini tidak
+  dipotong (mis. manajer/staf lapangan yang tidak wajib absen).
+
+Rekening tujuan memakai rekening bank di data pengguna. Owner ikut
+penggajian hanya bila data gajinya diisi.
+
+### 20.4 Penggajian bulanan
+
+Periode = **bulan kalender** ("2026-11"). Satu penggajian per bulan per company.
+
+1. Owner menekan **Buat penggajian** untuk satu bulan → ArchiPay menyusun
+   **draf** slip untuk setiap pengguna yang data gajinya diisi dan masa
+   kerjanya mencakup bulan itu (pengguna nonaktif ikut bila tanggal
+   berhentinya di bulan itu).
+2. Isi draf per karyawan (dihitung otomatis):
+
+   | Baris | Jenis | Rumus |
+   |---|---|---|
+   | Gaji pokok | pendapatan | dari data gaji |
+   | Tunjangan tetap | pendapatan | nominal per bulan |
+   | Tunjangan per hari hadir | pendapatan | nominal × hari hadir (dari absensi; tanpa add-on Absensi atau bila karyawan tidak wajib absen = hari kerja dalam masa kerja) |
+   | Potongan tetap | potongan | dari data gaji |
+   | Masuk/berhenti di tengah bulan | potongan | hari kerja di luar masa kerja × tarif harian |
+   | Tidak hadir & cuti/izin tidak dibayar | potongan | (hari tidak hadir + hari cuti/izin yang jenisnya *tidak dibayar*) × tarif harian, hanya bila potong otomatis nyala, add-on Absensi aktif, dan karyawan tidak dikecualikan |
+   | Sisa uang muka | potongan | setiap sisa uang muka yang lewat batas pengembalian (daftar Potong Gaji), nominal = sisa; plus yang sudah dicatat Finance di Potong Gaji untuk periode gaji bulan ini |
+   | Denda keterlambatan | potongan | denda yang masih berlaku dari periode absensi yang sudah dikunci & belum dipotong, per bulan absen; plus yang sudah dicatat dipotong untuk periode gaji bulan ini |
+
+   Sakit, cuti tahunan, dan izin yang jenisnya *dibayar* **tidak dipotong**
+   (PP 36/2021 Pasal 40: upah tidak dibayar bila tidak masuk kerja, kecuali
+   alasan tertentu seperti sakit, cuti, menikah). Owner mengatur jenis mana
+   yang dibayar di Pengaturan → Cuti & izin.
+3. Owner memeriksa dan menyesuaikan sebelum selesai:
+   - mengubah nominal / menghapus baris otomatis (sisa uang muka boleh
+     dikurangi = dicicil; denda hanya bisa dihapus = ditunda ke bulan lain);
+   - menambah baris **manual** (lembur, bonus, THR, potongan lain);
+   - **Hitung ulang** menyusun ulang semua baris otomatis dari data terbaru
+     (perubahan pada baris otomatis hilang; baris manual tetap);
+   - mengisi **tanggal bayar** (dicetak di slip).
+4. **Peringatan** bila total potongan seorang karyawan > 50% dari total
+   pendapatannya (batas potongan upah PP 36/2021). Peringatan saja, tidak
+   menghalangi. Gaji bersih **minus** menghalangi penyelesaian.
+5. **Selesaikan penggajian** (Owner):
+   - wajib tanggal bayar;
+   - bila potong otomatis ketidakhadiran nyala dan add-on Absensi aktif,
+     **periode absensi bulan itu wajib sudah dikunci** (bagian 18.9), agar
+     angka hari tidak hadir sudah final;
+   - setiap baris **sisa uang muka** dicatat ke ledger sebagai potong gaji
+     periode itu (sama seperti tombol di Potong Gaji: boleh sebagian, saldo 0
+     → uang muka Selesai), dan setiap baris **denda** ditandai dipotong
+     dengan periode gaji itu. Tidak ada WhatsApp per potongan; rinciannya ada
+     di slip;
+   - angka terkunci, slip tampil di menu Slip Gaji karyawan.
+6. **Buka kunci** (Owner, tercatat di audit log): kembali ke draf untuk
+   diperbaiki. Potongan uang muka & denda yang **sudah dicatat tetap
+   tercatat** (ledger tidak pernah dihapus) dan barisnya tidak bisa diubah
+   lagi; penyelesaian berikutnya hanya mencatat baris baru.
+
+Bila satu potongan uang muka gagal dicatat saat menyelesaikan (misalnya sudah
+dilunasi tunai di antaranya), penggajian tetap draf, baris yang sudah tercatat
+tetap tercatat, dan Owner diminta menghitung ulang.
+
+Tanpa add-on Penggajian, Potong Gaji tetap dipakai seperti biasa (Finance
+mencatat manual).
+
+### 20.5 Hasil
+
+- **Slip Gaji PDF** per karyawan (A4 tegak): nama & alamat company, periode,
+  tanggal bayar, nama karyawan, rekening tujuan, rincian pendapatan & potongan
+  (dengan keterangan hari, mis. "2 hari × Rp200.000"), total, **gaji bersih**,
+  ringkasan kehadiran (hari kerja, hadir, tidak hadir, cuti tidak dibayar).
+  Tanpa tanda tangan. PP 36/2021 mewajibkan bukti pembayaran upah yang
+  memuat rinciannya: slip ini memenuhinya.
+- **Semua slip** dalam satu PDF (satu halaman per karyawan) untuk dicetak Owner.
+- **Rekap PDF** satu bulan: per karyawan total pendapatan, potongan, gaji
+  bersih, plus total company.
+- **Excel**: sheet *Transfer* (nama, bank, nomor rekening, gaji bersih) untuk
+  transfer manual / unggah massal internet banking, dan sheet *Rincian*
+  (semua baris).
+- Karyawan mengunduh slipnya sendiri dari menu **Slip Gaji**.
+
+### 20.6 Data
+
+| Tabel | Isi |
+|---|---|
+| `company_settings` (+kolom) | `payroll_absence_deduction`, `payroll_daily_rate_method` (`WORKING_DAYS`/`FIXED_DIVISOR`/`FIXED_AMOUNT`), `payroll_daily_divisor`, `payroll_deduction_base` (`BASE`/`BASE_ALLOWANCES`) |
+| `salary_profiles` | Satu baris per pengguna: gaji pokok, nominal per hari, tanggal mulai/berhenti, tidak dipotong otomatis |
+| `salary_components` | Tunjangan (tetap / per hari hadir) & potongan tetap per pengguna |
+| `payroll_runs` | Satu per company per bulan: status `DRAFT`/`FINALIZED`, tanggal bayar, siapa & kapan diselesaikan |
+| `payslips` | Satu per karyawan per penggajian: snapshot nama & rekening, ringkasan hari, tarif harian, total pendapatan/potongan, gaji bersih |
+| `payslip_lines` | Baris slip: jenis (pendapatan/potongan), sumber (gaji pokok, tunjangan, potongan tetap, prorata, tidak hadir, sisa uang muka, denda, manual), keterangan, nominal, referensi (laporan PJ / bulan absen), `posted_at` (sudah dicatat ke ledger/denda) |
+
+---
+
+## 21. Catatan terbuka
 
 Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 

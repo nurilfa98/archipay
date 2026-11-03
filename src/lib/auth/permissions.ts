@@ -17,6 +17,7 @@
 // - node_modules/next/dist/docs/01-app/02-guides/authentication.md (bagian "Authorization")
 // - https://cheatsheetseries.owasp.org/cheatsheets/Authorization_Cheat_Sheet.html
 
+import { ADDON_KEYS, type AddonFlags, type AddonKey } from "@/lib/addons";
 import type { Role } from "./roles";
 
 // Format penamaan: "<sumber-daya>:<aksi>".
@@ -53,6 +54,9 @@ export const PERMISSIONS = [
   "leave:approve", // menyetujui/menolak cuti & izin kapan saja (Owner)
   "leave:approve-delegated", // menyetujui/menolak setelah waktu delegasi lewat (Admin HR)
   "attendance:review", // review bulanan: koreksi absen, bebaskan denda, kunci periode (Owner)
+  // Penggajian (add-on, BUSINESS-FLOW §20). Data gaji rahasia: Superadmin tidak punya keduanya.
+  "salary:manage", // data gaji, penggajian bulanan, rekap & Excel transfer (Owner)
+  "salary:view-own", // melihat & mengunduh Slip Gaji milik sendiri
 ] as const;
 
 export type Permission = (typeof PERMISSIONS)[number];
@@ -87,6 +91,8 @@ const ROLE_PERMISSIONS = {
         "leave:approve",
         "leave:approve-delegated",
         "attendance:review",
+        "salary:manage",
+        "salary:view-own",
       ].includes(permission),
   ),
   // Owner boleh semuanya, kecuali mengajukan uang muka untuk dirinya sendiri
@@ -114,6 +120,7 @@ const ROLE_PERMISSIONS = {
     "payroll:view",
     "payroll:manage",
     "attendance:check-in",
+    "salary:view-own",
   ],
   // Admin HR mengurus absensi & akun Karyawan (features/users/access.ts).
   // Bila perlu mengajukan uang muka, beri juga role Karyawan (permission digabung).
@@ -124,11 +131,37 @@ const ROLE_PERMISSIONS = {
     "attendance:manage-locations",
     "attendance:approve-face",
     "leave:approve-delegated",
+    "salary:view-own",
   ],
-  EMPLOYEE: ["advance:view-own", "advance:request", "settlement:submit", "attendance:check-in"],
+  EMPLOYEE: ["advance:view-own", "advance:request", "settlement:submit", "attendance:check-in", "salary:view-own"],
 } satisfies Record<Role, readonly Permission[]>;
 
+// Permission milik setiap add-on (lib/addons.ts). Company tanpa add-on itu
+// kehilangan semuanya, apa pun role-nya: menu, halaman, aksi, dan API ikut
+// tertutup. (Admin HR tetap bisa mengelola akun Karyawan tanpa add-on Absensi.)
+const ADDON_PERMISSIONS: Record<AddonKey, readonly Permission[]> = {
+  attendance: [
+    "attendance:check-in",
+    "attendance:view-all",
+    "attendance:manage-locations",
+    "attendance:approve-face",
+    "leave:approve",
+    "leave:approve-delegated",
+    "attendance:review",
+  ],
+  payroll: ["salary:manage", "salary:view-own"],
+};
+
+export type PermissionSubject = {
+  roles: readonly Role[];
+  // Company yang sedang dibuka beserta add-on aktifnya (lib/auth/dal.ts).
+  // Tanpa company (mis. mengecek role orang lain), add-on tidak ikut diperiksa.
+  company?: AddonFlags | null;
+};
+
 // User dengan banyak role mendapat gabungan permission dari semua role-nya.
-export function can(user: { roles: readonly Role[] }, permission: Permission) {
+export function can(user: PermissionSubject, permission: Permission) {
+  const company = user.company;
+  if (company && ADDON_KEYS.some((key) => !company[key] && ADDON_PERMISSIONS[key].includes(permission))) return false;
   return user.roles.some((role) => (ROLE_PERMISSIONS[role] as readonly Permission[]).includes(permission));
 }

@@ -7,6 +7,8 @@
 import "server-only";
 import { and, asc, count, desc, eq, exists, inArray, sql } from "drizzle-orm";
 import { io } from "next/cache";
+import type { AddonCoverage, AddonKey } from "@/lib/addons";
+import { loadAddonCoverage } from "@/lib/addons-db";
 import { db } from "@/lib/db";
 import { companies, companyPricing, paymentBankAccounts, subscriptionPayments, subscriptions } from "@/lib/db/schema";
 import { getPlatformSettings } from "@/lib/platform-settings";
@@ -54,6 +56,8 @@ export type SubscriptionItem = {
   kind: SubscriptionKind;
   months: PlanMonths | null; // null untuk tambah kuota
   users: number; // pengguna paket, atau tambahan pengguna (TOPUP)
+  attendance: boolean; // termasuk add-on Absensi
+  payroll: boolean; // termasuk add-on Penggajian
   price: number;
   amountPaid: number;
   status: SubscriptionStatus;
@@ -71,6 +75,9 @@ export type SubscriptionItem = {
 export type CompanySubscriptionState = {
   access: CompanyAccess;
   seats: { limit: number; active: number };
+  // Setiap add-on (lib/addons.ts): aktif/tidak, sampai kapan, dan batas akhir
+  // bila diaktifkan sekarang.
+  addons: Record<AddonKey, AddonCoverage>;
   // Tagihan terbuka (menunggu verifikasi / kurang bayar); maksimal satu.
   open: SubscriptionItem | null;
   // Penolakan terakhir bila itu kejadian paling baru: pemberitahuan ke Owner.
@@ -81,12 +88,20 @@ export type BankAccount = { id: string; bankName: string; accountNumber: string;
 
 // Komponen harga standar (Pengaturan platform).
 export async function getStandardPricing(): Promise<Pricing> {
-  const { basePrice, includedUsers, extraUserPrice, discount6, discount12 } = await getPlatformSettings();
-  return { basePrice, includedUsers, extraUserPrice, discount6, discount12 };
+  const { basePrice, includedUsers, extraUserPrice, discount6, discount12, attendanceUserPrice, payrollUserPrice } =
+    await getPlatformSettings();
+  return {
+    basePrice,
+    includedUsers,
+    extraUserPrice,
+    discount6,
+    discount12,
+    addonUserPrices: { attendance: attendanceUserPrice, payroll: payrollUserPrice },
+  };
 }
 
 // Harga yang berlaku untuk satu company: harga khusus (per komponen) bila ada,
-// selain itu standar. Diskon 6/12 bulan selalu standar.
+// selain itu standar. Diskon 6/12 bulan & harga add-on selalu standar.
 export async function getCompanyPricing(companyId: string): Promise<CompanyPricing> {
   await io();
   const [standard, [override]] = await Promise.all([
@@ -141,7 +156,7 @@ export function hasPaidSubscription() {
 // Status akses + tagihan terbuka satu company (halaman Langganan, detail company).
 export async function getCompanySubscriptionState(companyId: string): Promise<CompanySubscriptionState | null> {
   await io();
-  const [[company], settings, [latest], seats] = await Promise.all([
+  const [[company], settings, [latest], seats, addons] = await Promise.all([
     db
       .select({ subscriptionUntil: companies.subscriptionUntil, hasPaid: hasPaidSubscription() })
       .from(companies)
@@ -150,8 +165,9 @@ export async function getCompanySubscriptionState(companyId: string): Promise<Co
     getPlatformSettings(),
     listSubscriptions({ companyId, limit: 1 }),
     getSeatUsage(companyId),
+    loadAddonCoverage(db, companyId),
   ]);
-  if (!company) return null;
+  if (!company || !addons) return null;
   const isOpen = latest && (OPEN_SUBSCRIPTION_STATUSES as readonly string[]).includes(latest.status);
   return {
     access: getCompanyAccess({
@@ -160,11 +176,18 @@ export async function getCompanySubscriptionState(companyId: string): Promise<Co
       graceDays: settings.graceDays,
     }),
     seats,
+    addons,
     // Tagihan terbuka selalu yang terbaru: tagihan baru hanya bisa dibuat
     // bila tidak ada yang terbuka.
     open: isOpen ? latest : null,
     lastRejected: latest?.status === "REJECTED" ? latest : null,
   };
+}
+
+// Status setiap add-on satu company (detail company, Superadmin).
+export async function getAddonCoverage(companyId: string) {
+  await io();
+  return loadAddonCoverage(db, companyId);
 }
 
 // Daftar tagihan satu company atau semua company (companyId kosong). Yang
@@ -187,6 +210,8 @@ export async function listSubscriptions({
       kind: subscriptions.kind,
       months: subscriptions.months,
       users: subscriptions.users,
+      attendance: subscriptions.attendance,
+      payroll: subscriptions.payroll,
       price: subscriptions.price,
       amountPaid: subscriptions.amountPaid,
       status: subscriptions.status,

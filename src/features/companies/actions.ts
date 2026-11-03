@@ -36,7 +36,12 @@ import {
   attendanceHolidays,
   attendanceLocations,
   attendancePenalties,
+  attendancePeriods,
   attendanceRecords,
+  payrollRuns,
+  payslips,
+  salaryComponents,
+  salaryProfiles,
   leaveRequests,
   leaveTypes,
   faceProfiles,
@@ -284,6 +289,13 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
     await tx.delete(attendanceConsents).where(eq(attendanceConsents.companyId, id));
     await tx.delete(attendanceHolidays).where(eq(attendanceHolidays.companyId, id));
     await tx.delete(attendanceLocations).where(eq(attendanceLocations.companyId, id));
+    await tx.delete(attendancePeriods).where(eq(attendancePeriods.companyId, id));
+
+    // Penggajian (BUSINESS-FLOW §20); baris slip ikut terhapus bersama slipnya.
+    await tx.delete(payslips).where(eq(payslips.companyId, id));
+    await tx.delete(payrollRuns).where(eq(payrollRuns.companyId, id));
+    await tx.delete(salaryComponents).where(eq(salaryComponents.companyId, id));
+    await tx.delete(salaryProfiles).where(eq(salaryProfiles.companyId, id));
 
     // Uang muka & pertanggungjawaban (anak → induk).
     await tx

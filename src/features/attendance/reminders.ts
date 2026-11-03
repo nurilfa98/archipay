@@ -19,6 +19,7 @@
 import "server-only";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { getOwnerContacts } from "@/features/advances/queries";
+import { addonActiveSql } from "@/lib/addons-db";
 import { db } from "@/lib/db";
 import { companies, faceProfiles, roles, userRoles, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
@@ -43,6 +44,7 @@ export async function notifyPendingFaces() {
         eq(faceProfiles.status, "PENDING"),
         isNull(faceProfiles.ownerNotifiedAt),
         eq(companies.isActive, true),
+        addonActiveSql(db, "attendance"), // add-on Absensi aktif
         eq(users.isActive, true),
       ),
     )

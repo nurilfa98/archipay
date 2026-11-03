@@ -6,7 +6,7 @@
 // Tetap bisa dibuka saat company terkunci (allowLocked): justru dari sinilah
 // Owner memperpanjang. Saat terkunci, menu lain mengarah ke halaman ini.
 
-import { CircleAlertIcon, ClockIcon, LockIcon } from "lucide-react";
+import { CircleAlertIcon, ClockIcon, LockIcon, PuzzleIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -16,7 +16,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { accessLabel } from "@/features/companies/components/company-card";
 import { CompanyStatusBadge } from "@/features/companies/components/company-status-badge";
 import { InvoiceCard } from "@/features/subscriptions/components/invoice-card";
-import { PaymentPanel, PlanPicker, TopupPicker } from "@/features/subscriptions/components/plan-picker";
+import {
+  AddonPicker,
+  PaymentPanel,
+  PlanPicker,
+  TopupPicker,
+} from "@/features/subscriptions/components/plan-picker";
 import { invoiceLabel } from "@/features/subscriptions/labels";
 import { minPlanUsers } from "@/features/subscriptions/pricing";
 import {
@@ -25,6 +30,15 @@ import {
   listBankAccounts,
   listSubscriptions,
 } from "@/features/subscriptions/queries";
+import {
+  ADDON_KEYS,
+  ADDON_LABELS,
+  daysUntil,
+  isTrialOnly,
+  paidAddonDays,
+  type AddonFlags,
+  type AddonKey,
+} from "@/lib/addons";
 import { requirePermission } from "@/lib/auth/dal";
 import { formatDate, formatShortDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
@@ -57,12 +71,19 @@ async function SubscriptionContent() {
   ]);
   if (!state) return null;
 
-  const { access, open, lastRejected, seats } = state;
+  const { access, open, lastRejected, seats, addons } = state;
   const status = access.status;
   const payment = { banks, hasQris: !!settings.qrisImageKey };
   const past = history.filter((invoice) => invoice.id !== open?.id);
   const minUsers = minPlanUsers(pricing, seats.active);
   const canTopup = status === "ACTIVE" && access.daysLeft >= 1;
+  // Add-on di tengah periode: hanya bila langganan berjalan & add-on itu belum aktif.
+  const inactiveAddons = canTopup ? ADDON_KEYS.filter((key) => !addons[key].active) : [];
+  const defaultAddons = Object.fromEntries(ADDON_KEYS.map((key) => [key, addons[key].active])) as AddonFlags;
+  const addonDays = Object.fromEntries(ADDON_KEYS.map((key) => [key, paidAddonDays(addons[key])])) as Record<
+    AddonKey,
+    number
+  >;
 
   return (
     <div className="flex flex-col gap-6">
@@ -98,6 +119,25 @@ async function SubscriptionContent() {
               `Masa aktif habis ${formatDate(access.until)}; company dikunci ${formatDate(access.graceUntil)}. `}
             Perpanjangan dihitung dari tanggal berakhir, jadi membayar lebih awal tidak merugikan.
           </p>
+          {ADDON_KEYS.map((key) => {
+            const coverage = addons[key];
+            return (
+              <p key={key} className="flex items-center gap-1.5">
+                <PuzzleIcon className="size-4 text-muted-foreground" />
+                <span>
+                  Add-on {ADDON_LABELS[key]}:{" "}
+                  <strong>
+                    {coverage.active && coverage.until
+                      ? isTrialOnly(coverage)
+                        ? `aktif selama masa gratis (s.d. ${formatDate(coverage.until)})`
+                        : `aktif s.d. ${formatDate(coverage.until)}`
+                      : "tidak aktif"}
+                  </strong>
+                </span>
+              </p>
+            );
+          })}
+          <p className="text-muted-foreground">Tanpa add-on, menunya disembunyikan dan datanya tetap tersimpan.</p>
         </CardContent>
       </Card>
 
@@ -143,9 +183,32 @@ async function SubscriptionContent() {
               pricing={pricing}
               minUsers={minUsers}
               defaultUsers={status === "TRIAL" ? minUsers : Math.max(seats.limit, minUsers)}
+              defaultAddons={defaultAddons}
               payment={payment}
             />
           </section>
+          {inactiveAddons.length > 0 && (
+            <section className="flex flex-col gap-3">
+              <h2 className="text-lg font-semibold">Aktifkan add-on</h2>
+              <p className="text-sm text-muted-foreground">
+                Untuk semua {seats.limit} pengguna paket, dibayar untuk sisa periode. Menunya terbuka setelah pembayaran
+                diverifikasi.
+              </p>
+              <div className="grid gap-4 lg:grid-cols-2">
+                {inactiveAddons.map((key) => (
+                  <AddonPicker
+                    key={key}
+                    addon={key}
+                    pricing={pricing}
+                    users={seats.limit}
+                    days={daysUntil(addons[key].addonEnd)}
+                    untilLabel={formatShortDate(addons[key].addonEnd)}
+                    payment={payment}
+                  />
+                ))}
+              </div>
+            </section>
+          )}
           {canTopup && (
             <section className="flex flex-col gap-3">
               <h2 className="text-lg font-semibold">Tambah kuota pengguna</h2>
@@ -156,6 +219,7 @@ async function SubscriptionContent() {
               <TopupPicker
                 pricing={pricing}
                 daysLeft={access.daysLeft}
+                addonDays={addonDays}
                 untilLabel={formatShortDate(access.until)}
                 payment={payment}
               />

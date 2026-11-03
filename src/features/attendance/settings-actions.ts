@@ -22,9 +22,10 @@ const FORBIDDEN = {
   message: "Anda tidak memiliki akses.",
 } as const;
 
+// Pengaturan absensi/cuti hanya bisa diubah selama add-on Absensi aktif.
 async function getSettingsManager() {
   const actor = await verifySession();
-  return can(actor, "settings:manage") ? actor : null;
+  return can(actor, "settings:manage") && actor.company.attendance ? actor : null;
 }
 
 export async function updateAttendanceSettings(

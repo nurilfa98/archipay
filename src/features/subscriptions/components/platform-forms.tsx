@@ -1,5 +1,5 @@
-// Form di halaman Pengaturan platform (Superadmin): komponen harga paket
-// (dengan kalkulasi otomatis), masa gratis & tenggang + batas pengguna masa
+// Form di halaman Pengaturan platform (Superadmin): komponen harga paket &
+// add-on Absensi (dengan kalkulasi otomatis), masa gratis & tenggang + batas pengguna masa
 // gratis + WhatsApp admin, masa simpan nota, rekening bank tujuan transfer,
 // dan QRIS statis.
 
@@ -8,6 +8,7 @@
 import { ImageUpIcon, LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ActionDialog } from "@/features/advances/components/action-dialog";
@@ -15,6 +16,7 @@ import { notify } from "@/lib/notify";
 import { BankAccountFields } from "@/components/bank-account-fields";
 import { PhoneInput } from "@/components/phone-input";
 import { bankAccentClass, formatAccountNumber } from "@/lib/bank";
+import { ADDON_KEYS, ADDON_LABELS } from "@/lib/addons";
 import { formatRupiah } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import {
@@ -27,7 +29,7 @@ import {
   updateReceiptRetention,
   uploadQris,
 } from "../actions";
-import { PLAN_LABELS, PLAN_MONTHS } from "../constants";
+import { PLAN_LABELS, PLAN_MONTHS, type PlanMonths } from "../constants";
 import { discountOf, MAX_USERS, planPrice, type Pricing } from "../pricing";
 import type { BankAccount } from "../queries";
 import { RECEIPT_RETENTION_MAX_MONTHS } from "../schemas";
@@ -97,6 +99,21 @@ export function PricingForm({ pricing }: { pricing: Pricing }) {
             error={fieldError("discount12")}
           />
         </div>
+        <div className="grid gap-5 sm:grid-cols-3">
+          {ADDON_KEYS.map((key) => (
+            <RupiahInput
+              key={key}
+              name={`${key}UserPrice`}
+              label={`Add-on ${ADDON_LABELS[key]} / pengguna / bulan`}
+              defaultValue={pricing.addonUserPrices[key]}
+              description="Dikali jumlah pengguna paket; diskon 6 bulan & 1 tahun ikut berlaku. Semua company."
+              onValueChange={(value) =>
+                setValues((current) => ({ ...current, addonUserPrices: { ...current.addonUserPrices, [key]: value } }))
+              }
+              error={fieldError(`${key}UserPrice`)}
+            />
+          ))}
+        </div>
 
         <PricingPreview pricing={values} sampleUsers={sampleUsers} onSampleUsersChange={setSampleUsers} />
         <SubmitButton pending={pending} label="Simpan harga" />
@@ -117,10 +134,17 @@ export function PricingPreview({
   onSampleUsersChange: (value: number) => void;
 }) {
   const columns = [pricing.includedUsers, sampleUsers];
+  const [withAddons, setWithAddons] = useState(false);
+  const price = (months: PlanMonths, users: number) =>
+    planPrice(pricing, months, users, withAddons ? ADDON_KEYS : []);
   return (
     <div className="flex flex-col gap-3 rounded-lg border bg-muted/30 p-4 text-sm">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-medium">Hasil kalkulasi otomatis</p>
+        <label className="flex items-center gap-2 text-muted-foreground">
+          <Checkbox checked={withAddons} onCheckedChange={(value) => setWithAddons(value === true)} />
+          Dengan semua add-on
+        </label>
         <label className="flex items-center gap-2 text-muted-foreground">
           Contoh
           <Input
@@ -159,10 +183,10 @@ export function PricingPreview({
                 </td>
                 {columns.map((users, index) => (
                   <td key={index} className="py-2 text-right">
-                    <p className="font-medium">{formatRupiah(planPrice(pricing, months, users))}</p>
+                    <p className="font-medium">{formatRupiah(price(months, users))}</p>
                     {months > 1 && (
                       <p className="text-xs text-muted-foreground">
-                        setara {formatRupiah(Math.round(planPrice(pricing, months, users) / months))}/bln
+                        setara {formatRupiah(Math.round(price(months, users) / months))}/bln
                       </p>
                     )}
                   </td>

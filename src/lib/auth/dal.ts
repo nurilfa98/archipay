@@ -28,6 +28,8 @@ import "server-only";
 import { and, eq, exists, sql } from "drizzle-orm";
 import { cacheLife } from "next/cache";
 import { redirect } from "next/navigation";
+import type { AddonFlags } from "@/lib/addons";
+import { addonFlagColumns } from "@/lib/addons-db";
 import { db } from "@/lib/db";
 import { companies, roles, subscriptions, userRoles, users } from "@/lib/db/schema";
 import { getPlatformSettings } from "@/lib/platform-settings";
@@ -37,7 +39,9 @@ import { can, type Permission } from "./permissions";
 import { isRole, type Role } from "./roles";
 import { getSession } from "./session";
 
-export type ActiveCompany = { id: string; name: string; isActive: boolean; access: CompanyAccess };
+// `attendance` / `payroll` = add-on Absensi / Penggajian aktif (lib/addons.ts).
+// Bila false, permission add-on itu dicabut (lib/auth/permissions.ts → can()).
+export type ActiveCompany = { id: string; name: string; isActive: boolean; access: CompanyAccess } & AddonFlags;
 
 // DTO (Data Transfer Object): hanya field yang aman & dibutuhkan UI.
 // password_hash, nomor rekening, dll TIDAK ikut.
@@ -117,6 +121,7 @@ async function loadCurrentUser(activeCompanyId: string | null): Promise<CurrentU
       companyIsActive: companies.isActive,
       subscriptionUntil: companies.subscriptionUntil,
       hasPaid: hasPaidSubscription,
+      addons: addonFlagColumns(db),
     })
     .from(users)
     .leftJoin(companies, eq(users.companyId, companies.id))
@@ -140,7 +145,7 @@ async function loadCurrentUser(activeCompanyId: string | null): Promise<CurrentU
     const access = await accessOf(user.subscriptionUntil, user.hasPaid ?? false);
     // Langganan terkunci: hanya Owner yang boleh masuk (ke menu Langganan).
     if (access.locked && !userRolesList.includes("OWNER")) return null;
-    company = { id: user.companyId, name: user.companyName, isActive: true, access };
+    company = { id: user.companyId, name: user.companyName, isActive: true, access, ...user.addons };
   } else if (can({ roles: userRolesList }, "company:manage")) {
     company = await findSuperadminCompany(activeCompanyId);
   } else {
@@ -170,13 +175,14 @@ async function findSuperadminCompany(companyId: string | null): Promise<ActiveCo
       isActive: companies.isActive,
       subscriptionUntil: companies.subscriptionUntil,
       hasPaid: hasPaidSubscription,
+      addons: addonFlagColumns(db),
     })
     .from(companies)
     .where(eq(companies.id, companyId))
     .limit(1);
   if (!row) return null;
-  const { subscriptionUntil, hasPaid, ...company } = row;
-  return { ...company, access: await accessOf(subscriptionUntil, hasPaid) };
+  const { subscriptionUntil, hasPaid, addons, ...company } = row;
+  return { ...company, ...addons, access: await accessOf(subscriptionUntil, hasPaid) };
 }
 
 // "Company ini pernah punya tagihan lunas" (masa gratis vs langganan aktif).
@@ -247,6 +253,15 @@ export async function requirePermission(permission: Permission, options?: { allo
 
 // Untuk halaman platform Superadmin (menu Company), yang tidak membutuhkan
 // company aktif.
+// Untuk halaman absensi/cuti yang tidak memakai satu permission tertentu
+// (mis. /attendance yang isinya mengikuti role). Add-on Absensi tidak aktif →
+// kembali ke beranda, sama seperti requirePermission().
+export async function requireAttendanceAddon() {
+  const user = await verifySession();
+  if (!user.company.attendance) redirect("/");
+  return user;
+}
+
 export async function requirePlatformAdmin() {
   const user = await verifyAccount();
   if (!can(user, "company:manage")) redirect("/");

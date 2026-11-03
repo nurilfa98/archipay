@@ -68,7 +68,12 @@ const advanceColumns = {
 };
 
 // `since` = awal jendela "kemarin" & "baru lewat batas" (24 jam terakhir).
-export async function getDigestData(companyId: string, since: Date): Promise<DigestData> {
+// `attendance` = add-on Absensi aktif; tanpa add-on, foto wajah & cuti tidak ikut diringkas.
+export async function getDigestData(
+  companyId: string,
+  since: Date,
+  { attendance }: { attendance: boolean },
+): Promise<DigestData> {
   const byStatus = (status: string) =>
     db
       .select(advanceColumns)
@@ -82,12 +87,14 @@ export async function getDigestData(companyId: string, since: Date): Promise<Dig
     await Promise.all([
       byStatus("PENDING_APPROVAL"),
       byStatus("APPROVED"),
-      db
-        .select({ fullName: users.fullName, createdAt: faceProfiles.createdAt })
-        .from(faceProfiles)
-        .innerJoin(users, eq(faceProfiles.userId, users.id))
-        .where(and(eq(faceProfiles.companyId, companyId), eq(faceProfiles.status, "PENDING")))
-        .orderBy(asc(faceProfiles.createdAt)),
+      attendance
+        ? db
+            .select({ fullName: users.fullName, createdAt: faceProfiles.createdAt })
+            .from(faceProfiles)
+            .innerJoin(users, eq(faceProfiles.userId, users.id))
+            .where(and(eq(faceProfiles.companyId, companyId), eq(faceProfiles.status, "PENDING")))
+            .orderBy(asc(faceProfiles.createdAt))
+        : [],
       db
         .select({
           id: settlements.id,
@@ -141,19 +148,21 @@ export async function getDigestData(companyId: string, since: Date): Promise<Dig
         .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
         .where(and(eq(advanceRequests.companyId, companyId), gte(advanceRequests.acknowledgedAt, since)))
         .orderBy(asc(advanceRequests.acknowledgedAt)),
-      db
-        .select({
-          number: leaveRequests.number,
-          fullName: users.fullName,
-          typeName: leaveTypes.name,
-          startDate: leaveRequests.startDate,
-          endDate: leaveRequests.endDate,
-        })
-        .from(leaveRequests)
-        .innerJoin(users, eq(leaveRequests.userId, users.id))
-        .innerJoin(leaveTypes, eq(leaveRequests.leaveTypeId, leaveTypes.id))
-        .where(and(eq(leaveRequests.companyId, companyId), eq(leaveRequests.status, "PENDING")))
-        .orderBy(asc(leaveRequests.createdAt)),
+      attendance
+        ? db
+            .select({
+              number: leaveRequests.number,
+              fullName: users.fullName,
+              typeName: leaveTypes.name,
+              startDate: leaveRequests.startDate,
+              endDate: leaveRequests.endDate,
+            })
+            .from(leaveRequests)
+            .innerJoin(users, eq(leaveRequests.userId, users.id))
+            .innerJoin(leaveTypes, eq(leaveRequests.leaveTypeId, leaveTypes.id))
+            .where(and(eq(leaveRequests.companyId, companyId), eq(leaveRequests.status, "PENDING")))
+            .orderBy(asc(leaveRequests.createdAt))
+        : [],
     ]);
 
   return {

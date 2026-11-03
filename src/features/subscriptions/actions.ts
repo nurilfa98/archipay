@@ -1,7 +1,8 @@
 // Server Action fitur langganan (BUSINESS-FLOW §17).
 //
-// - Owner (subscription:view): memilih paket + jumlah pengguna (atau tambah
-//   kuota pengguna prorata) lalu "Saya sudah bayar" + bukti → tagihan
+// - Owner (subscription:view): memilih paket + jumlah pengguna + add-on
+//   (atau tambah kuota pengguna / aktifkan add-on di tengah periode, prorata)
+//   lalu "Saya sudah bayar" + bukti → tagihan
 //   tercatat (CLAIMED) beserta pembayaran pertama; bila tagihan kurang bayar,
 //   bukti berikutnya ditambahkan ke tagihan yang sama. Harga SELALU dihitung
 //   ulang di server (pricing.ts), bukan diambil dari browser. Boleh
@@ -26,6 +27,16 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { detectReceiptType } from "@/features/settlements/receipt-file";
+import {
+  ADDON_KEYS,
+  ADDON_LABELS,
+  addonKeysOf,
+  daysUntil,
+  paidAddonDays,
+  type AddonFlags,
+  type AddonKey,
+} from "@/lib/addons";
+import { loadAddonCoverage } from "@/lib/addons-db";
 import { logAudit } from "@/lib/audit";
 import { verifyAccount, verifySession } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
@@ -48,7 +59,7 @@ import type { ActionResult } from "@/types/action-result";
 import { OPEN_SUBSCRIPTION_STATUSES, PROOF_MAX_BYTES, QRIS_MAX_BYTES, type PlanMonths } from "./constants";
 import { invoiceLabel } from "./labels";
 import { notifyOwners } from "./notifications";
-import { minPlanUsers, planPrice, topupPrice } from "./pricing";
+import { addonPrice, minPlanUsers, planPrice, topupPrice } from "./pricing";
 import { getCompanyPricing } from "./queries";
 import {
   acceptPaymentSchema,
@@ -64,6 +75,8 @@ import {
   rejectPaymentSchema,
 } from "./schemas";
 import { getSeatUsage } from "./seats";
+
+const NO_ADDONS: AddonFlags = { attendance: false, payroll: false };
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
 const NOT_FOUND = { success: false, message: "Pembayaran tidak ditemukan atau sudah diperiksa." } as const;
@@ -95,6 +108,9 @@ export async function claimSubscriptionPaid(
     kind: formData.get("kind") || undefined,
     months: formData.get("months") || undefined,
     users: formData.get("users") || undefined,
+    attendance: formData.get("attendance") || undefined,
+    payroll: formData.get("payroll") || undefined,
+    addon: formData.get("addon") || undefined,
     subscriptionId: formData.get("subscriptionId") || undefined,
     note: formData.get("note") ?? "",
   });
@@ -119,6 +135,8 @@ export async function claimSubscriptionPaid(
         kind: subscriptions.kind,
         months: subscriptions.months,
         users: subscriptions.users,
+        attendance: subscriptions.attendance,
+        payroll: subscriptions.payroll,
         price: subscriptions.price,
       })
       .from(subscriptions)
@@ -152,6 +170,8 @@ export async function claimSubscriptionPaid(
           kind: invoice.kind,
           months: invoice.months,
           users: invoice.users,
+          attendance: invoice.attendance,
+          payroll: invoice.payroll,
           price: invoice.price, // snapshot
           status: "CLAIMED",
           createdById: actor.id,
@@ -234,6 +254,8 @@ export async function acceptPayment(paymentId: string, formData: FormData): Prom
         kind: subscriptions.kind,
         months: subscriptions.months,
         users: subscriptions.users,
+        attendance: subscriptions.attendance,
+        payroll: subscriptions.payroll,
         price: subscriptions.price,
         amountPaid: subscriptions.amountPaid,
       })
@@ -282,7 +304,7 @@ export async function acceptPayment(paymentId: string, formData: FormData): Prom
     notifyOwners(
       result.companyId,
       result.applied
-        ? { kind: "paid", until: result.applied.until, userLimit: result.applied.userLimit }
+        ? { kind: "paid", ...paidNotice(result.applied) }
         : { kind: "underpaid", received: parsed.data.amount, remaining: result.remaining, price: result.price },
     ),
   );
@@ -351,21 +373,24 @@ export async function recordDirectPayment(
     companyId: formData.get("companyId"),
     months: formData.get("months"),
     users: formData.get("users"),
+    attendance: formData.get("attendance") || undefined,
+    payroll: formData.get("payroll") || undefined,
     note: formData.get("note") ?? "",
   });
   if (!parsed.success) return invalid(parsed.error);
   const { companyId, months, users: userCount, note } = parsed.data;
+  const flags = pickAddonFlags(parsed.data);
 
   const [{ pricing }, seats] = await Promise.all([getCompanyPricing(companyId), getSeatUsage(companyId)]);
   if (pricing.basePrice <= 0) return fieldError("months", "Harga dasar paket belum diatur di Pengaturan platform");
   const minUsers = minPlanUsers(pricing, seats.active);
   if (userCount < minUsers) return fieldError("users", `Minimal ${minUsers} pengguna`);
-  const price = planPrice(pricing, months, userCount);
+  const price = planPrice(pricing, months, userCount, addonKeysOf(flags));
 
   let applied: Applied;
   try {
     applied = await db.transaction(async (tx) => {
-      const result = await applyPaidInvoice(tx, { companyId, kind: "PLAN", months, users: userCount });
+      const result = await applyPaidInvoice(tx, { companyId, kind: "PLAN", months, users: userCount, ...flags });
       const now = new Date();
       const subscriptionId = crypto.randomUUID();
       await tx.insert(subscriptions).values({
@@ -374,6 +399,7 @@ export async function recordDirectPayment(
         kind: "PLAN",
         months,
         users: userCount,
+        ...flags,
         price,
         amountPaid: price,
         status: "ACTIVE",
@@ -401,7 +427,7 @@ export async function recordDirectPayment(
     throw error;
   }
 
-  after(() => notifyOwners(companyId, { kind: "paid", until: applied.until, userLimit: applied.userLimit }));
+  after(() => notifyOwners(companyId, { kind: "paid", ...paidNotice(applied) }));
 
   revalidateSubscriptionPages();
   return { success: true, data: undefined };
@@ -420,6 +446,8 @@ export async function updatePricing(_prevState: ActionResult | undefined, formDa
     extraUserPrice: formData.get("extraUserPrice") ?? "",
     discount6: formData.get("discount6"),
     discount12: formData.get("discount12"),
+    attendanceUserPrice: formData.get("attendanceUserPrice") ?? "",
+    payrollUserPrice: formData.get("payrollUserPrice") ?? "",
   });
   if (!parsed.success) return invalid(parsed.error);
 
@@ -606,27 +634,58 @@ async function lockPendingPayment(tx: Transaction, paymentId: string) {
   return payment ?? null;
 }
 
-type Invoice = { kind: string; months: number | null; users: number; price: number };
-type Applied = { startsAt: Date | null; endsAt: Date | null; until: Date; userLimit: number };
+type Invoice = { kind: string; months: number | null; users: number; price: number } & AddonFlags;
+type Applied = {
+  startsAt: Date | null;
+  endsAt: Date | null;
+  until: Date;
+  userLimit: number;
+  // Add-on yang baru dibayar (PLAN yang dicentang / ADDON) dan akhir periodenya.
+  addonsUntil: { key: AddonKey; until: Date }[];
+};
 
 // Hitung tagihan baru dari pilihan Owner (harga & syarat dicek di server).
 async function quoteNewInvoice(
   companyId: string,
   access: CompanyAccess,
-  input: { kind: "PLAN" | "TOPUP"; months?: PlanMonths; users?: number },
+  input: { kind: "PLAN" | "TOPUP" | "ADDON"; months?: PlanMonths; users?: number; addon?: AddonKey } & AddonFlags,
 ): Promise<ActionResult<Invoice>> {
-  const [{ pricing }, seats] = await Promise.all([getCompanyPricing(companyId), getSeatUsage(companyId)]);
+  const [{ pricing }, seats, coverage] = await Promise.all([
+    getCompanyPricing(companyId),
+    getSeatUsage(companyId),
+    loadAddonCoverage(db, companyId),
+  ]);
+  if (!coverage) return { success: false, message: "Company tidak ditemukan." };
+  // Tambah kuota & add-on hanya untuk langganan berbayar yang masih berjalan;
+  // masa gratis/tenggang/terkunci membeli paket baru.
+  const midPeriod = access.status === "ACTIVE" && access.daysLeft >= 1;
+
+  if (input.kind === "ADDON") {
+    const key = input.addon;
+    if (!key) return { success: false, message: "Pilih add-on terlebih dahulu." };
+    const label = ADDON_LABELS[key];
+    if (!midPeriod) return { success: false, message: "Add-on hanya untuk langganan aktif. Pilih paket baru." };
+    if (coverage[key].active) return { success: false, message: `Add-on ${label} sudah aktif.` };
+    const price = addonPrice(pricing, key, seats.limit, daysUntil(coverage[key].addonEnd));
+    if (price <= 0) return { success: false, message: `Harga add-on ${label} belum diatur. Hubungi admin ArchiPay.` };
+    return {
+      success: true,
+      data: { kind: "ADDON", months: null, users: seats.limit, ...NO_ADDONS, [key]: true, price },
+    };
+  }
+
   if (input.users == null) return fieldError("users", "Isi jumlah pengguna");
 
   if (input.kind === "TOPUP") {
-    // Tambah kuota hanya untuk langganan berbayar yang masih berjalan; masa
-    // gratis/tenggang/terkunci membeli paket baru dengan jumlah pengguna baru.
-    if (access.status !== "ACTIVE" || access.daysLeft < 1) {
-      return { success: false, message: "Tambah kuota hanya untuk langganan aktif. Pilih paket baru." };
-    }
-    const price = topupPrice(pricing, input.users, access.daysLeft);
+    if (!midPeriod) return { success: false, message: "Tambah kuota hanya untuk langganan aktif. Pilih paket baru." };
+    const addonDays = Object.fromEntries(ADDON_KEYS.map((key) => [key, paidAddonDays(coverage[key])])) as Record<
+      AddonKey,
+      number
+    >;
+    const price = topupPrice(pricing, input.users, access.daysLeft, addonDays);
     if (price <= 0) return { success: false, message: "Harga pengguna tambahan belum diatur. Hubungi admin ArchiPay." };
-    return { success: true, data: { kind: "TOPUP", months: null, users: input.users, price } };
+    const flags = Object.fromEntries(ADDON_KEYS.map((key) => [key, addonDays[key] > 0])) as AddonFlags;
+    return { success: true, data: { kind: "TOPUP", months: null, users: input.users, ...flags, price } };
   }
 
   if (input.months == null) return { success: false, message: "Pilih paket terlebih dahulu." };
@@ -635,19 +694,33 @@ async function quoteNewInvoice(
   if (input.users < minUsers) {
     return fieldError("users", `Minimal ${minUsers} pengguna (pengguna aktif saat ini ${seats.active})`);
   }
+  const flags = pickAddonFlags(input);
   return {
     success: true,
-    data: { kind: "PLAN", months: input.months, users: input.users, price: planPrice(pricing, input.months, input.users) },
+    data: {
+      kind: "PLAN",
+      months: input.months,
+      users: input.users,
+      ...flags,
+      price: planPrice(pricing, input.months, input.users, addonKeysOf(flags)),
+    },
   };
+}
+
+function pickAddonFlags(input: AddonFlags): AddonFlags {
+  return Object.fromEntries(ADDON_KEYS.map((key) => [key, input[key]])) as AddonFlags;
 }
 
 // Terapkan tagihan yang lunas ke company (baris company dikunci):
 // - PLAN : masa aktif diperpanjang dari subscription_until yang sedang
-//          berjalan, batas pengguna = jumlah pengguna paket.
+//          berjalan, batas pengguna = jumlah pengguna paket. Add-on yang
+//          dicentang aktif selama periode itu (dibaca dari periode tagihan).
 // - TOPUP: batas pengguna bertambah, masa aktif tetap.
+// - ADDON: periode add-on = sekarang s.d. akhir masa aktif (atau s.d. periode
+//          berikutnya yang sudah termasuk add-on itu), dihitung saat lunas.
 async function applyPaidInvoice(
   tx: Transaction,
-  invoice: { companyId: string; kind: string; months: number | null; users: number },
+  invoice: { companyId: string; kind: string; months: number | null; users: number } & AddonFlags,
 ): Promise<Applied> {
   const [company] = await tx
     .select({ subscriptionUntil: companies.subscriptionUntil, userLimit: companies.userLimit })
@@ -655,11 +728,22 @@ async function applyPaidInvoice(
     .where(eq(companies.id, invoice.companyId))
     .for("update");
   if (!company) throw new CompanyNotFoundError();
+  const unchanged = { until: company.subscriptionUntil, userLimit: company.userLimit };
+  const keys = addonKeysOf(invoice);
+
+  if (invoice.kind === "ADDON") {
+    const coverage = await loadAddonCoverage(tx, invoice.companyId);
+    const key = keys[0];
+    const startsAt = new Date();
+    const addonEnd = key && coverage ? coverage[key].addonEnd : null;
+    const endsAt = addonEnd && addonEnd > startsAt ? addonEnd : company.subscriptionUntil;
+    return { startsAt, endsAt, ...unchanged, addonsUntil: keys.map((addon) => ({ key: addon, until: endsAt })) };
+  }
 
   if (invoice.kind === "TOPUP" || invoice.months == null) {
     const userLimit = company.userLimit + invoice.users;
     await tx.update(companies).set({ userLimit }).where(eq(companies.id, invoice.companyId));
-    return { startsAt: null, endsAt: null, until: company.subscriptionUntil, userLimit };
+    return { startsAt: null, endsAt: null, ...unchanged, userLimit, addonsUntil: [] };
   }
 
   const period = nextPeriod(company.subscriptionUntil, invoice.months);
@@ -667,7 +751,20 @@ async function applyPaidInvoice(
     .update(companies)
     .set({ subscriptionUntil: period.endsAt, userLimit: invoice.users })
     .where(eq(companies.id, invoice.companyId));
-  return { ...period, until: period.endsAt, userLimit: invoice.users };
+  return {
+    ...period,
+    until: period.endsAt,
+    userLimit: invoice.users,
+    addonsUntil: keys.map((key) => ({ key, until: period.endsAt })),
+  };
+}
+
+function paidNotice(applied: Applied) {
+  return {
+    until: applied.until,
+    userLimit: applied.userLimit,
+    addonsUntil: applied.addonsUntil.map(({ key, until }) => ({ label: ADDON_LABELS[key], until })),
+  };
 }
 
 function invalid(error: z.ZodError) {

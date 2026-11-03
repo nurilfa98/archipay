@@ -12,6 +12,7 @@
 
 import "server-only";
 import { and, eq, inArray } from "drizzle-orm";
+import { addonActiveSql } from "@/lib/addons-db";
 import { db } from "@/lib/db";
 import { companies, digestLogs, roles, userRoles, users } from "@/lib/db/schema";
 import { zonedDateString } from "@/lib/dates";
@@ -30,7 +31,12 @@ export async function sendDailyDigests() {
 
   const activeCompanies = (
     await db
-      .select({ id: companies.id, name: companies.name, subscriptionUntil: companies.subscriptionUntil })
+      .select({
+        id: companies.id,
+        name: companies.name,
+        subscriptionUntil: companies.subscriptionUntil,
+        attendance: addonActiveSql(db, "attendance"),
+      })
       .from(companies)
       .where(eq(companies.isActive, true))
   ).filter((company) => company.subscriptionUntil.getTime() + graceDays * DAY_MS >= now.getTime());
@@ -58,7 +64,7 @@ export async function sendDailyDigests() {
       }
     }
 
-    const data = await getDigestData(company.id, since);
+    const data = await getDigestData(company.id, since, { attendance: company.attendance });
     for (const [userId, person] of recipients) {
       const message = digestEmail({
         to: person.email,

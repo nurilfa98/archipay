@@ -2,7 +2,7 @@
 // menu yang boleh dibuka user.
 //
 // Client Component karena pencarian disaring langsung di browser saat
-// mengetik. Komponen ini menerima `roles` dari server, bukan daftar menu,
+// mengetik. Komponen ini menerima `roles` (dan add-on yang aktif) dari server, bukan daftar menu,
 // karena ikon lucide adalah fungsi yang tidak bisa dikirim dari Server
 // Component ke Client Component.
 //
@@ -15,6 +15,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { Input } from "@/components/ui/input";
+import type { AddonFlags } from "@/lib/addons";
 import type { Role } from "@/lib/auth/roles";
 import { canSeeMenu, MENU_ITEMS, type MenuItem } from "./nav-config";
 
@@ -27,11 +28,11 @@ function matches(item: MenuItem, query: string) {
     .every((word) => text.includes(word));
 }
 
-export function MenuLauncher({ roles }: { roles: Role[] }) {
+export function MenuLauncher({ roles, addons }: { roles: Role[]; addons: AddonFlags }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
 
-  const allowed = MENU_ITEMS.filter((item) => canSeeMenu({ roles }, item));
+  const allowed = MENU_ITEMS.filter((item) => canSeeMenu({ roles, company: addons }, item));
   const visible = allowed.filter((item) => matches(item, query));
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
