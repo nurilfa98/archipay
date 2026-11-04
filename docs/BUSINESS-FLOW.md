@@ -538,7 +538,10 @@ aturan akses `src/lib/subscription-access.ts` & `src/lib/auth/dal.ts`.
 
 - **Masa gratis** untuk setiap company baru, lamanya diatur Superadmin di
   Pengaturan platform (bawaan **14 hari**) sejak company dibuat, dengan
-  **batas pengguna masa gratis** (bawaan **10 pengguna aktif**).
+  **batas pengguna masa gratis** (bawaan **10 pengguna aktif**). Keduanya
+  hanya nilai awal: di form **Tambah company** Superadmin bisa mengubah lama
+  masa gratis (1–90 hari) dan batas penggunanya khusus untuk company itu
+  (keputusan 4 Nov 2026).
 - **Harga dasar + per pengguna** (keputusan 31 Okt 2026, menggantikan harga
   flat), diatur di Pengaturan platform (`features/subscriptions/pricing.ts`):
 
@@ -569,8 +572,11 @@ aturan akses `src/lib/subscription-access.ts` & `src/lib/auth/dal.ts`.
 - **Harga khusus per company** (hasil negosiasi) di detail company →
   Langganan: harga dasar, jumlah pengguna termasuk, dan/atau harga per
   pengguna tambahan; isian kosong mengikuti standar. Diskon selalu standar.
-- **Masa tenggang** (bawaan **3 hari**) setelah masa aktif habis: aplikasi
-  tetap bisa dipakai dengan spanduk merah. Lewat itu company **terkunci**.
+- **Masa tenggang** (bawaan **3 hari**) **khusus company berbayar** (pernah
+  punya tagihan lunas), setelah masa langganan habis: aplikasi tetap bisa
+  dipakai dengan spanduk merah. Lewat itu company **terkunci**. Masa gratis
+  **tanpa tenggang** (keputusan 4 Nov 2026): begitu masa gratis habis, company
+  langsung terkunci sampai Owner membayar paket.
 - **Add-on Absensi** (bagian 18–19) dan **Penggajian** (bagian 20) dibayar
   terpisah, lihat 17.6.
 
@@ -580,8 +586,8 @@ aturan akses `src/lib/subscription-access.ts` & `src/lib/auth/dal.ts`.
 |---|---|---|
 | Masa gratis | belum pernah lunas, masa aktif masih berjalan | normal; spanduk kuning mulai H-7 |
 | Aktif | pernah lunas, masa aktif masih berjalan | normal; spanduk kuning mulai H-7 |
-| Tenggang | masa aktif habis, belum lewat masa tenggang | normal; spanduk merah |
-| Terkunci | lewat masa tenggang | **Owner** hanya bisa membuka menu Langganan; **Finance & Karyawan tidak bisa login** ("Masa berlangganan ArchiPay company Anda sudah habis. Hubungi Owner…"); **Superadmin** tetap bisa membuka company itu |
+| Tenggang | pernah lunas, masa aktif habis, belum lewat masa tenggang | normal; spanduk merah |
+| Terkunci | lewat masa tenggang (masa gratis: langsung saat habis) | **Owner** hanya bisa membuka menu Langganan; **Finance & Karyawan tidak bisa login** ("Masa berlangganan ArchiPay company Anda sudah habis. Hubungi Owner…"); **Superadmin** tetap bisa membuka company itu |
 | Nonaktif | saklar manual Superadmin (bagian 16) | semua user tidak bisa login, apa pun status langganannya |
 
 Status dihitung dari `companies.subscription_until` setiap request, jadi

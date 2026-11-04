@@ -11,8 +11,8 @@ archipay/
 ├── public/                    # file statis (logo, gambar)
 ├── src/
 │   ├── app/                   # ROUTING SAJA — tipis, tidak ada logika bisnis
-│   │   ├── (auth)/layout.tsx               # tampilan tengah tanpa sidebar
-│   │   ├── (auth)/login/page.tsx
+│   │   ├── (auth)/layout.tsx               # tampilan tengah tanpa sidebar (ganti password, verifikasi HP)
+│   │   ├── (login)/login/page.tsx          # login: info + kartu form di PC, form saja di HP
 │   │   ├── (app)/layout.tsx                # sidebar + navbar untuk semua halaman setelah login
 │   │   ├── (app)/page.tsx                  # beranda (/)
 │   │   ├── (app)/advances/page.tsx         # (nanti)

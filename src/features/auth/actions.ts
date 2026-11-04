@@ -94,7 +94,10 @@ export async function login(
   }
   // Langganan habis & lewat masa tenggang: hanya Owner yang boleh masuk, dan
   // ia hanya bisa membuka menu Langganan (lib/auth/dal.ts).
-  if (user.companySubscriptionUntil && (await isLockedForUser(user.id, user.companySubscriptionUntil))) {
+  if (
+    user.companySubscriptionUntil &&
+    (await isLockedForUser(user.id, user.companySubscriptionUntil, user.companyHasPaid))
+  ) {
     await logFailedLogin(user, "SUBSCRIPTION_LOCKED", ip);
     return {
       success: false,
@@ -194,9 +197,9 @@ export async function changePassword(
   redirect(homePath(account.companyId));
 }
 
-async function isLockedForUser(userId: string, subscriptionUntil: Date) {
+async function isLockedForUser(userId: string, subscriptionUntil: Date, hasPaid: boolean) {
   const { graceDays } = await getPlatformSettings();
-  if (!getCompanyAccess({ subscriptionUntil, hasPaid: false, graceDays }).locked) return false;
+  if (!getCompanyAccess({ subscriptionUntil, hasPaid, graceDays }).locked) return false;
   return !(await findUserRoleNames(userId)).includes("OWNER");
 }
 

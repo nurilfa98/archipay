@@ -1,6 +1,7 @@
 # ArchiPay
 
-Project Financial Control & Petty Cash Management System. ArchiPay mencatat
+Keuangan Proyek & SDM: uang muka proyek, pertanggungjawaban nota, absensi,
+dan penggajian dalam satu aplikasi. ArchiPay mencatat
 **uang muka** (kas bon operasional) yang diberikan kantor ke karyawan, beserta
 **pertanggungjawaban** nota, pengembalian sisa dana, penggantian kekurangan,
 dan **potong gaji** bila sisa dana tidak dikembalikan. Notifikasi dan
@@ -36,7 +37,7 @@ Prasyarat: Node.js 20.9 atau lebih baru, pnpm 9, dan database PostgreSQL.
 
    ```bash
    pnpm db:migrate
-   pnpm db:create-superadmin admin@perusahaan.com passwordRahasia "Nama Superadmin"
+   pnpm db:create-superadmin admin@example.com passwordRahasia "Nama Superadmin"
    ```
 
 4. Jalankan aplikasi, lalu buka [http://localhost:3000](http://localhost:3000):

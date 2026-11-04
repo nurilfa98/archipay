@@ -88,7 +88,7 @@ export function LoginForm() {
             id="email"
             name="email"
             type="email"
-            placeholder="nama@perusahaan.com"
+            placeholder="nama@example.com"
             autoComplete="email"
             required
             value={email}

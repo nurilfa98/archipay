@@ -64,7 +64,6 @@ import {
   users,
 } from "@/lib/db/schema";
 import { sendEmail } from "@/lib/email";
-import { getPlatformSettings } from "@/lib/platform-settings";
 import { deleteObject } from "@/lib/storage";
 import { addDays } from "@/lib/subscription-access";
 import type { ActionResult } from "@/types/action-result";
@@ -98,15 +97,16 @@ export async function createCompany(
     name: formData.get("name") ?? "",
     address: formData.get("address") ?? "",
     phoneNumber: formData.get("phoneNumber") ?? "",
+    freeDays: formData.get("freeDays"),
+    trialMaxUsers: formData.get("trialMaxUsers"),
     ownerName: formData.get("ownerName") ?? "",
     ownerEmail: formData.get("ownerEmail") ?? "",
   });
   if (!parsed.success) return invalid(parsed.error);
-  const { ownerName, ownerEmail, ...company } = parsed.data;
+  const { ownerName, ownerEmail, freeDays, trialMaxUsers, ...company } = parsed.data;
 
   const temporaryPassword = generateTemporaryPassword();
   const passwordHash = await hashPassword(temporaryPassword);
-  const { freeDays, trialMaxUsers } = await getPlatformSettings();
 
   let companyId: string;
   try {
@@ -114,7 +114,7 @@ export async function createCompany(
     // pengaturan atau tanpa Owner tidak bisa dipakai.
     companyId = await db.transaction(async (tx) => {
       // Setiap company baru mendapat masa gratis dengan batas pengguna masa
-      // gratis (Pengaturan platform).
+      // gratis, diisi Superadmin di form (nilai awal dari Pengaturan platform).
       const [created] = await tx
         .insert(companies)
         .values({ ...company, subscriptionUntil: addDays(new Date(), freeDays), userLimit: trialMaxUsers })

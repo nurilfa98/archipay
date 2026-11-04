@@ -1,5 +1,6 @@
 // Layout untuk halaman akun tanpa sidebar/navbar (route group "(auth)"):
-// login dan ganti password. Konten di tengah layar.
+// ganti password dan verifikasi nomor HP. Konten di tengah layar.
+// Halaman login punya tampilan sendiri di src/app/(login)/login/page.tsx.
 //
 // min-h-svh = tinggi layar "small viewport". Di HP, ini tidak tertutup
 // address bar browser (berbeda dengan 100vh).

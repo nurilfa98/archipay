@@ -219,7 +219,7 @@ export function PlatformSettingsForm({
             label="Masa gratis company baru"
             defaultValue={settings.freeDays}
             max={90}
-            description="Berlaku untuk company yang dibuat setelah ini."
+            description="Nilai awal di form Tambah company; bisa diubah per company."
             error={fieldError("freeDays")}
           />
           <DaysField
@@ -227,7 +227,7 @@ export function PlatformSettingsForm({
             label="Masa tenggang"
             defaultValue={settings.graceDays}
             max={30}
-            description="Setelah masa aktif habis, sebelum company dikunci."
+            description="Khusus company berbayar: setelah masa langganan habis, sebelum dikunci."
             error={fieldError("graceDays")}
           />
         </div>
@@ -238,7 +238,7 @@ export function PlatformSettingsForm({
           defaultValue={settings.trialMaxUsers}
           min={1}
           max={MAX_USERS}
-          description="Pengguna aktif (Owner, Finance, Karyawan) selama masa gratis. Berlaku untuk company yang dibuat setelah ini."
+          description="Pengguna aktif (Owner, Finance, Admin HR, Karyawan) selama masa gratis. Nilai awal di form Tambah company; bisa diubah per company."
           error={fieldError("trialMaxUsers")}
         />
         <PhoneInput

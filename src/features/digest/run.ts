@@ -8,16 +8,19 @@
 //
 // Anti-dobel: digest_logs (user + tanggal) dicatat sebelum email dikirim;
 // bila gagal terkirim, catatannya dihapus agar dicoba di jadwal berikutnya.
-// Company nonaktif dan yang terkunci (lewat masa tenggang) dilewati.
+// Company nonaktif dan yang terkunci (masa gratis habis, atau lewat masa
+// tenggang bagi company berbayar) dilewati.
 
 import "server-only";
 import { and, eq, inArray } from "drizzle-orm";
+import { hasPaidSubscription } from "@/features/subscriptions/queries";
 import { addonActiveSql } from "@/lib/addons-db";
 import { db } from "@/lib/db";
 import { companies, digestLogs, roles, userRoles, users } from "@/lib/db/schema";
 import { zonedDateString } from "@/lib/dates";
 import { sendEmail } from "@/lib/email";
 import { getPlatformSettings } from "@/lib/platform-settings";
+import { getCompanyAccess } from "@/lib/subscription-access";
 import { digestEmail, type DigestAudience } from "./email";
 import { getDigestData } from "./queries";
 
@@ -35,11 +38,12 @@ export async function sendDailyDigests() {
         id: companies.id,
         name: companies.name,
         subscriptionUntil: companies.subscriptionUntil,
+        hasPaid: hasPaidSubscription(),
         attendance: addonActiveSql(db, "attendance"),
       })
       .from(companies)
       .where(eq(companies.isActive, true))
-  ).filter((company) => company.subscriptionUntil.getTime() + graceDays * DAY_MS >= now.getTime());
+  ).filter((company) => !getCompanyAccess({ ...company, graceDays, now }).locked);
 
   let sent = 0;
   for (const company of activeCompanies) {

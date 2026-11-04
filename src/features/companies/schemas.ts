@@ -3,7 +3,10 @@
 
 import { z } from "zod";
 import { emailSchema, fullNameSchema } from "@/features/users/schemas";
+import { MAX_USERS } from "@/features/subscriptions/pricing";
 import { normalizeIndonesianPhone } from "@/lib/phone";
+
+export const MAX_FREE_DAYS = 90;
 
 const name = z
   .string()
@@ -30,9 +33,25 @@ const phoneNumber = z.string().transform((value, ctx) => {
 
 export const companySchema = z.object({ name, address, phoneNumber });
 
+// Masa gratis company baru: diisi Superadmin, nilai awal dari Pengaturan
+// platform. Batas sama dengan Pengaturan platform (features/subscriptions/schemas).
+const freeDays = z.coerce
+  .number("Masa gratis harus berupa angka")
+  .int("Masa gratis harus bilangan bulat")
+  .min(1, "Masa gratis minimal 1 hari")
+  .max(MAX_FREE_DAYS, `Masa gratis maksimal ${MAX_FREE_DAYS} hari`);
+
+const trialMaxUsers = z.coerce
+  .number("Batas pengguna harus berupa angka")
+  .int("Batas pengguna harus bilangan bulat")
+  .min(1, "Batas pengguna minimal 1")
+  .max(MAX_USERS, `Batas pengguna maksimal ${MAX_USERS}`);
+
 // Company baru selalu dibuat bersama Owner pertamanya. Password sementara
 // Owner dibuat sistem dan dikirim ke emailnya.
 export const createCompanySchema = companySchema.extend({
+  freeDays,
+  trialMaxUsers,
   ownerName: fullNameSchema,
   ownerEmail: emailSchema,
 });

@@ -23,13 +23,20 @@ import { Field, FieldError, FieldGroup, FieldLabel, FieldLegend, FieldSet } from
 import { Textarea } from "@/components/ui/textarea";
 import { createCompany, updateCompany } from "@/features/companies/actions";
 import type { CompanyDetail } from "@/features/companies/queries";
+import { MAX_FREE_DAYS } from "@/features/companies/schemas";
+import { NumberField } from "@/features/subscriptions/components/platform-forms";
+import { MAX_USERS } from "@/features/subscriptions/pricing";
 import { TextField } from "@/features/users/components/text-field";
 import { notify } from "@/lib/notify";
 import { PhoneInput } from "@/components/phone-input";
 
 type CompanyFormProps = { company: Pick<CompanyDetail, "id" | "name" | "address" | "phoneNumber"> };
 
-export function CompanyCreateForm() {
+// Nilai awal masa gratis dari Pengaturan platform; Superadmin boleh mengubahnya
+// khusus untuk company ini.
+export type TrialDefaults = { freeDays: number; trialMaxUsers: number };
+
+export function CompanyCreateForm({ trialDefaults }: { trialDefaults: TrialDefaults }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createCompany, undefined);
   const fieldError = (name: string) => (state && !state.success ? state.fieldErrors?.[name]?.[0] : undefined);
@@ -62,6 +69,29 @@ export function CompanyCreateForm() {
     <form onSubmit={handleSubmit} className="max-w-xl">
       <FieldGroup>
         <CompanyFields fieldError={fieldError} />
+
+        <div className="grid gap-5 sm:grid-cols-2">
+          <NumberField
+            name="freeDays"
+            label="Masa gratis"
+            unit="hari"
+            defaultValue={trialDefaults.freeDays}
+            min={1}
+            max={MAX_FREE_DAYS}
+            description="Dihitung sejak company dibuat. Bawaan dari Pengaturan platform."
+            error={fieldError("freeDays")}
+          />
+          <NumberField
+            name="trialMaxUsers"
+            label="Batas pengguna masa gratis"
+            unit="pengguna"
+            defaultValue={trialDefaults.trialMaxUsers}
+            min={1}
+            max={MAX_USERS}
+            description="Pengguna aktif selama masa gratis. Bawaan dari Pengaturan platform."
+            error={fieldError("trialMaxUsers")}
+          />
+        </div>
 
         <FieldSet>
           <FieldLegend>Owner pertama</FieldLegend>

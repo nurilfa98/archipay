@@ -4,9 +4,13 @@
 //
 //   TRIAL  belum pernah lunas, masa gratis masih berjalan   → normal
 //   ACTIVE pernah lunas, masa langganan masih berjalan       → normal
-//   GRACE  masa aktif habis, belum lewat masa tenggang      → normal + spanduk merah
-//   LOCKED lewat masa tenggang → Owner hanya membuka Langganan, Finance &
-//          Karyawan tidak bisa login. Superadmin tetap bisa membuka company.
+//   GRACE  pernah lunas, masa aktif habis, belum lewat masa tenggang
+//                                                            → normal + spanduk merah
+//   LOCKED lewat masa tenggang (masa gratis: langsung saat habis) → Owner hanya
+//          membuka Langganan, Finance & Karyawan tidak bisa login. Superadmin
+//          tetap bisa membuka company.
+//
+// Masa tenggang khusus klien berbayar: masa gratis tidak punya tenggang.
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -26,8 +30,8 @@ export type CompanyAccess = {
 // Spanduk pengingat & chip "Segera habis" mulai H-7.
 export const REMINDER_DAYS = 7;
 
-// `hasPaid` = pernah ada tagihan lunas (membedakan TRIAL vs ACTIVE; hanya
-// label, tidak memengaruhi akses).
+// `hasPaid` = pernah ada tagihan lunas: membedakan TRIAL vs ACTIVE, dan hanya
+// company yang pernah lunas mendapat masa tenggang (`graceDays`).
 export function getCompanyAccess({
   subscriptionUntil,
   hasPaid,
@@ -39,7 +43,7 @@ export function getCompanyAccess({
   graceDays: number;
   now?: Date;
 }): CompanyAccess {
-  const graceUntil = addDays(subscriptionUntil, graceDays);
+  const graceUntil = addDays(subscriptionUntil, hasPaid ? graceDays : 0);
   const daysLeft = Math.ceil((subscriptionUntil.getTime() - now.getTime()) / DAY_MS);
   const locked = now > graceUntil;
   const status: CompanyAccessStatus = locked

@@ -8,6 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyCreateForm } from "@/features/companies/components/company-form";
 import { requirePlatformAdmin } from "@/lib/auth/dal";
+import { getPlatformSettings } from "@/lib/platform-settings";
 
 export const metadata: Metadata = {
   title: "Tambah Company",
@@ -33,5 +34,6 @@ export default function NewCompanyPage() {
 
 async function NewCompanyContent() {
   await requirePlatformAdmin();
-  return <CompanyCreateForm />;
+  const { freeDays, trialMaxUsers } = await getPlatformSettings();
+  return <CompanyCreateForm trialDefaults={{ freeDays, trialMaxUsers }} />;
 }

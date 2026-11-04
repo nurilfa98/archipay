@@ -8,6 +8,7 @@
 
 import "server-only";
 import { eq } from "drizzle-orm";
+import { hasPaidSubscription } from "@/features/subscriptions/queries";
 import { db } from "@/lib/db";
 import { companies, roles, userRoles, users } from "@/lib/db/schema";
 
@@ -29,6 +30,8 @@ export async function findUserForLogin(email: string) {
       ...credentialColumns,
       companyIsActive: companies.isActive,
       companySubscriptionUntil: companies.subscriptionUntil,
+      // Masa tenggang hanya untuk company yang pernah lunas.
+      companyHasPaid: hasPaidSubscription(),
     })
     .from(users)
     .leftJoin(companies, eq(users.companyId, companies.id))
