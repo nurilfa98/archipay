@@ -24,7 +24,6 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { setExpenseCategoryActive } from "@/features/settings/actions";
 import { notify } from "@/lib/notify";
-import { cn } from "@/lib/utils";
 
 export function CategoryActiveSwitch({
   id,
@@ -70,10 +69,7 @@ export function CategoryActiveSwitch({
           aria-labelledby={labelId}
           className="data-checked:bg-emerald-600 dark:data-checked:bg-emerald-500"
         />
-        <span
-          id={labelId}
-          className={cn("text-sm", optimisticActive ? "font-medium" : "text-muted-foreground")}
-        >
+        <span id={labelId} className="text-sm text-muted-foreground">
           <span className="sr-only">Status {name}: </span>
           {optimisticActive ? "Aktif" : "Nonaktif"}
         </span>

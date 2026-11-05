@@ -4,12 +4,21 @@
 //
 // Alur di HP:
 // 1. Kamera depan dibuka (getUserMedia). Tidak ada pilihan unggah dari galeri.
-// 2. @vladmandic/human (TensorFlow.js, berjalan di browser) mendeteksi wajah
-//    beberapa kali per detik: harus tepat satu wajah, cukup dekat, menghadap
-//    kamera, dan lolos model anti-spoof & liveness.
-// 3. Karyawan diminta berkedip. Setelah kedipan terdeteksi dan mata terbuka
-//    lagi, foto diambil otomatis.
-// 4. Dari foto itu dihitung face embedding (1024 angka).
+// 2. @vladmandic/human (TensorFlow.js, berjalan di browser) memeriksa setiap
+//    frame dengan model RINGAN saja (deteksi wajah, mesh, ekspresi): harus
+//    tepat satu wajah, cukup dekat, dan di tengah bingkai → bingkai hijau
+//    setengah.
+// 3. Karyawan diminta tersenyum (tantangan liveness). Senyum terdeteksi →
+//    bingkai hijau penuh, foto diambil otomatis. Senyum dipakai (bukan kedip)
+//    karena kedip hanya ±0,1–0,3 detik dan sering terlewat di HP yang lambat;
+//    senyum ditahan sehingga selalu tertangkap.
+// 4. Foto diambil dari frame wajah NETRAL sesaat sebelum tersenyum (agar
+//    pencocokan dengan foto acuan tetap akurat). Baru di langkah ini model
+//    BERAT dijalankan sekali: face embedding (1024 angka), anti-spoof &
+//    liveness. Menjalankan model berat di setiap frame-lah yang dulu membuat
+//    kamera terasa lambat.
+// 5. Foto disimpan TERCERMIN, sama dengan tampilan kamera depan; embedding
+//    dihitung dari gambar asli (tidak dicerminkan).
 //    - Daftar foto acuan: foto (JPEG, sisi terpanjang 640 px) + embedding
 //      dikirim ke server dan disimpan sebagai acuan.
 //    - Absen: hanya embedding yang dikirim; server membandingkannya dengan
@@ -20,7 +29,7 @@
 // hanya saat kamera dibuka, lewat dynamic import.
 //
 // Referensi:
-// - https://github.com/vladmandic/human (Config, FaceResult, gesture)
+// - https://github.com/vladmandic/human (Config, FaceResult, emotion, mesh)
 // - https://developer.mozilla.org/docs/Web/API/MediaDevices/getUserMedia
 
 "use client";
@@ -45,7 +54,47 @@ const REAL_MIN = 0.5;
 const LIVE_MIN = 0.5;
 // Lebar kotak wajah minimal (porsi lebar video) agar wajah cukup jelas.
 const FACE_MIN_WIDTH = 0.28;
+// Titik tengah wajah harus di area tengah ini (porsi lebar/tinggi video).
+const CENTER_MARGIN = 0.25;
 const PHOTO_MAX_SIDE = 640;
+// Senyum: skor ekspresi "happy" ≥ ini, ATAU lebar mulut (relatif terhadap
+// jarak kedua mata) naik ≥ SMILE_WIDEN dari wajah netral.
+const HAPPY_MIN = 0.6;
+const SMILE_WIDEN = 1.12;
+// Frame netral yang lebih tua dari ini tidak dipakai (wajah mungkin bergeser).
+const NEUTRAL_MAX_AGE_MS = 1500;
+
+const BASE_FACE = {
+  enabled: true,
+  detector: { rotation: false, maxDetected: 2, minConfidence: 0.5 },
+  mesh: { enabled: true },
+  iris: { enabled: false },
+  attention: { enabled: false },
+  gear: { enabled: false },
+};
+
+// human.detect() MENGGABUNGKAN config ke instance, jadi setiap panggilan harus
+// menyebut lengkap model mana yang aktif.
+// - Setiap frame: ringan (deteksi + mesh + ekspresi).
+const LOOP_CONFIG: Partial<Config> = {
+  face: {
+    ...BASE_FACE,
+    emotion: { enabled: true },
+    description: { enabled: false },
+    antispoof: { enabled: false },
+    liveness: { enabled: false },
+  },
+};
+// - Sekali saat foto diambil: embedding + anti-spoof + liveness.
+const CAPTURE_CONFIG: Partial<Config> = {
+  face: {
+    ...BASE_FACE,
+    emotion: { enabled: false },
+    description: { enabled: true },
+    antispoof: { enabled: true },
+    liveness: { enabled: true },
+  },
+};
 
 const HUMAN_CONFIG: Partial<Config> = {
   modelBasePath: MODEL_BASE_PATH,
@@ -53,23 +102,19 @@ const HUMAN_CONFIG: Partial<Config> = {
   debug: false,
   // 0 = tanpa cache antar-frame: setiap deteksi memakai frame terbaru.
   cacheSensitivity: 0,
+  // Semua model diaktifkan saat dimuat agar sudah terunduh & siap sebelum dipakai.
   face: {
-    enabled: true,
-    detector: { rotation: false, maxDetected: 2, minConfidence: 0.5 },
-    mesh: { enabled: true },
-    iris: { enabled: false },
+    ...BASE_FACE,
+    emotion: { enabled: true },
     description: { enabled: true },
-    emotion: { enabled: false },
     antispoof: { enabled: true },
     liveness: { enabled: true },
-    attention: { enabled: false },
-    gear: { enabled: false },
   },
   body: { enabled: false },
   hand: { enabled: false },
   object: { enabled: false },
   segmentation: { enabled: false },
-  gesture: { enabled: true },
+  gesture: { enabled: false },
   filter: { enabled: true, flip: false },
 };
 
@@ -120,6 +165,8 @@ export function SelfieCamera({
   const runningRef = useRef(false);
   const [phase, setPhase] = useState<Phase>("idle");
   const [hint, setHint] = useState<Hint>({ text: "", tone: "info" });
+  // 0 = belum pas, 0,5 = wajah pas (hijau setengah), 1 = senyum (hijau penuh).
+  const [progress, setProgress] = useState(0);
   const [photo, setPhoto] = useState<CapturedSelfie | null>(null);
 
   useEffect(() => () => stopCamera(), []);
@@ -137,6 +184,7 @@ export function SelfieCamera({
     }
     setPhoto(null);
     onChange(null);
+    setProgress(0);
     setPhase("loading");
     setHint({ text: "Menyiapkan pendeteksi wajah...", tone: "info" });
     try {
@@ -169,56 +217,74 @@ export function SelfieCamera({
     const video = videoRef.current;
     if (!human || !video) return;
     runningRef.current = true;
-    let eyesClosedSeen = false;
+    // Frame netral terakhir (wajah pas, belum tersenyum) dan lebar mulut netral.
+    const neutral = document.createElement("canvas");
+    let neutralAt = 0;
+    let neutralMouth: number | null = null;
 
     while (runningRef.current) {
-      const result = await human.detect(video);
+      const result = await human.detect(video, LOOP_CONFIG);
       if (!runningRef.current) break;
-      const check = checkFace(result.face, video.videoWidth);
+      const check = checkPosition(result.face, video.videoWidth, video.videoHeight);
       if (!check.ok) {
+        setProgress(0);
         setHint({ text: check.message, tone: "warn" });
+        neutralAt = 0;
+        neutralMouth = null;
       } else {
-        const closed = result.gesture.some(
-          (gesture) =>
-            "face" in gesture && (gesture.gesture === "blink left eye" || gesture.gesture === "blink right eye"),
-        );
-        if (closed) eyesClosedSeen = true;
-        if (!eyesClosedSeen) {
-          setHint({ text: "Wajah terdeteksi. Sekarang kedipkan mata Anda.", tone: "ok" });
-        } else if (!closed) {
-          // Kedip selesai (mata terbuka lagi) → ambil foto.
+        const face = result.face[0];
+        const mouth = mouthRatio(face);
+        const happy = face.emotion?.find((item) => item.emotion === "happy")?.score ?? 0;
+        const smiling =
+          happy >= HAPPY_MIN || (mouth !== null && neutralMouth !== null && mouth >= neutralMouth * SMILE_WIDEN);
+
+        if (!smiling) {
+          // Simpan frame netral terbaru + perbarui lebar mulut netral (rata-rata bergerak).
+          drawFrame(neutral, video);
+          neutralAt = performance.now();
+          if (mouth !== null) neutralMouth = neutralMouth === null ? mouth : neutralMouth * 0.8 + mouth * 0.2;
+          setProgress(0.5);
+          setHint({ text: "Wajah pas. Sekarang tersenyum.", tone: "ok" });
+        } else {
+          setProgress(1);
           runningRef.current = false;
-          await capture();
+          const fresh = neutralAt > 0 && performance.now() - neutralAt <= NEUTRAL_MAX_AGE_MS;
+          await capture(fresh ? neutral : null);
           return;
         }
       }
-      await new Promise((resolve) => setTimeout(resolve, 120));
+      // Beri jeda satu frame layar agar UI tetap responsif.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
     }
   }
 
-  async function capture() {
+  // `source` = frame netral sebelum tersenyum; null = pakai frame saat ini.
+  async function capture(source: HTMLCanvasElement | null) {
     const human = humanRef.current;
     const video = videoRef.current;
     if (!human || !video) return;
     setHint({ text: "Memproses foto...", tone: "info" });
 
-    const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(video.videoWidth, video.videoHeight));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.round(video.videoWidth * scale);
-    canvas.height = Math.round(video.videoHeight * scale);
-    canvas.getContext("2d")!.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-    const result = await human.detect(canvas);
-    const check = checkFace(result.face, canvas.width);
+    const canvas = source ?? drawFrame(document.createElement("canvas"), video);
+    const result = await human.detect(canvas, CAPTURE_CONFIG);
+    const check = checkCapture(result.face, canvas.width, canvas.height);
     const embedding = result.face[0]?.embedding;
     if (!check.ok || !embedding || embedding.length !== FACE_EMBEDDING_LENGTH) {
+      setProgress(0);
       setHint({ text: check.ok ? "Wajah kurang jelas. Coba lagi." : check.message, tone: "warn" });
-      runningRef.current = true;
       void detectLoop();
       return;
     }
 
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+    // Foto dicerminkan agar sama dengan tampilan kamera depan.
+    const mirrored = document.createElement("canvas");
+    mirrored.width = canvas.width;
+    mirrored.height = canvas.height;
+    const context = mirrored.getContext("2d")!;
+    context.translate(canvas.width, 0);
+    context.scale(-1, 1);
+    context.drawImage(canvas, 0, 0);
+    const blob = await new Promise<Blob | null>((resolve) => mirrored.toBlob(resolve, "image/jpeg", 0.85));
     if (!blob) {
       notify.error("Foto gagal dibuat. Coba lagi.");
       return;
@@ -240,7 +306,7 @@ export function SelfieCamera({
   return (
     <div className="flex flex-col items-center gap-4">
       <div className="relative aspect-[3/4] w-full max-w-sm overflow-hidden rounded-2xl border bg-muted">
-        {/* Tampilan kamera dicerminkan agar terasa seperti cermin; foto yang disimpan tidak. */}
+        {/* Tampilan kamera dicerminkan seperti cermin; foto hasilnya juga dicerminkan. */}
         <video
           ref={videoRef}
           playsInline
@@ -251,9 +317,7 @@ export function SelfieCamera({
           // eslint-disable-next-line @next/next/no-img-element -- pratinjau blob lokal
           <img src={photo.url} alt="Pratinjau foto wajah" className="size-full object-cover" />
         )}
-        {phase === "camera" && (
-          <div className="pointer-events-none absolute inset-[12%] rounded-[50%] border-4 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
-        )}
+        {phase === "camera" && <FaceGuide progress={progress} />}
         {(phase === "idle" || phase === "loading") && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
             {phase === "loading" ? (
@@ -311,6 +375,32 @@ export function SelfieCamera({
   );
 }
 
+// Bingkai oval dengan garis kemajuan hijau: 0 = putih, 0,5 = hijau setengah
+// (wajah pas), 1 = hijau penuh (tersenyum, foto diambil).
+function FaceGuide({ progress }: { progress: number }) {
+  return (
+    <div className="pointer-events-none absolute inset-[12%]">
+      <div className="absolute inset-0 rounded-[50%] border-4 border-white/60 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="absolute inset-0 size-full" aria-hidden>
+        <ellipse
+          cx="50"
+          cy="50"
+          rx="49"
+          ry="49"
+          fill="none"
+          pathLength={100}
+          strokeDasharray={`${progress * 100} 100`}
+          transform="rotate(90 50 50)"
+          vectorEffect="non-scaling-stroke"
+          className="stroke-emerald-500 transition-[stroke-dasharray] duration-300"
+          strokeWidth={6}
+          strokeLinecap="round"
+        />
+      </svg>
+    </div>
+  );
+}
+
 // Pendaftaran foto acuan wajah (halaman /attendance/enroll).
 export function FaceCapture() {
   const router = useRouter();
@@ -347,11 +437,46 @@ export function FaceCapture() {
   );
 }
 
-function checkFace(faces: FaceResult[], frameWidth: number): { ok: true } | { ok: false; message: string } {
+// Salin frame video (sisi terpanjang PHOTO_MAX_SIDE) ke canvas, tidak dicerminkan.
+function drawFrame(canvas: HTMLCanvasElement, video: HTMLVideoElement) {
+  const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(video.videoWidth, video.videoHeight));
+  canvas.width = Math.round(video.videoWidth * scale);
+  canvas.height = Math.round(video.videoHeight * scale);
+  canvas.getContext("2d")!.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+// Lebar mulut ÷ jarak sudut luar kedua mata (titik mesh MediaPipe 468:
+// 61 & 291 = sudut bibir, 33 & 263 = sudut luar mata). Naik saat tersenyum.
+function mouthRatio(face: FaceResult) {
+  const mesh = face.mesh;
+  if (!mesh || mesh.length < 300) return null;
+  const distance = (a: number, b: number) => Math.hypot(mesh[a][0] - mesh[b][0], mesh[a][1] - mesh[b][1]);
+  const eyes = distance(33, 263);
+  return eyes > 0 ? distance(61, 291) / eyes : null;
+}
+
+type Check = { ok: true } | { ok: false; message: string };
+
+// Setiap frame: jumlah wajah, ukuran, dan posisi di tengah bingkai.
+function checkPosition(faces: FaceResult[], frameWidth: number, frameHeight: number): Check {
   if (faces.length === 0) return { ok: false, message: "Wajah belum terlihat. Posisikan wajah di dalam bingkai." };
   if (faces.length > 1) return { ok: false, message: "Terlihat lebih dari satu wajah. Pastikan hanya Anda di kamera." };
+  const [x, y, width, height] = faces[0].box;
+  if (width < frameWidth * FACE_MIN_WIDTH) return { ok: false, message: "Dekatkan wajah ke kamera." };
+  const centerX = (x + width / 2) / frameWidth;
+  const centerY = (y + height / 2) / frameHeight;
+  const centered =
+    centerX >= CENTER_MARGIN && centerX <= 1 - CENTER_MARGIN && centerY >= CENTER_MARGIN && centerY <= 1 - CENTER_MARGIN;
+  if (!centered) return { ok: false, message: "Posisikan wajah di tengah bingkai." };
+  return { ok: true };
+}
+
+// Saat foto diambil: posisi + lolos model anti-spoof & liveness.
+function checkCapture(faces: FaceResult[], frameWidth: number, frameHeight: number): Check {
+  const position = checkPosition(faces, frameWidth, frameHeight);
+  if (!position.ok) return position;
   const face = faces[0];
-  if (face.box[2] < frameWidth * FACE_MIN_WIDTH) return { ok: false, message: "Dekatkan wajah ke kamera." };
   if ((face.real ?? 0) < REAL_MIN || (face.live ?? 0) < LIVE_MIN) {
     return { ok: false, message: "Wajah belum terbaca sebagai wajah asli. Hadap kamera langsung di tempat terang." };
   }

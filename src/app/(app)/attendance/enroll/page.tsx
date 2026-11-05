@@ -52,7 +52,7 @@ async function EnrollContent() {
       <CardHeader>
         <CardTitle>Ambil foto</CardTitle>
         <CardDescription>
-          Hadapkan wajah ke kamera di dalam bingkai, lalu kedipkan mata. Foto diambil otomatis.
+          Hadapkan wajah ke kamera di dalam bingkai sampai garis hijau setengah, lalu tersenyum. Foto diambil otomatis.
         </CardDescription>
       </CardHeader>
       <CardContent>

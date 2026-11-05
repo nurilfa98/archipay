@@ -14,7 +14,6 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyStatusBadge } from "@/features/companies/components/company-status-badge";
 import { HideWhilePlanFocused, PlanFocusProvider } from "@/features/subscriptions/components/plan-focus";
@@ -110,7 +109,7 @@ async function SubscriptionContent() {
           </Alert>
         )}
 
-        <StatusCard status={status} access={access} seats={seats} addons={addons} />
+        <StatusSection status={status} access={access} seats={seats} addons={addons} />
 
         {lastRejected && !open && (
           <Alert variant="destructive">
@@ -218,9 +217,9 @@ async function SubscriptionContent() {
   );
 }
 
-// Kartu Status ringkas: masa aktif, pengguna aktif, add-on, masing-masing
-// satu kotak. Teks panjang diganti satu catatan singkat.
-function StatusCard({
+// Bagian Status (tanpa kartu pembungkus): judul + tiga kotak (masa aktif,
+// pengguna aktif, add-on). Teks panjang diganti satu catatan singkat.
+function StatusSection({
   status,
   access,
   seats,
@@ -250,53 +249,49 @@ function StatusCard({
   const full = seats.active >= seats.limit;
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
-          Status
-          <CompanyStatusBadge status={status} />
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        <dl className="grid gap-3 sm:grid-cols-3">
-          <StatusBox label={period.label} value={period.value} hint={period.hint} warn={period.warn} />
-          <StatusBox
-            label="Pengguna aktif"
-            value={`${seats.active} / ${seats.limit}`}
-            hint={full ? "Batas penuh" : status === "TRIAL" ? "Batas masa gratis" : "Batas paket"}
-            warn={full}
-          />
-          <div className="flex flex-col gap-1 rounded-lg border p-3">
-            <dt className="text-xs text-muted-foreground">Add-on</dt>
-            {ADDON_KEYS.map((key) => {
-              const coverage = addons[key];
-              const active = coverage.active && coverage.until;
-              return (
-                <dd key={key} className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm">
-                  <span className="font-medium">{ADDON_LABELS[key]}</span>
-                  <span className={cn("text-xs", active ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground")}>
-                    {active
-                      ? `${isTrialOnly(coverage) ? "Gratis" : "Aktif"} s.d. ${formatShortDate(coverage.until!)}`
-                      : "Nonaktif"}
-                  </span>
-                </dd>
-              );
-            })}
-          </div>
-        </dl>
-        {(status === "TRIAL" || status === "ACTIVE") && (
-          <p className="text-xs text-muted-foreground">
-            Bayar lebih awal tidak rugi: masa aktif baru dihitung dari tanggal berakhir.
-          </p>
-        )}
-      </CardContent>
-    </Card>
+    <section className="flex flex-col gap-3" aria-labelledby="subscription-status-title">
+      <h2 id="subscription-status-title" className="flex flex-wrap items-center gap-2 text-lg font-semibold">
+        Status
+        <CompanyStatusBadge status={status} />
+      </h2>
+      <dl className="grid gap-3 sm:grid-cols-3">
+        <StatusBox label={period.label} value={period.value} hint={period.hint} warn={period.warn} />
+        <StatusBox
+          label="Pengguna aktif"
+          value={`${seats.active} / ${seats.limit}`}
+          hint={full ? "Batas penuh" : status === "TRIAL" ? "Batas masa gratis" : "Batas paket"}
+          warn={full}
+        />
+        <div className="flex flex-col gap-1 rounded-xl border bg-card p-4">
+          <dt className="text-xs text-muted-foreground">Add-on</dt>
+          {ADDON_KEYS.map((key) => {
+            const coverage = addons[key];
+            const active = coverage.active && coverage.until;
+            return (
+              <dd key={key} className="flex flex-wrap items-baseline justify-between gap-x-2 text-sm">
+                <span className="font-medium">{ADDON_LABELS[key]}</span>
+                <span className={cn("text-xs", active ? "text-emerald-700 dark:text-emerald-300" : "text-muted-foreground")}>
+                  {active
+                    ? `${isTrialOnly(coverage) ? "Gratis" : "Aktif"} s.d. ${formatShortDate(coverage.until!)}`
+                    : "Nonaktif"}
+                </span>
+              </dd>
+            );
+          })}
+        </div>
+      </dl>
+      {(status === "TRIAL" || status === "ACTIVE") && (
+        <p className="text-xs text-muted-foreground">
+          Bayar lebih awal tidak rugi: masa aktif baru dihitung dari tanggal berakhir.
+        </p>
+      )}
+    </section>
   );
 }
 
 function StatusBox({ label, value, hint, warn }: { label: string; value: string; hint?: string; warn?: boolean }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-lg border p-3">
+    <div className="flex flex-col gap-0.5 rounded-xl border bg-card p-4">
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="text-lg font-semibold tabular-nums">{value}</dd>
       {hint && (

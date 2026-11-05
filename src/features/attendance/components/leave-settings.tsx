@@ -161,7 +161,7 @@ export function LeaveTypesManager({ types, readOnly }: { types: LeaveType[]; rea
             <LeaveTypeForm onDone={() => setEditing(null)} />
           </div>
         ) : (
-          <Button variant="outline" className="self-start" onClick={() => setEditing("new")}>
+          <Button variant="brand" className="self-start" onClick={() => setEditing("new")}>
             <PlusIcon />
             Tambah jenis
           </Button>

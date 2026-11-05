@@ -786,13 +786,13 @@ punya role lain.
 ### 18.4 Foto acuan wajah & persetujuan data pribadi
 
 1. Saat pertama membuka Absensi, user mencentang **pernyataan persetujuan** pengolahan data wajah & lokasi (UU PDP 27/2022). Teks persis, waktu, dan IP disimpan, sama seperti persetujuan di konfirmasi uang muka (bagian 5).
-2. User mengambil **selfie acuan** dari kamera (bukan galeri) dengan cek liveness (kedip). HP menghitung *face embedding*; foto disimpan di R2 dan embedding di database. Status: **Menunggu persetujuan**.
+2. User mengambil **selfie acuan** dari kamera (bukan galeri) dengan cek liveness (senyum). HP menghitung *face embedding*; foto disimpan di R2 dan embedding di database. Status: **Menunggu persetujuan**.
 3. Owner atau Admin HR mencocokkan foto dengan orangnya lalu **Setujui** / **Tolak** (alasan wajib). Sebelum disetujui, user belum bisa absen.
 4. Mengganti foto acuan memakai alur yang sama; foto lama dipakai sampai foto baru disetujui, lalu filenya dihapus.
 5. Foto acuan & embedding **dihapus saat user dinonaktifkan**; bila diaktifkan lagi, user mendaftar ulang.
 6. Tidak ada yang bisa menyetujui foto wajahnya sendiri. Foto yang ditolak langsung dihapus filenya; hanya alasan penolakan terakhir yang disimpan.
 7. **Kabar ke Owner & Admin HR:** cron harian (bagian 9) mengirim WhatsApp ke semua Owner dan Admin HR aktif bila ada foto baru yang menunggu persetujuan (Admin HR tidak dikabari foto miliknya sendiri). Hemat kuota: semua foto baru dalam satu company digabung jadi **satu pesan per penerima**, dan setiap foto hanya dikabarkan **sekali** (`face_profiles.owner_notified_at`); foto yang belum diproses tidak dikirim ulang, jumlahnya tetap tampil di menu Absensi. Foto yang diganti karyawan dihitung sebagai foto baru.
-8. Liveness saat pendaftaran: tepat satu wajah, cukup dekat, lolos model anti-spoof & liveness (skor ≥ 0,5), lalu berkedip; foto diambil otomatis setelah kedipan. Foto disimpan JPEG maks. 640 px.
+8. Liveness saat pendaftaran & absen: tepat satu wajah, cukup dekat, di tengah bingkai (garis hijau setengah), lalu **tersenyum** (garis hijau penuh); foto diambil otomatis dari frame netral sesaat sebelum tersenyum, lalu harus lolos model anti-spoof & liveness (skor ≥ 0,5). Setiap frame hanya memakai model ringan (deteksi, mesh, ekspresi); embedding, anti-spoof & liveness dihitung sekali saat foto diambil. Senyum menggantikan kedip (2026-11-05) karena kedip sering terlewat di HP. Foto disimpan JPEG maks. 640 px, tercermin seperti tampilan kamera depan.
 
 ### 18.5 Absen masuk
 

@@ -236,7 +236,7 @@ export function CheckFlow() {
           disabled={pending || !selected}
           idleText={
             selected
-              ? "Hadap kamera di tempat terang, lalu kedipkan mata. Selfie hanya untuk dicocokkan, tidak disimpan."
+              ? "Hadap kamera di tempat terang, lalu tersenyum. Selfie hanya untuk dicocokkan, tidak disimpan."
               : "Pilih lokasi dulu."
           }
         />
