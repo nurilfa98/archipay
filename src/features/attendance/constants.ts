@@ -63,8 +63,9 @@ export function consentStatement(fullName: string, companyName: string) {
   return (
     `Saya, ${fullName}, menyetujui ${companyName} mengolah foto wajah dan lokasi GPS saya melalui ArchiPay ` +
     `untuk keperluan absensi kerja. Foto acuan wajah saya disimpan selama saya aktif sebagai pengguna dan ` +
-    `dihapus saat akun saya dinonaktifkan. Foto selfie absensi disimpan sementara sebagai bukti kehadiran, ` +
-    `lalu dihapus otomatis setelah masa simpan berakhir. Lokasi hanya diambil saat saya menekan tombol absen.`
+    `dihapus saat akun saya dinonaktifkan. Foto selfie saat absen hanya dipakai untuk dicocokkan dengan foto ` +
+    `acuan dan tidak disimpan; yang disimpan hanya waktu, lokasi, dan hasil kecocokan wajah. Lokasi hanya ` +
+    `diambil saat saya menekan tombol absen.`
   );
 }
 

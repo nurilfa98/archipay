@@ -6,6 +6,7 @@
 "use client";
 
 import { CheckIcon, PaperclipIcon, XIcon } from "lucide-react";
+import { FilePreview } from "@/components/file-preview";
 import { ToneBadge, type Tone } from "@/components/tone-badge";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -23,6 +24,7 @@ export type LeaveListRow = {
   tone: Tone;
   paid: boolean;
   hasAttachment: boolean;
+  attachmentIsPdf: boolean;
   decidedText: string | null;
   rejectReason: string | null;
   // Owner/Admin HR
@@ -63,15 +65,14 @@ export function LeaveList({
           </div>
           <p className="text-sm">Alasan: {row.reason}</p>
           {row.hasAttachment && (
-            <a
-              href={`/api/attendance/leave/${row.id}/attachment`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex w-fit items-center gap-1 text-sm text-brand hover:underline"
+            <FilePreview
+              src={`/api/attendance/leave/${row.id}/attachment`}
+              isPdf={row.attachmentIsPdf}
+              title="Pratinjau lampiran"
             >
               <PaperclipIcon className="size-3.5" />
               Lihat lampiran
-            </a>
+            </FilePreview>
           )}
           {row.decidedText && <p className="text-sm text-muted-foreground">{row.decidedText}</p>}
           {row.rejectReason && <p className="text-sm text-destructive">Alasan ditolak: {row.rejectReason}</p>}

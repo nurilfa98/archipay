@@ -111,7 +111,7 @@ export async function createAdvance(
   // Uang muka baru wajib masuk ke project yang masih aktif.
   const project = await getActiveProject(companyId, input.projectId);
   if (!project) {
-    return { success: false, message: "Project tidak ditemukan atau sudah selesai. Pilih project lagi di halaman Uang Muka." };
+    return { success: false, message: "Proyek tidak ditemukan atau sudah selesai. Pilih proyek lagi di halaman Uang Muka." };
   }
 
   if (!isRequest && input.recipientId === actor.id) {

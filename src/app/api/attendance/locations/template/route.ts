@@ -37,8 +37,8 @@ const GUIDE = [
   ],
   [IMPORT_COLUMNS.radius, "Ya", "10 – 5000. Disarankan minimal 50 karena GPS HP bisa meleset 5–20 m."],
   [IMPORT_COLUMNS.timezone, "Ya", "WIB, WITA, atau WIT."],
-  [IMPORT_COLUMNS.project, "Tidak", "Nama project persis seperti di menu Project. Kosongkan untuk kantor/gudang."],
-  [IMPORT_COLUMNS.workStart, "Tidak", "Format 07:30. Kosongkan jam masuk & pulang untuk memakai jam kerja company."],
+  [IMPORT_COLUMNS.project, "Tidak", "Nama proyek persis seperti di menu Proyek. Kosongkan untuk kantor/gudang."],
+  [IMPORT_COLUMNS.workStart, "Tidak", "Format 07:30. Kosongkan jam masuk & pulang untuk memakai jam kerja perusahaan."],
   [IMPORT_COLUMNS.workEnd, "Tidak", "Format 16:30. Isi bersama jam masuk."],
   ["", "", "Maksimal 200 lokasi per unggahan. Hapus baris contoh sebelum mengunggah."],
 ];

@@ -506,7 +506,7 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
 function SettlementDetailSkeleton() {
   return (
     <>
-      <BackToList href="/projects" label="Daftar project" />
+      <BackToList href="/projects" label="Daftar proyek" />
       <Skeleton className="h-12 w-64" />
       <Skeleton className="h-40 w-full" />
       <Skeleton className="h-64 w-full" />

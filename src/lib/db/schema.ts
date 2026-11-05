@@ -665,10 +665,7 @@ export const platformSettings = pgTable(
     // file dihapus otomatis oleh cron harian (features/settlements/receipt-retention.ts)
     // agar penyimpanan R2 tidak terus menumpuk. Company nonaktif dikecualikan.
     receiptRetentionMonths: integer("receipt_retention_months").notNull().default(6),
-    // Absensi (BUSINESS-FLOW §18): masa simpan file selfie absen (bulan sejak
-    // absen), dihapus cron harian (features/attendance/selfie-retention.ts).
-    attendanceSelfieRetentionMonths: integer("attendance_selfie_retention_months").notNull().default(3),
-    // Ambang kecocokan wajah absen terhadap foto acuan, 0–100 (= skor
+    // Absensi (BUSINESS-FLOW §18): ambang kecocokan wajah absen terhadap foto acuan, 0–100 (= skor
     // similarity @vladmandic/human × 100). Di bawah ini absen ditolak.
     faceMatchThreshold: integer("face_match_threshold").notNull().default(50),
     // Harga add-on per pengguna per bulan (lib/addons.ts): dikalikan jumlah
@@ -688,10 +685,6 @@ export const platformSettings = pgTable(
     check("platform_settings_prices_check", sql`${t.basePrice} >= 0 AND ${t.extraUserPrice} >= 0`),
     check("platform_settings_discounts_check", sql`${t.discount6} BETWEEN 0 AND 90 AND ${t.discount12} BETWEEN 0 AND 90`),
     check("platform_settings_receipt_retention_check", sql`${t.receiptRetentionMonths} BETWEEN 1 AND 120`),
-    check(
-      "platform_settings_selfie_retention_check",
-      sql`${t.attendanceSelfieRetentionMonths} BETWEEN 1 AND 24`,
-    ),
     check("platform_settings_face_threshold_check", sql`${t.faceMatchThreshold} BETWEEN 30 AND 95`),
     check("platform_settings_attendance_price_check", sql`${t.attendanceUserPrice} >= 0`),
     check("platform_settings_payroll_price_check", sql`${t.payrollUserPrice} >= 0`),
@@ -978,7 +971,6 @@ export const attendanceRecords = pgTable(
     checkInAccuracy: integer("check_in_accuracy").notNull(),
     checkInDistance: integer("check_in_distance").notNull(),
     checkInInRadius: boolean("check_in_in_radius").notNull(),
-    checkInSelfieKey: varchar("check_in_selfie_key", { length: 255 }),
     checkInFaceScore: integer("check_in_face_score").notNull(),
     // 0 = tepat waktu. Dihitung dari jam masuk (bukan dari akhir toleransi).
     lateMinutes: integer("late_minutes").notNull().default(0),
@@ -992,7 +984,6 @@ export const attendanceRecords = pgTable(
     checkOutAccuracy: integer("check_out_accuracy"),
     checkOutDistance: integer("check_out_distance"),
     checkOutInRadius: boolean("check_out_in_radius"),
-    checkOutSelfieKey: varchar("check_out_selfie_key", { length: 255 }),
     checkOutFaceScore: integer("check_out_face_score"),
     earlyMinutes: integer("early_minutes"),
     earlyReason: varchar("early_reason", { length: 500 }),
@@ -1001,10 +992,8 @@ export const attendanceRecords = pgTable(
     // "Ajukan Sanggahan / Catatan Khusus" (§18.7), bisa diisi saat masuk
     // maupun pulang (digabung). Bahan review bulanan Owner.
     appealNote: varchar("appeal_note", { length: 1000 }),
-    // File selfie dihapus otomatis setelah masa simpan; data absen tetap ada.
-    selfieDeletedAt: timestamptz("selfie_deleted_at"),
     // Koreksi Owner saat review bulanan (§18.9), misal HP karyawan mati.
-    // Absen yang DIBUAT lewat koreksi tidak punya selfie & skor wajah 0.
+    // Absen yang DIBUAT lewat koreksi tidak lewat cocok wajah: skor wajah 0.
     correctionNote: varchar("correction_note", { length: 500 }),
     correctedById: userRef("corrected_by_id"),
     correctedAt: timestamptz("corrected_at"),

@@ -47,7 +47,7 @@ export default function SettlementsPage({ searchParams }: PageProps<"/settlement
     <>
       <PageHeader
         title="Pertanggungjawaban"
-        description="Laporan penggunaan uang muka beserta nota belanja, per project."
+        description="Laporan penggunaan uang muka beserta nota belanja, per proyek."
       />
       <Suspense fallback={<SettlementsSkeleton />}>
         <SettlementsContent searchParams={searchParams} />

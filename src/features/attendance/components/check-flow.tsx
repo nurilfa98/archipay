@@ -5,6 +5,7 @@
 //    terlambat, atau pulang cepat, form alasan muncul, beserta tombol
 //    "Ajukan Sanggahan / Catatan Khusus".
 // 3. Selfie dengan liveness, lalu kirim. Server menghitung ulang semuanya.
+//    Yang dikirim hanya face embedding; foto selfie tidak dikirim/disimpan.
 
 "use client";
 
@@ -27,7 +28,7 @@ import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { getCheckContext, submitAttendance, type CheckContext, type CheckLocation } from "../check-actions";
 import { formatMinutes } from "../schedule";
-import { appendSelfie, SelfieCamera, type CapturedSelfie } from "./face-capture";
+import { appendEmbedding, SelfieCamera, type CapturedSelfie } from "./face-capture";
 
 type Gps = { latitude: number; longitude: number; accuracy: number };
 type Ready = Exclude<CheckContext, { mode: "done" }>;
@@ -121,7 +122,7 @@ export function CheckFlow() {
     formData.set("latitude", String(gps.latitude));
     formData.set("longitude", String(gps.longitude));
     formData.set("accuracy", String(gps.accuracy));
-    appendSelfie(formData, selfie);
+    appendEmbedding(formData, selfie);
     startTransition(async () => {
       const result = await submitAttendance(formData);
       if (!result.success) {
@@ -233,7 +234,11 @@ export function CheckFlow() {
         <SelfieCamera
           onChange={setSelfie}
           disabled={pending || !selected}
-          idleText={selected ? "Hadap kamera di tempat terang, lalu kedipkan mata." : "Pilih lokasi dulu."}
+          idleText={
+            selected
+              ? "Hadap kamera di tempat terang, lalu kedipkan mata. Selfie hanya untuk dicocokkan, tidak disimpan."
+              : "Pilih lokasi dulu."
+          }
         />
       </section>
 

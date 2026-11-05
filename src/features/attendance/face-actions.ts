@@ -94,7 +94,15 @@ export async function submitFaceProfile(formData: FormData): Promise<ActionResul
 
   const profileId = crypto.randomUUID();
   const photoKey = `${actor.company.id}/faces/${actor.id}/${profileId}.jpg`;
-  await putObject(photoKey, new Uint8Array(await parsed.data.photo.arrayBuffer()), "image/jpeg");
+  // Gagal unggah (R2 bermasalah/belum diatur) jangan dilempar: error yang
+  // dilempar Server Action tampil sebagai halaman error "Minified React error
+  // #441" di production. Sama dengan unggah nota (settlements/actions.ts).
+  try {
+    await putObject(photoKey, new Uint8Array(await parsed.data.photo.arrayBuffer()), "image/jpeg");
+  } catch (error) {
+    console.error("[attendance] unggah foto acuan gagal:", error);
+    return { success: false, message: "Gagal mengunggah foto wajah. Coba lagi beberapa saat." };
+  }
 
   const ip = await getClientIp();
   let replacedKeys: string[] = [];

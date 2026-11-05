@@ -11,8 +11,8 @@ export const MAX_FREE_DAYS = 90;
 const name = z
   .string()
   .trim()
-  .min(2, "Nama company minimal 2 karakter")
-  .max(100, "Nama company maksimal 100 karakter");
+  .min(2, "Nama perusahaan minimal 2 karakter")
+  .max(100, "Nama perusahaan maksimal 100 karakter");
 
 const address = z
   .string()

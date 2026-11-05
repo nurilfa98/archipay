@@ -17,9 +17,9 @@ export function SubscriptionBanner({ user }: { user: CurrentUser }) {
   const urgent = access.status === "GRACE" || access.status === "LOCKED";
   const message =
     access.status === "LOCKED"
-      ? "Masa berlangganan habis dan akses company dikunci. Tim Anda tidak bisa masuk sampai pembayaran diverifikasi."
+      ? "Masa berlangganan habis dan akses perusahaan dikunci. Tim Anda tidak bisa masuk sampai pembayaran diverifikasi."
       : access.status === "GRACE"
-        ? `Masa aktif habis ${formatDate(access.until)}. Company dikunci ${formatDate(access.graceUntil)} bila belum diperpanjang.`
+        ? `Masa aktif habis ${formatDate(access.until)}. Perusahaan dikunci ${formatDate(access.graceUntil)} bila belum diperpanjang.`
         : `${access.status === "TRIAL" ? "Masa gratis" : "Masa langganan"} berakhir ${formatDate(access.until)}${
             access.daysLeft > 0 ? ` (${access.daysLeft} hari lagi)` : ""
           }.`;

@@ -38,8 +38,8 @@ const label =
 const LOGIN_FAILED_REASONS: Record<string, string> = {
   WRONG_PASSWORD: "Password salah",
   INACTIVE: "Akun nonaktif",
-  COMPANY_INACTIVE: "Company nonaktif",
-  SUBSCRIPTION_LOCKED: "Langganan company terkunci",
+  COMPANY_INACTIVE: "Perusahaan nonaktif",
+  SUBSCRIPTION_LOCKED: "Langganan perusahaan terkunci",
 };
 
 // Urutan di sini = urutan tampil. Field yang tidak terdaftar tetap
@@ -63,7 +63,7 @@ const FIELDS: Record<string, { label: string; format?: Formatter }> = {
   wasTemporary: { label: "Password sementara" },
   isActive: { label: "Aktif" },
   recipientName: { label: "Penerima" },
-  projectName: { label: "Project" },
+  projectName: { label: "Proyek" },
   client: { label: "Klien" },
   contractValue: { label: "Nilai kontrak", format: rupiah },
   icon: { label: "Ikon" },
@@ -146,7 +146,7 @@ const FIELDS: Record<string, { label: string; format?: Formatter }> = {
   cancelledAll: { label: "Dibatalkan seluruhnya" },
   isPaid: { label: "Dibayar" },
   usesQuota: { label: "Memotong kuota cuti" },
-  annualLeaveQuota: { label: "Kuota cuti tahunan", format: (value) => (value === null ? "Ikut kuota company" : `${text(value)} hari`) },
+  annualLeaveQuota: { label: "Kuota cuti tahunan", format: (value) => (value === null ? "Ikut kuota perusahaan" : `${text(value)} hari`) },
   leaveDelegationEnabled: { label: "Delegasi ke Admin HR" },
   leaveDelegationHours: { label: "Waktu tunggu delegasi", format: (value) => `${text(value)} jam` },
   userAgent: { label: "Perangkat (browser)" },

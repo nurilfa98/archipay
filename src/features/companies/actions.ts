@@ -74,7 +74,7 @@ import { getCompany } from "./queries";
 import { companyIdSchema, companySchema, createCompanySchema } from "./schemas";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
-const NOT_FOUND = { success: false, message: "Company tidak ditemukan." } as const;
+const NOT_FOUND = { success: false, message: "Perusahaan tidak ditemukan." } as const;
 
 async function getPlatformAdmin() {
   const actor = await verifyAccount();
@@ -147,7 +147,7 @@ export async function createCompany(
     // Ditolak UNIQUE constraint di database, bukan "cek dulu baru insert",
     // agar tetap aman walau dua orang submit bersamaan.
     const constraint = violatedConstraint(error);
-    if (constraint === "companies_name_unique") return fieldError("name", "Nama company sudah dipakai");
+    if (constraint === "companies_name_unique") return fieldError("name", "Nama perusahaan sudah dipakai");
     if (constraint === "users_email_unique") return fieldError("ownerEmail", "Email sudah dipakai pengguna lain");
     throw error;
   }
@@ -187,7 +187,7 @@ export async function updateCompany(_prevState: ActionResult | undefined, formDa
       .returning({ id: companies.id });
     if (!row) return NOT_FOUND;
   } catch (error) {
-    if (violatedConstraint(error) === "companies_name_unique") return fieldError("name", "Nama company sudah dipakai");
+    if (violatedConstraint(error) === "companies_name_unique") return fieldError("name", "Nama perusahaan sudah dipakai");
     throw error;
   }
 
@@ -250,7 +250,7 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
     .limit(1);
   if (!company) return NOT_FOUND;
   if (input.data.confirmName.trim() !== company.name) {
-    return { success: false, message: "Nama company yang diketik tidak sesuai." };
+    return { success: false, message: "Nama perusahaan yang diketik tidak sesuai." };
   }
 
   const fileKeys = await db.transaction(async (tx) => {
@@ -262,7 +262,7 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
     const userIds = companyUsers.map((user) => user.id);
 
     // Key file dikumpulkan sebelum barisnya hilang.
-    const [receiptFiles, proofFiles, faceFiles, selfieFiles, leaveFiles] = await Promise.all([
+    const [receiptFiles, proofFiles, faceFiles, leaveFiles] = await Promise.all([
       // Nota yang sudah dihapus otomatis (lewat masa simpan) dilewati.
       tx
         .select({ key: settlementItems.fileKey })
@@ -273,10 +273,6 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
         .from(subscriptionPayments)
         .where(eq(subscriptionPayments.companyId, id)),
       tx.select({ key: faceProfiles.photoKey }).from(faceProfiles).where(eq(faceProfiles.companyId, id)),
-      tx
-        .select({ inKey: attendanceRecords.checkInSelfieKey, outKey: attendanceRecords.checkOutSelfieKey })
-        .from(attendanceRecords)
-        .where(eq(attendanceRecords.companyId, id)),
       tx.select({ key: leaveRequests.attachmentKey }).from(leaveRequests).where(eq(leaveRequests.companyId, id)),
     ]);
 
@@ -331,8 +327,7 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
 
     await tx.delete(companies).where(eq(companies.id, id));
 
-    const selfieKeys = selfieFiles.flatMap((row) => [{ key: row.inKey }, { key: row.outKey }]);
-    return [...receiptFiles, ...proofFiles, ...faceFiles, ...selfieKeys, ...leaveFiles].map((file) => file.key).filter((key): key is string => key !== null);
+    return [...receiptFiles, ...proofFiles, ...faceFiles, ...leaveFiles].map((file) => file.key).filter((key): key is string => key !== null);
   });
 
   after(async () => {

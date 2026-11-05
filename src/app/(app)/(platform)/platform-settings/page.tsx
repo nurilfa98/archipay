@@ -31,7 +31,7 @@ export const metadata: Metadata = {
 export default function PlatformSettingsPage() {
   return (
     <>
-      <PageHeader title="Pengaturan platform" description="Berlaku untuk semua company ArchiPay." />
+      <PageHeader title="Pengaturan platform" description="Berlaku untuk semua perusahaan ArchiPay." />
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
         <PlatformSettingsContent />
       </Suspense>
@@ -68,7 +68,7 @@ async function PlatformSettingsContent() {
         <CardHeader>
           <CardTitle>Masa gratis & tenggang</CardTitle>
           <CardDescription>
-            Lewat masa tenggang, company terkunci: Owner hanya bisa membuka menu Langganan, Finance & Karyawan tidak
+            Lewat masa tenggang, perusahaan terkunci: Owner hanya bisa membuka menu Langganan, Finance & Karyawan tidak
             bisa login.
           </CardDescription>
         </CardHeader>
@@ -82,7 +82,7 @@ async function PlatformSettingsContent() {
           <CardTitle>Masa simpan nota</CardTitle>
           <CardDescription>
             File foto/PDF nota dihapus otomatis dari penyimpanan setelah masa ini lewat, agar penyimpanan tidak terus
-            menumpuk. Nominal, keterangan, dan riwayat uang muka tetap tersimpan. Nota company nonaktif tidak dihapus.
+            menumpuk. Nominal, keterangan, dan riwayat uang muka tetap tersimpan. Nota perusahaan nonaktif tidak dihapus.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -94,15 +94,11 @@ async function PlatformSettingsContent() {
         <CardHeader>
           <CardTitle>Absensi</CardTitle>
           <CardDescription>
-            Berlaku untuk semua company. Selfie absen dihapus otomatis setelah masa simpan agar penyimpanan tidak
-            menumpuk dan data wajah tidak disimpan lebih lama dari perlu (UU PDP).
+            Berlaku untuk semua perusahaan. Selfie absen hanya dicocokkan dengan foto acuan dan tidak disimpan.
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <AttendancePlatformForm
-            selfieMonths={settings.attendanceSelfieRetentionMonths}
-            faceThreshold={settings.faceMatchThreshold}
-          />
+          <AttendancePlatformForm faceThreshold={settings.faceMatchThreshold} />
         </CardContent>
       </Card>
 

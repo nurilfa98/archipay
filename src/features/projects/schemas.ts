@@ -16,14 +16,14 @@ const contractValue = z
   .pipe(z.number().int().min(1, "Nilai kontrak minimal Rp1").nullable());
 
 export const projectSchema = z.object({
-  name: z.string().trim().min(3, "Nama project minimal 3 karakter").max(120, "Nama project maksimal 120 karakter"),
+  name: z.string().trim().min(3, "Nama proyek minimal 3 karakter").max(120, "Nama proyek maksimal 120 karakter"),
   client: z
     .string()
     .trim()
     .max(120, "Nama klien maksimal 120 karakter")
     .transform((value) => value || null),
   contractValue,
-  icon: z.enum(PROJECT_ICONS, "Pilih ikon project"),
+  icon: z.enum(PROJECT_ICONS, "Pilih ikon proyek"),
 });
 
 export const projectStatusSchema = z.enum(PROJECT_STATUS);

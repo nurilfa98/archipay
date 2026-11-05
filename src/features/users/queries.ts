@@ -14,17 +14,19 @@
 // <Suspense> yang tampil), saat request biasa langsung lanjut.
 //
 // Referensi:
-// - https://orm.drizzle.team/docs/operators (ilike, or, inArray)
+// - https://orm.drizzle.team/docs/operators (eq, inArray)
 // - node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md
 // - node_modules/next/dist/docs/01-app/02-guides/data-security.md
 
 import "server-only";
-import { and, asc, eq, ilike, inArray, or, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, not, type SQL } from "drizzle-orm";
 import { io } from "next/cache";
 import { isRole, type Role } from "@/lib/auth/roles";
 import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
 import { roles, userRoles, users } from "@/lib/db/schema";
+import type { UserStatus } from "./constants";
+import type { UserFilters } from "./schemas";
 
 export type UserListItem = {
   id: string;
@@ -50,11 +52,11 @@ const listColumns = {
   mustChangePassword: users.mustChangePassword,
 };
 
-// `search` mencocokkan nama atau email (tidak peka huruf besar/kecil).
+// Filter role & status dari URL (halaman /users). Pencarian nama/email
+// berjalan di browser (components/data-table), jadi tidak di sini.
 // Akun superadmin tidak ikut tampil.
-export async function listUsers(companyId: string, search?: string): Promise<UserListItem[]> {
+export async function listUsers(companyId: string, filters: UserFilters = {}): Promise<UserListItem[]> {
   await io();
-  const pattern = search ? `%${escapeLike(search)}%` : undefined;
 
   const rows = await db
     .select(listColumns)
@@ -63,7 +65,17 @@ export async function listUsers(companyId: string, search?: string): Promise<Use
       and(
         eq(users.companyId, companyId),
         notSuperadmin(users.id),
-        pattern ? or(ilike(users.fullName, pattern), ilike(users.email, pattern)) : undefined,
+        filters.role
+          ? inArray(
+              users.id,
+              db
+                .select({ id: userRoles.userId })
+                .from(userRoles)
+                .innerJoin(roles, eq(userRoles.roleId, roles.id))
+                .where(eq(roles.name, filters.role)),
+            )
+          : undefined,
+        filters.status ? statusCondition(filters.status) : undefined,
       ),
     )
     .orderBy(asc(users.fullName));
@@ -119,8 +131,15 @@ async function getRolesByUserIds(userIds: string[]) {
   return result;
 }
 
-// Karakter % dan _ punya arti khusus di LIKE. Tanpa di-escape, pencarian "_"
-// akan cocok dengan semua user.
-function escapeLike(value: string) {
-  return value.replace(/[\\%_]/g, (char) => `\\${char}`);
+// Sama dengan urutan StatusBadge (user-badges.tsx): nonaktif menang atas
+// "menunggu login".
+function statusCondition(status: UserStatus) {
+  switch (status) {
+    case "INACTIVE":
+      return not(users.isActive);
+    case "PENDING_LOGIN":
+      return and(eq(users.isActive, true), eq(users.mustChangePassword, true));
+    case "ACTIVE":
+      return and(eq(users.isActive, true), eq(users.mustChangePassword, false));
+  }
 }

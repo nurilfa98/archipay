@@ -24,11 +24,11 @@ import { getActiveProject } from "./queries";
 import { projectIdSchema, projectSchema, projectStatusSchema } from "./schemas";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
-const NOT_FOUND = { success: false, message: "Project tidak ditemukan." } as const;
+const NOT_FOUND = { success: false, message: "Proyek tidak ditemukan." } as const;
 const NAME_TAKEN = {
   success: false as const,
   message: "Periksa kembali isian Anda.",
-  fieldErrors: { name: ["Nama project sudah dipakai"] },
+  fieldErrors: { name: ["Nama proyek sudah dipakai"] },
 };
 
 async function getProjectManager() {
@@ -177,10 +177,10 @@ export async function assignAdvanceProject(advanceId: string, projectId: string)
   const advance = advanceIdSchema.safeParse(advanceId);
   const projectParsed = projectIdSchema.safeParse(projectId);
   if (!advance.success) return { success: false, message: "Uang muka tidak ditemukan." };
-  if (!projectParsed.success) return { success: false, message: "Pilih project." };
+  if (!projectParsed.success) return { success: false, message: "Pilih proyek." };
 
   const project = await getActiveProject(actor.company.id, projectParsed.data);
-  if (!project) return { success: false, message: "Project tidak ditemukan atau sudah selesai." };
+  if (!project) return { success: false, message: "Proyek tidak ditemukan atau sudah selesai." };
 
   const ip = await getClientIp();
   const updated = await db.transaction(async (tx) => {
@@ -216,7 +216,7 @@ export async function assignAdvanceProject(advanceId: string, projectId: string)
   if (!updated) {
     return {
       success: false,
-      message: "Project hanya bisa ditetapkan untuk uang muka yang belum punya project dan belum berakhir.",
+      message: "Proyek hanya bisa ditetapkan untuk uang muka yang belum punya proyek dan belum berakhir.",
     };
   }
 

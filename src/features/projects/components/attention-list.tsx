@@ -152,7 +152,7 @@ function buildItems(projects: ProjectFinanceRow[]): Item[] {
       key: "no-value",
       level: "info",
       icon: FileQuestionIcon,
-      text: `${withoutValue.length} project aktif belum punya nilai kontrak`,
+      text: `${withoutValue.length} proyek aktif belum punya nilai kontrak`,
       hint: "Keuntungannya belum bisa dihitung",
       href: "/projects",
     });
@@ -164,8 +164,8 @@ function buildItems(projects: ProjectFinanceRow[]): Item[] {
       key: "legacy",
       level: "info",
       icon: FileQuestionIcon,
-      text: `${legacy.stats.active} uang muka berjalan belum punya project`,
-      hint: "Tetapkan project dari halaman detail uang muka",
+      text: `${legacy.stats.active} uang muka berjalan belum punya proyek`,
+      hint: "Tetapkan proyek dari halaman detail uang muka",
       href: `/advances?project=${NO_PROJECT}`,
     });
   }

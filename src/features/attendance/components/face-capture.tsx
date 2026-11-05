@@ -9,9 +9,12 @@
 //    kamera, dan lolos model anti-spoof & liveness.
 // 3. Karyawan diminta berkedip. Setelah kedipan terdeteksi dan mata terbuka
 //    lagi, foto diambil otomatis.
-// 4. Dari foto itu dihitung face embedding (1024 angka). Foto (JPEG, sisi
-//    terpanjang 640 px) + embedding dikirim ke server, yang membandingkannya
-//    dengan foto acuan (features/attendance/face-match.ts).
+// 4. Dari foto itu dihitung face embedding (1024 angka).
+//    - Daftar foto acuan: foto (JPEG, sisi terpanjang 640 px) + embedding
+//      dikirim ke server dan disimpan sebagai acuan.
+//    - Absen: hanya embedding yang dikirim; server membandingkannya dengan
+//      foto acuan (features/attendance/face-match.ts). Selfie absen tidak
+//      dikirim dan tidak disimpan.
 //
 // Library & modelnya (±12 MB, sekali unduh lalu di-cache browser) dimuat
 // hanya saat kamera dibuka, lewat dynamic import.
@@ -72,10 +75,16 @@ const HUMAN_CONFIG: Partial<Config> = {
 
 export type CapturedSelfie = { blob: Blob; url: string; embedding: number[] };
 
-// Foto + embedding ke FormData (5 desimal cukup untuk perbandingan & lebih kecil).
-export function appendSelfie(formData: FormData, selfie: CapturedSelfie) {
-  formData.set("photo", new File([selfie.blob], "wajah.jpg", { type: "image/jpeg" }));
+// Embedding ke FormData (5 desimal cukup untuk perbandingan & lebih kecil).
+// Dipakai saat absen: foto tidak ikut dikirim.
+export function appendEmbedding(formData: FormData, selfie: CapturedSelfie) {
   formData.set("embedding", JSON.stringify(selfie.embedding.map((n) => Math.round(n * 1e5) / 1e5)));
+}
+
+// Foto + embedding ke FormData, untuk pendaftaran foto acuan.
+function appendSelfie(formData: FormData, selfie: CapturedSelfie) {
+  formData.set("photo", new File([selfie.blob], "wajah.jpg", { type: "image/jpeg" }));
+  appendEmbedding(formData, selfie);
 }
 
 type Phase = "idle" | "loading" | "camera" | "captured";

@@ -264,8 +264,8 @@ function AdvanceDetails({
 
   return (
     <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
-      <Item label="Project">
-        {advance.projectName ?? <span className="text-muted-foreground">Tanpa project</span>}
+      <Item label="Proyek">
+        {advance.projectName ?? <span className="text-muted-foreground">Tanpa proyek</span>}
         {assignableProjects && (
           <span className="mt-1 block">
             <AssignProjectDialog advanceId={advance.id} projects={assignableProjects} />
@@ -340,7 +340,7 @@ function isFinished(status: AdvanceDetail["status"]) {
 function AdvanceDetailSkeleton() {
   return (
     <>
-      <BackToList href="/projects" label="Daftar project" />
+      <BackToList href="/projects" label="Daftar proyek" />
       <Skeleton className="h-12 w-64" />
       <Skeleton className="h-64 w-full" />
     </>

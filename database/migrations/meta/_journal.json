@@ -99,6 +99,13 @@
       "when": 1793709800285,
       "tag": "0013_payroll_addon",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793845957194,
+      "tag": "0014_drop_selfie_storage",
+      "breakpoints": true
     }
   ]
 }

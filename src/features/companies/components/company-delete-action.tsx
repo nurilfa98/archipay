@@ -45,21 +45,21 @@ export function CompanyDeleteAction({ company }: { company: { id: string; name: 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium">Hapus company</p>
+        <p className="text-sm font-medium">Hapus perusahaan</p>
         <p className="text-sm text-muted-foreground">
-          Company ini beserta semua datanya (pengguna, project, uang muka, pertanggungjawaban, file nota, potong gaji,
+          Perusahaan ini beserta semua datanya (pengguna, proyek, uang muka, pertanggungjawaban, file nota, potong gaji,
           tagihan langganan, audit log) dihapus permanen dan tidak bisa dikembalikan.
         </p>
       </div>
       <Button variant="destructive" className="shrink-0" onClick={() => setOpen(true)}>
-        Hapus company
+        Hapus perusahaan
       </Button>
       <AlertDialog open={open} onOpenChange={handleOpenChange}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus {company.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              Semua data company ini dihapus permanen, termasuk akun penggunanya. Tindakan ini tidak bisa dibatalkan.
+              Semua data perusahaan ini dihapus permanen, termasuk akun penggunanya. Tindakan ini tidak bisa dibatalkan.
               Bila hanya ingin menghentikan akses, pilih Nonaktifkan.
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -76,7 +76,7 @@ export async function reportError(input: ErrorReportInput): Promise<ActionResult
       "",
       `Pelapor: ${user.fullName} (${user.email})`,
       `Role: ${user.roles.map((role) => ROLE_LABELS[role]).join(", ") || "-"}`,
-      `Company: ${user.company?.name ?? "-"}`,
+      `Perusahaan: ${user.company?.name ?? "-"}`,
       `Waktu: ${formatDateTime(new Date())}`,
       `Halaman: ${new URL(path, env.NEXT_PUBLIC_APP_URL).toString()}`,
       `Kode error: ${digest || "-"}`,

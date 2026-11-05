@@ -11,14 +11,14 @@ import { requirePlatformAdmin } from "@/lib/auth/dal";
 import { getPlatformSettings } from "@/lib/platform-settings";
 
 export const metadata: Metadata = {
-  title: "Tambah Company",
+  title: "Tambah Perusahaan",
 };
 
 export default function NewCompanyPage() {
   return (
     <>
       <PageHeader
-        title="Tambah company"
+        title="Tambah perusahaan"
         description="Pengaturan awal dan kategori biaya dibuat otomatis, lalu bisa diubah Owner di menu Pengaturan."
       />
       <Card>

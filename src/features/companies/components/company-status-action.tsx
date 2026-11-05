@@ -26,7 +26,7 @@ export function CompanyStatusAction({ company }: { company: { id: string; name: 
     startTransition(async () => {
       const result = await setCompanyActive(company.id, !company.isActive);
       if (!result.success) notify.error(result.message);
-      else notify.success(company.isActive ? "Company dinonaktifkan." : "Company diaktifkan kembali.");
+      else notify.success(company.isActive ? "Perusahaan dinonaktifkan." : "Perusahaan diaktifkan kembali.");
       setOpen(false);
     });
   }
@@ -34,11 +34,11 @@ export function CompanyStatusAction({ company }: { company: { id: string; name: 
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-medium">{company.isActive ? "Nonaktifkan company" : "Aktifkan company"}</p>
+        <p className="text-sm font-medium">{company.isActive ? "Nonaktifkan perusahaan" : "Aktifkan perusahaan"}</p>
         <p className="text-sm text-muted-foreground">
           {company.isActive
-            ? "Semua pengguna company ini tidak bisa login, dan sesi yang sedang berjalan langsung berhenti. Data tetap tersimpan."
-            : "Pengguna company ini bisa login kembali."}
+            ? "Semua pengguna perusahaan ini tidak bisa login, dan sesi yang sedang berjalan langsung berhenti. Data tetap tersimpan."
+            : "Pengguna perusahaan ini bisa login kembali."}
         </p>
       </div>
       <Button
@@ -56,8 +56,8 @@ export function CompanyStatusAction({ company }: { company: { id: string; name: 
             </AlertDialogTitle>
             <AlertDialogDescription>
               {company.isActive
-                ? "Semua pengguna company ini langsung tidak bisa memakai aplikasi. Anda bisa mengaktifkannya kembali kapan saja."
-                : "Pengguna company ini bisa login kembali."}
+                ? "Semua pengguna perusahaan ini langsung tidak bisa memakai aplikasi. Anda bisa mengaktifkannya kembali kapan saja."
+                : "Pengguna perusahaan ini bisa login kembali."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

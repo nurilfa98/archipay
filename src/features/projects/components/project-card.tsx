@@ -65,7 +65,7 @@ export function ProjectCard({
             <p className="truncate font-semibold">{card.name}</p>
           )}
           <p className="truncate text-xs text-muted-foreground">
-            {card.client ?? (card.id ? "Tanpa nama klien" : "Uang muka sebelum ada project")}
+            {card.client ?? (card.id ? "Tanpa nama klien" : "Uang muka sebelum ada proyek")}
           </p>
         </div>
         {card.id && (

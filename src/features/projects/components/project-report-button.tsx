@@ -18,14 +18,14 @@ export function ProjectReportButton({ projectId, projectName }: { projectId: str
       try {
         const response = await fetch(`/api/projects/${projectId}/report`, { cache: "no-store" });
         if (response.status === 404) {
-          notify.warning("Project tidak ditemukan. Muat ulang halaman, lalu coba lagi.");
+          notify.warning("Proyek tidak ditemukan. Muat ulang halaman, lalu coba lagi.");
           return;
         }
         if (!response.ok) {
           notify.error("Laporan PDF gagal dibuat. Muat ulang halaman, lalu coba lagi.");
           return;
         }
-        downloadBlob(await response.blob(), filenameOf(response) ?? "laporan-project.pdf");
+        downloadBlob(await response.blob(), filenameOf(response) ?? "laporan-proyek.pdf");
       } catch {
         notify.error("Laporan PDF gagal diunduh. Periksa koneksi internet Anda, lalu coba lagi.");
       }

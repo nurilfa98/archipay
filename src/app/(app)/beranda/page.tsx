@@ -66,7 +66,7 @@ async function DashboardContent() {
             Uang muka terbaru
           </h2>
           <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/projects" />}>
-            Buka project
+            Buka proyek
             <ArrowRightIcon />
           </Button>
         </div>

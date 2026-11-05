@@ -31,7 +31,7 @@ export async function getCompanySettings(companyId: string): Promise<CompanySett
   // Barisnya dibuat bersama company-nya (features/companies/actions.ts). Bila
   // hilang, lebih baik error jelas daripada diam-diam memakai nilai lain dari
   // yang diatur OWNER.
-  if (!row) throw new Error(`Baris company_settings untuk company ${companyId} tidak ditemukan.`);
+  if (!row) throw new Error(`Baris company_settings untuk perusahaan ${companyId} tidak ditemukan.`);
   return row;
 }
 

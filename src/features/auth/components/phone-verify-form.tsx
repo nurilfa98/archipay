@@ -5,7 +5,7 @@
 "use client";
 
 import { LoaderCircleIcon } from "lucide-react";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { PhoneInput } from "@/components/phone-input";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -25,7 +25,13 @@ export function PhoneVerifyForm({
   const [phone, setPhone] = useState<string | null>(null);
   const [cooldown, setCooldown] = useState(0);
   const [errors, setErrors] = useState<Record<string, string | undefined>>({});
-  const [pending, startTransition] = useTransition();
+  const [transitionPending, startTransition] = useTransition();
+  const [verified, setVerified] = useState(false);
+  const pending = transitionPending || verified;
+  // Penjaga tekan ganda: `pending` baru true setelah render ulang, jadi dua
+  // ketukan cepat bisa memanggil requestPhoneOtp dua kali (OTP terkirim 2x).
+  // Server juga menolak permintaan kedua (phone-actions.ts).
+  const sendingRef = useRef(false);
 
   useEffect(() => {
     if (cooldown <= 0) return;
@@ -34,8 +40,12 @@ export function PhoneVerifyForm({
   }, [cooldown]);
 
   function send(phoneInput: string) {
+    if (sendingRef.current) return;
+    sendingRef.current = true;
     startTransition(async () => {
-      const result = await requestPhoneOtp(phoneInput);
+      const result = await requestPhoneOtp(phoneInput).finally(() => {
+        sendingRef.current = false;
+      });
       if (!result.success) {
         setErrors({ phoneNumber: result.fieldErrors?.phoneNumber?.[0] });
         if (!result.fieldErrors) notify.error(result.message);
@@ -52,11 +62,16 @@ export function PhoneVerifyForm({
   function verify(code: string) {
     startTransition(async () => {
       const result = await verifyPhoneOtp(code, returnTo);
-      // Berhasil → server langsung mengarahkan ke halaman berikutnya.
-      if (result && !result.success) {
+      if (!result.success) {
         setErrors({ code: result.fieldErrors?.code?.[0] });
         if (!result.fieldErrors) notify.error(result.message);
+        return;
       }
+      // Muat penuh (bukan router.push): status verifikasi ada di data user
+      // yang di-cache browser, jadi semua halaman harus dibaca ulang dari
+      // server. Tombol tetap terkunci sampai halaman tujuan terbuka.
+      setVerified(true);
+      window.location.replace(result.data.redirectTo);
     });
   }
 

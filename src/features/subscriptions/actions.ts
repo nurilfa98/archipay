@@ -159,7 +159,14 @@ export async function claimSubscriptionPaid(
   const paymentId = crypto.randomUUID();
   // Diawali id company agar file tiap klien terpisah di storage.
   const proofKey = `${companyId}/subscription-proofs/${paymentId}.${type.extension}`;
-  await putObject(proofKey, bytes, type.contentType);
+  // Gagal unggah (R2) dijadikan pesan, bukan dilempar: error yang dilempar
+  // Server Action tampil sebagai halaman "React error #441" di production.
+  try {
+    await putObject(proofKey, bytes, type.contentType);
+  } catch (error) {
+    console.error("[subscriptions] unggah bukti bayar gagal:", error);
+    return { success: false, message: "Gagal mengunggah bukti bayar. Coba lagi beberapa saat." };
+  }
 
   try {
     await db.transaction(async (tx) => {
@@ -423,7 +430,7 @@ export async function recordDirectPayment(
       return result;
     });
   } catch (error) {
-    if (error instanceof CompanyNotFoundError) return { success: false, message: "Company tidak ditemukan." };
+    if (error instanceof CompanyNotFoundError) return { success: false, message: "Perusahaan tidak ditemukan." };
     throw error;
   }
 
@@ -528,7 +535,7 @@ export async function updateReceiptRetention(
   return { success: true, data: undefined };
 }
 
-// Absensi: masa simpan selfie & ambang kecocokan wajah, berlaku untuk semua company.
+// Absensi: ambang kecocokan wajah, berlaku untuk semua company.
 export async function updateAttendancePlatformSettings(
   _prevState: ActionResult | undefined,
   formData: FormData,
@@ -536,7 +543,6 @@ export async function updateAttendancePlatformSettings(
   if (!(await getSubscriptionAdmin())) return FORBIDDEN;
 
   const parsed = attendancePlatformSchema.safeParse({
-    attendanceSelfieRetentionMonths: formData.get("attendanceSelfieRetentionMonths"),
     faceMatchThreshold: formData.get("faceMatchThreshold"),
   });
   if (!parsed.success) return invalid(parsed.error);
@@ -586,7 +592,12 @@ export async function uploadQris(_prevState: ActionResult | undefined, formData:
   }
 
   const key = `platform/qris-${crypto.randomUUID()}.${type.extension}`;
-  await putObject(key, bytes, type.contentType);
+  try {
+    await putObject(key, bytes, type.contentType);
+  } catch (error) {
+    console.error("[subscriptions] unggah QRIS gagal:", error);
+    return { success: false, message: "Gagal mengunggah gambar QRIS. Coba lagi beberapa saat." };
+  }
   const previous = await setQrisKey(key);
   if (previous) await deleteObject(previous).catch(() => undefined);
 
@@ -655,7 +666,7 @@ async function quoteNewInvoice(
     getSeatUsage(companyId),
     loadAddonCoverage(db, companyId),
   ]);
-  if (!coverage) return { success: false, message: "Company tidak ditemukan." };
+  if (!coverage) return { success: false, message: "Perusahaan tidak ditemukan." };
   // Tambah kuota & add-on hanya untuk langganan berbayar yang masih berjalan;
   // masa gratis/tenggang/terkunci membeli paket baru.
   const midPeriod = access.status === "ACTIVE" && access.daysLeft >= 1;

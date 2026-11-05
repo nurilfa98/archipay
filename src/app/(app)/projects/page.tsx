@@ -34,7 +34,7 @@ import { requirePermission, verifySession } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 
 export const metadata: Metadata = {
-  title: "Project",
+  title: "Proyek",
 };
 
 type Tile = { card: ProjectCardData; finance?: ProjectCardFinance };
@@ -43,8 +43,8 @@ export default function ProjectsPage() {
   return (
     <>
       <PageHeader
-        title="Project"
-        description="Uang muka dan pertanggungjawaban diajukan per project."
+        title="Proyek"
+        description="Uang muka dan pertanggungjawaban diajukan per proyek."
         action={
           <Suspense>
             <HeaderAction />
@@ -64,7 +64,7 @@ async function HeaderAction() {
   return (
     <Button nativeButton={false} render={<Link href="/projects/new" />}>
       <PlusIcon />
-      Tambah project
+      Tambah proyek
     </Button>
   );
 }
@@ -83,11 +83,11 @@ async function ProjectsContent() {
   if (tiles.length === 0) {
     return (
       <div className="flex flex-col gap-1 rounded-lg border border-dashed p-6 text-sm">
-        <p className="font-medium">Belum ada project.</p>
+        <p className="font-medium">Belum ada proyek.</p>
         <p className="text-muted-foreground">
           {can(user, "project:manage")
-            ? "Klik \"Tambah project\" agar uang muka bisa diajukan."
-            : "Hubungi Owner untuk menambahkan project."}
+            ? "Klik \"Tambah proyek\" agar uang muka bisa diajukan."
+            : "Hubungi Owner untuk menambahkan proyek."}
         </p>
       </div>
     );
@@ -98,8 +98,8 @@ async function ProjectsContent() {
       <Alert>
         <InfoIcon />
         <AlertDescription>
-          Klik kartu untuk melihat detail project. Badge <strong>Uang Muka</strong> dan{" "}
-          <strong>Pertanggungjawaban</strong> langsung membuka daftarnya di project itu.
+          Klik kartu untuk melihat detail proyek. Badge <strong>Uang Muka</strong> dan{" "}
+          <strong>Pertanggungjawaban</strong> langsung membuka daftarnya di proyek itu.
         </AlertDescription>
       </Alert>
 

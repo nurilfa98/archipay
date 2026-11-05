@@ -16,14 +16,14 @@ import { projectIdSchema } from "@/features/projects/schemas";
 import { requirePermission } from "@/lib/auth/dal";
 
 export const metadata: Metadata = {
-  title: "Ubah Project",
+  title: "Ubah Proyek",
 };
 
 export default function EditProjectPage({ params }: PageProps<"/projects/[id]/edit">) {
   return (
     <>
       <PageHeader
-        title="Ubah project"
+        title="Ubah proyek"
         description="Perubahan nama dan klien ikut tampil di uang muka yang sudah ada."
       />
       <Card>

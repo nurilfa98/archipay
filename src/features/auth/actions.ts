@@ -90,7 +90,7 @@ export async function login(
   }
   if (user.companyIsActive === false) {
     await logFailedLogin(user, "COMPANY_INACTIVE", ip);
-    return { success: false, message: "Akses company Anda sedang dinonaktifkan. Hubungi admin ArchiPay." };
+    return { success: false, message: "Akses perusahaan Anda sedang dinonaktifkan. Hubungi admin ArchiPay." };
   }
   // Langganan habis & lewat masa tenggang: hanya Owner yang boleh masuk, dan
   // ia hanya bisa membuka menu Langganan (lib/auth/dal.ts).
@@ -101,7 +101,7 @@ export async function login(
     await logFailedLogin(user, "SUBSCRIPTION_LOCKED", ip);
     return {
       success: false,
-      message: "Masa berlangganan ArchiPay company Anda sudah habis. Hubungi Owner untuk memperpanjang.",
+      message: "Masa berlangganan ArchiPay perusahaan Anda sudah habis. Hubungi Owner untuk memperpanjang.",
     };
   }
 

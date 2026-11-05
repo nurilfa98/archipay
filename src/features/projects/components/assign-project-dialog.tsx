@@ -16,27 +16,27 @@ export function AssignProjectDialog({
   projects: { id: string; name: string }[];
 }) {
   if (projects.length === 0) {
-    return <span className="text-xs text-muted-foreground">Belum ada project aktif. Tambahkan di menu Project.</span>;
+    return <span className="text-xs text-muted-foreground">Belum ada proyek aktif. Tambahkan di menu Proyek.</span>;
   }
 
   const items = projects.map((project) => ({ value: project.id, label: project.name }));
 
   return (
     <ActionDialog
-      label="Tetapkan project"
+      label="Tetapkan proyek"
       variant="outline"
-      title="Tetapkan project"
-      description="Uang muka ini dibuat sebelum ada project. Setelah ditetapkan, project tidak bisa diganti lagi."
+      title="Tetapkan proyek"
+      description="Uang muka ini dibuat sebelum ada proyek. Setelah ditetapkan, proyek tidak bisa diganti lagi."
       confirmLabel="Tetapkan"
-      successMessage="Project ditetapkan."
+      successMessage="Proyek ditetapkan."
       onConfirm={(formData) => assignAdvanceProject(advanceId, String(formData.get("projectId") ?? ""))}
     >
       {(fieldError) => (
         <Field data-invalid={!!fieldError("projectId")}>
-          <FieldLabel htmlFor="projectId">Project</FieldLabel>
+          <FieldLabel htmlFor="projectId">Proyek</FieldLabel>
           <Select name="projectId" items={items}>
             <SelectTrigger id="projectId" className="w-full">
-              <SelectValue placeholder="Pilih project" />
+              <SelectValue placeholder="Pilih proyek" />
             </SelectTrigger>
             <SelectContent>
               {items.map((item) => (

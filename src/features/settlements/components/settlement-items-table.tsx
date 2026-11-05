@@ -2,7 +2,8 @@
 // (selama draf / perlu diperbaiki). Tanggal sudah diformat di server.
 //
 // File nota dibuka lewat /api/receipts/<id> yang mengecek hak akses dulu,
-// lalu menampilkan file dari penyimpanan privat.
+// lalu menampilkan file dari penyimpanan privat. Pratinjaunya mengambang di
+// halaman yang sama (components/file-preview.tsx), tidak membuka tab baru.
 //
 // Layar lebar: tabel. HP (< md): satu kartu per nota (pola sama dengan
 // AdvanceCard di advances-table.tsx), supaya tidak perlu geser ke samping.
@@ -10,6 +11,7 @@
 "use client";
 
 import { FileTextIcon, ImageIcon, Trash2Icon } from "lucide-react";
+import { FilePreview } from "@/components/file-preview";
 import {
   Table,
   TableBody,
@@ -190,14 +192,9 @@ export function ReceiptLink({
   }
   const Icon = item.isPdf ? FileTextIcon : ImageIcon;
   return (
-    <a
-      href={`/api/receipts/${item.id}`}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
-    >
+    <FilePreview src={`/api/receipts/${item.id}`} isPdf={item.isPdf} title="Pratinjau nota">
       <Icon className="size-4" />
       Lihat
-    </a>
+    </FilePreview>
   );
 }

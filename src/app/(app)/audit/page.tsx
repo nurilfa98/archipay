@@ -85,7 +85,7 @@ function describeEntity(log: AuditLogRow): { entityKind: string; entityLabel: st
     case "expense_categories":
       return { entityKind: "Kategori biaya", entityLabel: label, entityHref: "/settings" };
     case "projects":
-      return { entityKind: "Project", entityLabel: label, entityHref: `/projects/${log.entityId}` };
+      return { entityKind: "Proyek", entityLabel: label, entityHref: `/projects/${log.entityId}` };
     case "company_settings":
       return { entityKind: "Pengaturan", entityLabel: "Kebijakan uang muka", entityHref: "/settings" };
     default:

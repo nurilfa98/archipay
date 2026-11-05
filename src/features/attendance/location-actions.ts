@@ -256,7 +256,7 @@ export async function importLocations(rows: unknown[]): Promise<ActionResult<{ c
     if (!row) return null;
     if (existingNames.has(row.name.toLowerCase())) addError(rowErrors, index, "Nama lokasi sudah ada di ArchiPay");
     const projectId = row.projectName ? projectByName.get(row.projectName.toLowerCase()) : null;
-    if (row.projectName && !projectId) addError(rowErrors, index, `Project "${row.projectName}" tidak ditemukan`);
+    if (row.projectName && !projectId) addError(rowErrors, index, `Proyek "${row.projectName}" tidak ditemukan`);
     return {
       companyId: actor.company.id,
       createdById: actor.id,
@@ -395,7 +395,7 @@ function projectNotFound() {
   return {
     success: false as const,
     message: "Periksa kembali isian Anda.",
-    fieldErrors: { projectId: ["Project tidak ditemukan"] },
+    fieldErrors: { projectId: ["Proyek tidak ditemukan"] },
   };
 }
 

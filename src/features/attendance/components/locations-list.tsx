@@ -69,7 +69,7 @@ export function LocationsList({
         <Input
           type="search"
           aria-label="Cari lokasi"
-          placeholder="Cari nama lokasi atau project"
+          placeholder="Cari nama lokasi atau proyek"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="pl-8"
@@ -91,7 +91,7 @@ export function LocationsList({
                   <MapPinIcon className="mt-0.5 size-4 shrink-0 text-brand" />
                   <div className="min-w-0">
                     <p className="font-medium break-words">{location.name}</p>
-                    <p className="text-sm text-muted-foreground">{location.projectName ?? "Tanpa project"}</p>
+                    <p className="text-sm text-muted-foreground">{location.projectName ?? "Tanpa proyek"}</p>
                   </div>
                 </div>
                 {!readOnly && (

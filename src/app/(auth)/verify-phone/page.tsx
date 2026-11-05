@@ -1,7 +1,9 @@
 // Halaman /verify-phone: isi & verifikasi nomor WhatsApp dengan kode OTP.
 // - Wajib (forced): user company tanpa nomor terverifikasi diarahkan ke sini
 //   oleh lib/auth/dal.ts sebelum bisa membuka menu apa pun.
-// - Ganti nomor: dibuka dari menu Profil (?from=profile).
+// - Ganti nomor: HANYA dibuka dari menu Profil (?from=profile). User yang
+//   sudah terverifikasi tanpa ?from=profile (misal tepat setelah verifikasi
+//   atau membuka URL ini langsung) diarahkan ke beranda.
 //
 // Ada di grup (auth) agar tampil tanpa menu, dan memakai getCurrentUser()
 // (bukan verifySession) agar tidak redirect loop, sama seperti /change-password.
@@ -40,7 +42,7 @@ async function VerifyPhoneContent({ searchParams }: Pick<PageProps<"/verify-phon
   if (!user.company || user.roles.includes("SUPERADMIN")) redirect("/");
 
   const forced = user.mustVerifyPhone;
-  const fromProfile = !forced && (await searchParams).from === "profile";
+  if (!forced && (await searchParams).from !== "profile") redirect("/");
   const profile = await getOwnProfile(user.id);
 
   return (
@@ -56,14 +58,14 @@ async function VerifyPhoneContent({ searchParams }: Pick<PageProps<"/verify-phon
       <CardContent>
         <PhoneVerifyForm
           defaultPhone={forced ? (profile?.phoneNumber ?? null) : null}
-          returnTo={fromProfile ? "profile" : "home"}
+          returnTo={forced ? "home" : "profile"}
         />
       </CardContent>
       <CardFooter className="justify-center">
         {forced ? (
           <LogoutButton />
         ) : (
-          <Button variant="link" size="sm" nativeButton={false} render={<Link href={fromProfile ? "/profile" : "/"} />}>
+          <Button variant="link" size="sm" nativeButton={false} render={<Link href="/profile" />}>
             Batal
           </Button>
         )}

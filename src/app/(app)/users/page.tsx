@@ -1,4 +1,5 @@
-// Halaman /users (khusus OWNER): daftar pengguna + pencarian.
+// Halaman /users (khusus OWNER): daftar pengguna dengan pencarian & filter
+// Role/Status (pola sama dengan riwayat Uang Muka, components/data-table).
 //
 // Polanya sama dengan halaman lain: judul statis di luar <Suspense> (langsung
 // tampil saat menu diklik), sedangkan bagian yang membaca cookie, searchParams,
@@ -20,12 +21,11 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { UserSearch } from "@/features/users/components/user-search";
-import { USER_SEARCH_MIN_LENGTH } from "@/features/users/constants";
 import { UsersTable } from "@/features/users/components/users-table";
 import { getSeatUsage } from "@/features/subscriptions/seats";
 import { canManageUsers } from "@/features/users/access";
 import { listUsers } from "@/features/users/queries";
+import { parseUserFilters } from "@/features/users/schemas";
 import { verifySession } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 
@@ -57,12 +57,9 @@ async function UsersContent({ searchParams }: Pick<PageProps<"/users">, "searchP
   const actor = await verifySession();
   if (!canManageUsers(actor)) redirect("/");
 
-  const { q } = await searchParams;
-  // ?q=a&q=b menghasilkan array; cukup ambil yang pertama.
-  const keyword = (Array.isArray(q) ? q[0] : q)?.trim().slice(0, 100) ?? "";
-  // Kurang dari 3 karakter dianggap tidak mencari (tampilkan semua).
-  const search = keyword.length >= USER_SEARCH_MIN_LENGTH ? keyword : undefined;
-  const [users, seats] = await Promise.all([listUsers(actor.company.id, search), getSeatUsage(actor.company.id)]);
+  // Filter: ?role=&status= (nilai tidak valid diabaikan).
+  const filters = parseUserFilters(await searchParams);
+  const [users, seats] = await Promise.all([listUsers(actor.company.id, filters), getSeatUsage(actor.company.id)]);
   const full = seats.active >= seats.limit;
 
   return (
@@ -92,8 +89,7 @@ async function UsersContent({ searchParams }: Pick<PageProps<"/users">, "searchP
           </span>
         </AlertDescription>
       </Alert>
-      <UserSearch search={search} />
-      <UsersTable users={users} search={search} />
+      <UsersTable users={users} filters={filters} />
     </div>
   );
 }

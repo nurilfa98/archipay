@@ -55,8 +55,8 @@ export function CompanySearchList({ entries }: { entries: CompanySearchEntry[] }
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Cari nama company atau Owner"
-              aria-label="Cari company"
+              placeholder="Cari nama perusahaan atau Owner"
+              aria-label="Cari perusahaan"
               className="pl-8"
             />
           </div>
@@ -66,7 +66,7 @@ export function CompanySearchList({ entries }: { entries: CompanySearchEntry[] }
             </Button>
           )}
         </div>
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Saring status company">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Saring status perusahaan">
           {filters.map((value) => (
             <Button
               key={value}
@@ -90,7 +90,7 @@ export function CompanySearchList({ entries }: { entries: CompanySearchEntry[] }
 
       {visible.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          {keyword ? `Company atau Owner "${query.trim()}" tidak ditemukan.` : "Tidak ada company dengan status ini."}
+          {keyword ? `Perusahaan atau Owner "${query.trim()}" tidak ditemukan.` : "Tidak ada perusahaan dengan status ini."}
         </p>
       ) : (
         // 1 kolom di HP, 2 di tablet, 3 di layar lebar.

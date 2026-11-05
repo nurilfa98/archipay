@@ -250,7 +250,7 @@ export const gpsSchema = z.object({
 export const checkSubmissionSchema = gpsSchema.extend({
   mode: z.enum(["in", "out"]),
   locationId: idSchema,
-  photo: facePhoto,
+  // Hanya embedding; selfie absen tidak dikirim/disimpan (check-actions.ts).
   embedding: faceEmbedding,
   lateReason: optionalText(500),
   earlyReason: optionalText(500),
@@ -317,7 +317,7 @@ export const userQuotaSchema = z
     if (!value) return null;
     const quota = Number(value);
     if (!Number.isInteger(quota) || quota < 0 || quota > 60) {
-      ctx.addIssue({ code: "custom", message: "Kuota 0–60 hari, atau kosongkan untuk ikut kuota company" });
+      ctx.addIssue({ code: "custom", message: "Kuota 0–60 hari, atau kosongkan untuk ikut kuota perusahaan" });
       return z.NEVER;
     }
     return quota;

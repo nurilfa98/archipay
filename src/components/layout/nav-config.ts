@@ -56,11 +56,11 @@ export const MENU_ITEMS: MenuItem[] = [
     keywords: ["dashboard", "ringkasan", "keuntungan", "laporan"],
   },
   {
-    title: "Project",
+    title: "Proyek",
     href: "/projects",
     icon: FolderKanbanIcon,
-    description: "Uang muka & pertanggungjawaban per project",
-    keywords: ["uang muka", "pertanggungjawaban", "nota", "kasbon", "pengajuan"],
+    description: "Uang muka & pertanggungjawaban per proyek",
+    keywords: ["proyek", "project", "uang muka", "pertanggungjawaban", "nota", "kasbon", "pengajuan"],
     permission: "advance:view-own",
   },
   {
@@ -148,7 +148,7 @@ export const SUB_PAGES: { title: string; href: string; parent?: string }[] = [
 // app/(app)/(platform)/layout.tsx. Di halaman ini breadcrumb tidak
 // menampilkan "Menu" dan tombol kembali ke menu disembunyikan.
 export const PLATFORM_PAGES: { title: string; href: string }[] = [
-  { title: "Company", href: "/companies" },
+  { title: "Perusahaan", href: "/companies" },
   { title: "Tagihan", href: "/billing" },
   { title: "Pengaturan platform", href: "/platform-settings" },
 ];

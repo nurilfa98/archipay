@@ -6,6 +6,10 @@
 // Server TIDAK percaya hitungan HP: jarak ke lokasi, jam & tanggal setempat
 // (jam server di zona waktu lokasi), terlambat/pulang cepat, dan kecocokan
 // wajah dihitung ulang di sini. Wajah tidak cocok → absen ditolak.
+//
+// Selfie absen TIDAK disimpan: HP hanya mengirim face embedding, server
+// membandingkannya dengan foto acuan, lalu yang disimpan hanya data absen
+// (jam, lokasi, jarak, skor kecocokan wajah).
 
 "use server";
 
@@ -19,7 +23,6 @@ import { db, isUniqueViolation } from "@/lib/db";
 import { attendanceHolidays, attendanceLocations, attendancePenalties, attendanceRecords } from "@/lib/db/schema";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { getClientIp } from "@/lib/request";
-import { deleteObject, putObject } from "@/lib/storage";
 import type { ActionResult } from "@/types/action-result";
 import { formatLocalClock, localTime } from "./clock";
 import { FACE_MODEL_VERSION } from "./constants";
@@ -224,7 +227,6 @@ export async function submitAttendance(formData: FormData): Promise<ActionResult
     latitude: formData.get("latitude"),
     longitude: formData.get("longitude"),
     accuracy: formData.get("accuracy"),
-    photo: formData.get("photo"),
     embedding: formData.get("embedding") ?? "",
     lateReason: formData.get("lateReason") ?? "",
     earlyReason: formData.get("earlyReason") ?? "",
@@ -233,7 +235,7 @@ export async function submitAttendance(formData: FormData): Promise<ActionResult
   });
   if (!parsed.success) {
     const fieldErrors = z.flattenError(parsed.error).fieldErrors as Record<string, string[]>;
-    const general = fieldErrors.photo?.[0] ?? fieldErrors.embedding?.[0];
+    const general = fieldErrors.embedding?.[0];
     return { success: false, message: general ?? "Periksa kembali isian Anda.", fieldErrors };
   }
   const input = parsed.data;
@@ -325,9 +327,6 @@ async function checkIn(
   meta: { now: Date; score: number; lateMinutes: number; ip: string | null },
 ): Promise<ActionResult<{ message: string }>> {
   const recordId = crypto.randomUUID();
-  const selfieKey = `${actor.company.id}/attendance/${recordId}-in.jpg`;
-  await putObject(selfieKey, new Uint8Array(await input.photo.arrayBuffer()), "image/jpeg");
-
   const settings = await getAttendanceSettings(actor.company.id);
   try {
     await db.transaction(async (tx) => {
@@ -348,7 +347,6 @@ async function checkIn(
         checkInAccuracy: Math.round(input.accuracy),
         checkInDistance: location.distance,
         checkInInRadius: location.inRadius,
-        checkInSelfieKey: selfieKey,
         checkInFaceScore: meta.score,
         lateMinutes: meta.lateMinutes,
         lateReason: meta.lateMinutes > 0 ? input.lateReason : null,
@@ -385,7 +383,6 @@ async function checkIn(
       );
     });
   } catch (error) {
-    await deleteObject(selfieKey).catch(() => undefined);
     if (isUniqueViolation(error)) return { success: false, message: "Anda sudah absen masuk hari ini." };
     throw error;
   }
@@ -410,9 +407,6 @@ async function checkOut(
   record: AttendanceRecordRow,
   meta: { now: Date; score: number; earlyMinutes: number; ip: string | null },
 ): Promise<ActionResult<{ message: string }>> {
-  const selfieKey = `${actor.company.id}/attendance/${record.id}-out.jpg`;
-  await putObject(selfieKey, new Uint8Array(await input.photo.arrayBuffer()), "image/jpeg");
-
   const appealNote = input.appealNote
     ? [record.appealNote, `Pulang: ${input.appealNote}`].filter(Boolean).join("\n")
     : record.appealNote;
@@ -428,7 +422,6 @@ async function checkOut(
         checkOutAccuracy: Math.round(input.accuracy),
         checkOutDistance: location.distance,
         checkOutInRadius: location.inRadius,
-        checkOutSelfieKey: selfieKey,
         checkOutFaceScore: meta.score,
         earlyMinutes: meta.earlyMinutes,
         earlyReason: meta.earlyMinutes > 0 ? input.earlyReason : null,
@@ -459,7 +452,6 @@ async function checkOut(
     return true;
   });
   if (!updated) {
-    await deleteObject(selfieKey).catch(() => undefined);
     return { success: false, message: "Anda sudah absen pulang hari ini." };
   }
 

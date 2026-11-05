@@ -73,7 +73,7 @@ export default function AdvancesPage({ searchParams }: PageProps<"/advances">) {
     <RequestBlockedProvider>
       <PageHeader
         title="Uang Muka"
-        description="Uang muka dikelompokkan per project."
+        description="Uang muka dikelompokkan per proyek."
         action={
           <Suspense>
             <AdvanceHeaderActions searchParams={searchParams} />

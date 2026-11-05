@@ -41,7 +41,7 @@ function Empty() {
 // nama panjang tetap muat di layar HP.
 export function CategoryChart({
   categories,
-  description = "Nota yang disetujui, semua project.",
+  description = "Nota yang disetujui, semua proyek.",
 }: {
   categories: CategoryExpense[];
   description?: string;

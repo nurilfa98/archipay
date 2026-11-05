@@ -196,7 +196,7 @@ export async function listProjectCards(filter: {
   if (legacy) {
     cards.push({
       id: null,
-      name: "Tanpa project",
+      name: "Tanpa proyek",
       client: null,
       icon: DEFAULT_PROJECT_ICON,
       status: null,

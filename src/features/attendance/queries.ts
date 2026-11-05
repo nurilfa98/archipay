@@ -50,7 +50,7 @@ export async function getAttendanceSettings(companyId: string): Promise<Attendan
     .where(eq(companySettings.companyId, companyId))
     .limit(1);
   // Baris dibuat bersama company-nya (lihat features/settings/queries.ts).
-  if (!row) throw new Error(`Baris company_settings untuk company ${companyId} tidak ditemukan.`);
+  if (!row) throw new Error(`Baris company_settings untuk perusahaan ${companyId} tidak ditemukan.`);
   return row;
 }
 
@@ -410,22 +410,6 @@ export async function isHoliday(companyId: string, date: string) {
     .where(and(eq(attendanceHolidays.companyId, companyId), eq(attendanceHolidays.date, date)))
     .limit(1);
   return !!row;
-}
-
-// File selfie untuk route /api/attendance/records/<id>/selfie/<in|out>.
-export async function getRecordSelfie(companyId: string, recordId: string) {
-  await io();
-  const [row] = await db
-    .select({
-      userId: attendanceRecords.userId,
-      checkInSelfieKey: attendanceRecords.checkInSelfieKey,
-      checkOutSelfieKey: attendanceRecords.checkOutSelfieKey,
-      selfieDeletedAt: attendanceRecords.selfieDeletedAt,
-    })
-    .from(attendanceRecords)
-    .where(and(eq(attendanceRecords.id, recordId), eq(attendanceRecords.companyId, companyId)))
-    .limit(1);
-  return row ?? null;
 }
 
 export async function getApprovedFace(companyId: string, userId: string) {

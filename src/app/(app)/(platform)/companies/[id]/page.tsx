@@ -36,13 +36,13 @@ import { minPlanUsers } from "@/features/subscriptions/pricing";
 import { getAddonCoverage, getCompanyPricing, listSubscriptions } from "@/features/subscriptions/queries";
 import { ADDON_KEYS, ADDON_LABELS, isTrialOnly } from "@/lib/addons";
 import { companyIdSchema } from "@/features/companies/schemas";
-import { StatusBadge } from "@/features/users/components/users-table";
+import { StatusBadge } from "@/features/users/components/user-badges";
 import { requirePlatformAdmin } from "@/lib/auth/dal";
-import { formatDate } from "@/lib/dates";
+import { formatDate, formatShortDate } from "@/lib/dates";
 import { formatPhone } from "@/lib/phone";
 
 export const metadata: Metadata = {
-  title: "Detail Company",
+  title: "Detail Perusahaan",
 };
 
 export default function CompanyDetailPage({ params }: PageProps<"/companies/[id]">) {
@@ -51,7 +51,7 @@ export default function CompanyDetailPage({ params }: PageProps<"/companies/[id]
       <div>
         <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/companies" />}>
           <ArrowLeftIcon />
-          Daftar company
+          Daftar perusahaan
         </Button>
       </div>
       <Suspense fallback={<CompanyDetailSkeleton />}>
@@ -96,7 +96,7 @@ async function CompanyDetailContent({ id }: { id: string }) {
           <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
             <Item label="Pengguna aktif">{company.userCount}</Item>
             <Item label="Pengguna nonaktif">{company.inactiveUserCount}</Item>
-            <Item label="Project">{company.projectCount}</Item>
+            <Item label="Proyek">{company.projectCount}</Item>
             <Item label="Telepon / WhatsApp">{company.phoneNumber ? formatPhone(company.phoneNumber) : "-"}</Item>
             <Item label="Alamat">{company.address ?? "-"}</Item>
           </dl>
@@ -107,14 +107,20 @@ async function CompanyDetailContent({ id }: { id: string }) {
         <CardHeader>
           <CardTitle>Langganan</CardTitle>
           <CardDescription>
-            {accessLabel(company, status)} · {company.userCount} dari {company.userLimit} pengguna aktif
+            <span className="block">
+              {accessLabel(company, status)} · {company.userCount} dari {company.userLimit} pengguna aktif
+            </span>
             {ADDON_KEYS.map((key) => {
               const coverage = addons?.[key];
               const text =
                 coverage?.active && coverage.until
-                  ? `aktif s.d. ${formatDate(coverage.until)}${isTrialOnly(coverage) ? " (masa gratis)" : ""}`
-                  : "tidak aktif";
-              return <span key={key}>{` · Add-on ${ADDON_LABELS[key]} ${text}`}</span>;
+                  ? `Add-on ${ADDON_LABELS[key]} aktif s.d. ${formatShortDate(coverage.until)}${isTrialOnly(coverage) ? " (masa gratis)" : ""}`
+                  : `Add-on ${ADDON_LABELS[key]} (Nonaktif)`;
+              return (
+                <span key={key} className="block">
+                  {text}
+                </span>
+              );
             })}
           </CardDescription>
         </CardHeader>
@@ -144,7 +150,7 @@ async function CompanyDetailContent({ id }: { id: string }) {
           </div>
 
           <div className="flex flex-col gap-3 border-t pt-6">
-            <h3 className="text-sm font-medium">Harga khusus company ini</h3>
+            <h3 className="text-sm font-medium">Harga khusus perusahaan ini</h3>
             <CompanyPricingForm companyId={company.id} pricing={pricing} />
           </div>
         </CardContent>
@@ -154,7 +160,7 @@ async function CompanyDetailContent({ id }: { id: string }) {
         <CardHeader>
           <CardTitle>Owner</CardTitle>
           <CardDescription>
-            Untuk menambah Owner lain, reset password, atau menonaktifkan akun, buka company ini lalu pilih menu
+            Untuk menambah Owner lain, reset password, atau menonaktifkan akun, buka perusahaan ini lalu pilih menu
             Pengguna.
           </CardDescription>
         </CardHeader>
@@ -179,7 +185,7 @@ async function CompanyDetailContent({ id }: { id: string }) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Data company</CardTitle>
+          <CardTitle>Data perusahaan</CardTitle>
         </CardHeader>
         <CardContent>
           <CompanyEditForm company={company} />
@@ -197,7 +203,7 @@ async function CompanyDetailContent({ id }: { id: string }) {
 
       <Card className="ring-destructive/30">
         <CardHeader>
-          <CardTitle className="text-destructive">Hapus company</CardTitle>
+          <CardTitle className="text-destructive">Hapus perusahaan</CardTitle>
         </CardHeader>
         <CardContent>
           <CompanyDeleteAction company={company} />

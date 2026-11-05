@@ -1,8 +1,11 @@
 // Daftar absen (Server Component): riwayat milik sendiri di menu Absensi dan
 // daftar semua orang di /attendance/today. Jam ditampilkan dalam zona waktu
-// lokasi absen; selfie dibuka lewat route berizin.
+// lokasi absen.
+//
+// Selfie absen tidak disimpan: yang tampil adalah hasil cocok wajah (skor).
+// Skor 0 = absen hasil koreksi Owner (tanpa cocok wajah).
 
-import { ExternalLinkIcon } from "lucide-react";
+import { ExternalLinkIcon, ScanFaceIcon } from "lucide-react";
 import { ToneBadge } from "@/components/tone-badge";
 import { formatDateOnly } from "@/lib/dates";
 import { formatLocalClock } from "../clock";
@@ -46,14 +49,12 @@ export function RecordList({
           <div className="grid gap-3 sm:grid-cols-2">
             <CheckSide
               title="Masuk"
-              recordId={record.id}
-              kind="in"
               at={record.checkInAt}
               timezone={record.timezone}
               locationName={record.checkInLocationName}
               distance={record.checkInDistance}
               point={{ lat: record.checkInLatitude, lng: record.checkInLongitude }}
-              hasSelfie={!!record.checkInSelfieKey}
+              faceScore={record.checkInFaceScore}
               notes={[
                 record.lateReason && `Alasan terlambat: ${record.lateReason}`,
                 record.checkInOutsideReason && `Alasan di luar radius: ${record.checkInOutsideReason}`,
@@ -62,14 +63,12 @@ export function RecordList({
             {record.checkOutAt ? (
               <CheckSide
                 title="Pulang"
-                recordId={record.id}
-                kind="out"
                 at={record.checkOutAt}
                 timezone={record.timezone}
                 locationName={record.checkOutLocationName ?? "-"}
                 distance={record.checkOutDistance ?? 0}
                 point={{ lat: record.checkOutLatitude ?? 0, lng: record.checkOutLongitude ?? 0 }}
-                hasSelfie={!!record.checkOutSelfieKey}
+                faceScore={record.checkOutFaceScore ?? 0}
                 notes={[
                   record.earlyReason && `Alasan pulang cepat: ${record.earlyReason}`,
                   record.checkOutOutsideReason && `Alasan di luar radius: ${record.checkOutOutsideReason}`,
@@ -97,42 +96,34 @@ export function RecordList({
 
 function CheckSide({
   title,
-  recordId,
-  kind,
   at,
   timezone,
   locationName,
   distance,
   point,
-  hasSelfie,
+  faceScore,
   notes,
 }: {
   title: string;
-  recordId: string;
-  kind: "in" | "out";
   at: Date;
   timezone: string;
   locationName: string;
   distance: number;
   point: { lat: number; lng: number };
-  hasSelfie: boolean;
+  faceScore: number;
   notes: (string | null | false)[];
 }) {
   return (
     <div className="flex gap-3">
-      {hasSelfie ? (
-        <a href={`/api/attendance/records/${recordId}/selfie/${kind}`} target="_blank" rel="noreferrer">
-          {/* eslint-disable-next-line @next/next/no-img-element -- file privat lewat route berizin */}
-          <img
-            src={`/api/attendance/records/${recordId}/selfie/${kind}`}
-            alt={`Selfie ${title.toLowerCase()}`}
-            className="size-16 rounded-md bg-muted object-cover"
-            loading="lazy"
-          />
-        </a>
+      {faceScore > 0 ? (
+        <div className="flex size-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md bg-emerald-50 text-center text-[10px] leading-tight text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+          <ScanFaceIcon className="size-5" />
+          Wajah cocok
+          <span className="tabular-nums">{faceScore}%</span>
+        </div>
       ) : (
         <div className="flex size-16 shrink-0 items-center justify-center rounded-md bg-muted text-center text-[10px] text-muted-foreground">
-          Tanpa selfie
+          Koreksi Owner
         </div>
       )}
       <div className="min-w-0 text-sm">

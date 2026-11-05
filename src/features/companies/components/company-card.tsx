@@ -75,7 +75,7 @@ export function CompanyCard({
             </span>
             <span className="inline-flex items-center gap-1.5">
               <FolderKanbanIcon className="size-4 text-muted-foreground" />
-              {company.projectCount} project
+              {company.projectCount} proyek
             </span>
             {addonKeysOf(company.addons).map((key) => (
               <span key={key} className="inline-flex items-center gap-1.5">

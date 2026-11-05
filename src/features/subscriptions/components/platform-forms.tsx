@@ -106,7 +106,7 @@ export function PricingForm({ pricing }: { pricing: Pricing }) {
               name={`${key}UserPrice`}
               label={`Add-on ${ADDON_LABELS[key]} / pengguna / bulan`}
               defaultValue={pricing.addonUserPrices[key]}
-              description="Dikali jumlah pengguna paket; diskon 6 bulan & 1 tahun ikut berlaku. Semua company."
+              description="Dikali jumlah pengguna paket; diskon 6 bulan & 1 tahun ikut berlaku. Semua perusahaan."
               onValueChange={(value) =>
                 setValues((current) => ({ ...current, addonUserPrices: { ...current.addonUserPrices, [key]: value } }))
               }
@@ -216,10 +216,10 @@ export function PlatformSettingsForm({
         <div className="grid gap-5 sm:grid-cols-2">
           <DaysField
             name="freeDays"
-            label="Masa gratis company baru"
+            label="Masa gratis perusahaan baru"
             defaultValue={settings.freeDays}
             max={90}
-            description="Nilai awal di form Tambah company; bisa diubah per company."
+            description="Nilai awal di form Tambah perusahaan; bisa diubah per perusahaan."
             error={fieldError("freeDays")}
           />
           <DaysField
@@ -227,7 +227,7 @@ export function PlatformSettingsForm({
             label="Masa tenggang"
             defaultValue={settings.graceDays}
             max={30}
-            description="Khusus company berbayar: setelah masa langganan habis, sebelum dikunci."
+            description="Khusus perusahaan berbayar: setelah masa langganan habis, sebelum dikunci."
             error={fieldError("graceDays")}
           />
         </div>
@@ -238,7 +238,7 @@ export function PlatformSettingsForm({
           defaultValue={settings.trialMaxUsers}
           min={1}
           max={MAX_USERS}
-          description="Pengguna aktif (Owner, Finance, Admin HR, Karyawan) selama masa gratis. Nilai awal di form Tambah company; bisa diubah per company."
+          description="Pengguna aktif (Owner, Finance, Admin HR, Karyawan) selama masa gratis. Nilai awal di form Tambah perusahaan; bisa diubah per perusahaan."
           error={fieldError("trialMaxUsers")}
         />
         <PhoneInput
@@ -276,13 +276,7 @@ export function ReceiptRetentionForm({ months }: { months: number }) {
   );
 }
 
-export function AttendancePlatformForm({
-  selfieMonths,
-  faceThreshold,
-}: {
-  selfieMonths: number;
-  faceThreshold: number;
-}) {
+export function AttendancePlatformForm({ faceThreshold }: { faceThreshold: number }) {
   const { pending, handleSubmit, fieldError } = useFormAction(
     updateAttendancePlatformSettings,
     "Pengaturan absensi tersimpan.",
@@ -290,16 +284,6 @@ export function AttendancePlatformForm({
   return (
     <form onSubmit={handleSubmit} className="max-w-xl">
       <FieldGroup>
-        <NumberField
-          name="attendanceSelfieRetentionMonths"
-          label="Masa simpan selfie absen"
-          unit="bulan"
-          defaultValue={selfieMonths}
-          min={1}
-          max={24}
-          description="Dihitung sejak tanggal absen. Data absen (jam, jarak, alasan) tetap tersimpan."
-          error={fieldError("attendanceSelfieRetentionMonths")}
-        />
         <NumberField
           name="faceMatchThreshold"
           label="Ambang kecocokan wajah"

@@ -22,7 +22,7 @@ export function ProjectFinanceList({ projects }: { projects: ProjectFinanceRow[]
   if (projects.length === 0) {
     return (
       <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-        Belum ada project. Tambahkan di menu Project.
+        Belum ada proyek. Tambahkan di menu Proyek.
       </p>
     );
   }
@@ -33,7 +33,7 @@ export function ProjectFinanceList({ projects }: { projects: ProjectFinanceRow[]
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Project</TableHead>
+              <TableHead>Proyek</TableHead>
               <TableHead className="text-right">Nilai kontrak</TableHead>
               <TableHead className="min-w-44">Pengeluaran</TableHead>
               <TableHead className="text-right">Keuntungan</TableHead>
@@ -134,7 +134,7 @@ function ProjectName({ project }: { project: ProjectFinanceRow }) {
           {project.status === "COMPLETED" && <ToneBadge tone="pending">Selesai</ToneBadge>}
         </div>
         <p className="truncate text-xs text-muted-foreground">
-          {project.client ?? (project.id ? "Tanpa nama klien" : "Uang muka sebelum ada project")}
+          {project.client ?? (project.id ? "Tanpa nama klien" : "Uang muka sebelum ada proyek")}
         </p>
       </div>
     </div>

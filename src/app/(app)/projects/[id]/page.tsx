@@ -35,13 +35,13 @@ import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 
 export const metadata: Metadata = {
-  title: "Detail project",
+  title: "Detail proyek",
 };
 
 export default function ProjectDetailPage({ params }: PageProps<"/projects/[id]">) {
   return (
     <>
-      <BackToList href="/projects" label="Daftar project" />
+      <BackToList href="/projects" label="Daftar proyek" />
       <Suspense fallback={<DetailSkeleton />}>
         <ProjectDetail params={params} />
       </Suspense>
@@ -99,7 +99,7 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
               <>
                 <Button variant="outline" nativeButton={false} render={<Link href={`/projects/${id}/edit`} />}>
                   <PencilIcon />
-                  Ubah project
+                  Ubah proyek
                 </Button>
                 <ProjectStatusButton project={{ id, name: card.name, status: card.status }} />
               </>
@@ -111,7 +111,7 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
 
       {!active && (
         <p className="text-sm text-muted-foreground">
-          Project sudah selesai: tidak bisa dipakai untuk uang muka baru, tetapi daftar dan laporannya tetap bisa dibuka.
+          Proyek sudah selesai: tidak bisa dipakai untuk uang muka baru, tetapi daftar dan laporannya tetap bisa dibuka.
         </p>
       )}
 
@@ -125,10 +125,10 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
       {finance && (
         <section className="flex flex-col gap-4" aria-labelledby="project-finance-title">
           <h2 id="project-finance-title" className="text-sm font-medium">
-            Keuangan project
+            Keuangan proyek
           </h2>
           <FinanceKpis totals={summarizeFinance([finance])} scope="project" />
-          <CategoryChart categories={categories} description="Nota yang disetujui di project ini." />
+          <CategoryChart categories={categories} description="Nota yang disetujui di proyek ini." />
         </section>
       )}
     </div>

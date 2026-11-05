@@ -9,15 +9,15 @@ import { ProjectForm } from "@/features/projects/components/project-form";
 import { requirePermission } from "@/lib/auth/dal";
 
 export const metadata: Metadata = {
-  title: "Tambah Project",
+  title: "Tambah Proyek",
 };
 
 export default function NewProjectPage() {
   return (
     <>
       <PageHeader
-        title="Tambah project"
-        description="Project baru langsung bisa dipakai untuk mengajukan uang muka. Nilai kontrak bisa diisi nanti."
+        title="Tambah proyek"
+        description="Proyek baru langsung bisa dipakai untuk mengajukan uang muka. Nilai kontrak bisa diisi nanti."
       />
       <Card>
         <CardContent>

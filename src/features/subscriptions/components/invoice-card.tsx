@@ -5,10 +5,12 @@
 // - detail company → Langganan (Superadmin): `admin`, tanpa nama company;
 // - menu Langganan (Owner): hanya melihat.
 //
-// Bukti transfer dibuka di tab baru lewat /api/subscription-payments/<id>/proof.
+// Bukti transfer dipratinjau mengambang (components/file-preview.tsx) lewat
+// /api/subscription-payments/<id>/proof.
 
-import { ExternalLinkIcon, FileTextIcon, ImageIcon } from "lucide-react";
+import { FileTextIcon, ImageIcon } from "lucide-react";
 import Link from "next/link";
+import { FilePreview } from "@/components/file-preview";
 import { ToneBadge } from "@/components/tone-badge";
 import { formatDateTime, formatShortDate } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
@@ -121,16 +123,15 @@ function PaymentRow({
       </div>
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-muted-foreground">
         {payment.proof ? (
-          <a
-            href={`/api/subscription-payments/${payment.id}/proof`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-1.5 font-medium text-foreground hover:underline"
+          <FilePreview
+            src={`/api/subscription-payments/${payment.id}/proof`}
+            isPdf={payment.proof === "pdf"}
+            title="Pratinjau bukti bayar"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-sm font-medium text-foreground outline-none hover:underline focus-visible:ring-2 focus-visible:ring-ring"
           >
             {payment.proof === "pdf" ? <FileTextIcon className="size-4" /> : <ImageIcon className="size-4" />}
             Lihat bukti
-            <ExternalLinkIcon className="size-3.5" />
-          </a>
+          </FilePreview>
         ) : (
           <span>Dicatat langsung oleh admin</span>
         )}

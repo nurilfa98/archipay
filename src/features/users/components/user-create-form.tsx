@@ -1,8 +1,8 @@
 // Form tambah pengguna: cukup mengisi nama, email, dan role awal. Pilihan role
 // berasal dari features/users/access.ts (superadmin bisa memilih Owner, Owner
 // hanya Finance/Karyawan). Nomor WhatsApp dan rekening diisi belakangan.
-// Setelah berhasil, toast memberi tahu apakah email kredensial terkirim
-// (dengan tombol "Lihat detail"), lalu form dikosongkan untuk pengguna berikutnya.
+// Setelah berhasil, kembali ke daftar /users dan toast singkat memberi tahu
+// apakah email password sementara terkirim (dengan tombol "Lihat detail").
 //
 // Kenapa memakai onSubmit, bukan <form action={formAction}>?
 // Dengan `action`, React mengosongkan form setelah Server Action selesai,
@@ -19,7 +19,7 @@
 import { LoaderCircleIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useState, type FormEvent } from "react";
+import { startTransition, useActionState, type FormEvent } from "react";
 import { useActionResult } from "@/hooks/use-action-result";
 import { notify } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
@@ -30,13 +30,6 @@ import { ROLE_LABELS, type AssignableRole } from "@/lib/auth/roles";
 import { TextField } from "./text-field";
 
 export function UserCreateForm({ roles }: { roles: AssignableRole[] }) {
-  // Mengganti `key` membuat React membuat ulang form dari nol (isian & state
-  // hasil action ikut kosong). Dipakai setelah pengguna berhasil dibuat.
-  const [formKey, setFormKey] = useState(0);
-  return <CreateForm key={formKey} roles={roles} onCreated={() => setFormKey((key) => key + 1)} />;
-}
-
-function CreateForm({ roles, onCreated }: { roles: AssignableRole[]; onCreated: () => void }) {
   const router = useRouter();
   const [state, formAction, pending] = useActionState(createUser, undefined);
 
@@ -49,7 +42,7 @@ function CreateForm({ roles, onCreated }: { roles: AssignableRole[]; onCreated: 
       return;
     }
     showCreatedToast(result.data, () => router.push(`/users/${result.data.id}`));
-    onCreated();
+    router.push("/users");
   });
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -110,14 +103,12 @@ function CreateForm({ roles, onCreated }: { roles: AssignableRole[]; onCreated: 
 function showCreatedToast(result: CreateUserResult, openDetail: () => void) {
   const action = { label: "Lihat detail", onClick: openDetail };
   if (result.emailSent) {
-    notify.success(
-      `Password sementara sudah dikirim ke ${result.email}. Pengguna wajib menggantinya saat login pertama.`,
-      { title: "Pengguna berhasil dibuat", action },
-    );
+    notify.success(`Password sementara dikirim ke ${result.email}.`, { title: "Pengguna berhasil dibuat", action });
   } else {
-    notify.warning(
-      `Buka detail pengguna lalu tekan "Reset password" untuk mengirim ulang password ke ${result.email}.`,
-      { title: "Pengguna dibuat, tetapi email gagal dikirim", timeout: 10000, action },
-    );
+    notify.warning(`Password sementara gagal dikirim ke ${result.email}.`, {
+      title: "Pengguna dibuat, tetapi email gagal dikirim",
+      timeout: 10000,
+      action,
+    });
   }
 }

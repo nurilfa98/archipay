@@ -37,11 +37,11 @@ export function ProjectStatusButton({ project }: { project: { id: string; name: 
       title={active ? `Tandai "${project.name}" selesai?` : `Aktifkan lagi "${project.name}"?`}
       description={
         active
-          ? "Project tidak bisa dipakai lagi untuk uang muka baru. Uang muka yang sudah berjalan tetap berjalan, dan laporan project tetap bisa dibuka."
-          : "Project bisa dipakai lagi untuk uang muka baru."
+          ? "Proyek tidak bisa dipakai lagi untuk uang muka baru. Uang muka yang sudah berjalan tetap berjalan, dan laporan proyek tetap bisa dibuka."
+          : "Proyek bisa dipakai lagi untuk uang muka baru."
       }
       confirmLabel={active ? "Tandai selesai" : "Aktifkan"}
-      successMessage={active ? "Project ditandai selesai." : "Project diaktifkan."}
+      successMessage={active ? "Proyek ditandai selesai." : "Proyek diaktifkan."}
       onConfirm={() => setProjectStatus(project.id, active ? "COMPLETED" : "ACTIVE")}
     />
   );
@@ -62,7 +62,7 @@ export function ProjectFields({
   return (
     <>
       <Field data-invalid={!!fieldError("name")}>
-        <FieldLabel htmlFor="name">Nama project</FieldLabel>
+        <FieldLabel htmlFor="name">Nama proyek</FieldLabel>
         <Input
           id="name"
           name="name"
@@ -108,13 +108,13 @@ export function ProjectFields({
             aria-invalid={!!fieldError("contractValue")}
           />
         </div>
-        <FieldDescription>Hanya terlihat oleh Owner. Dipakai untuk menghitung keuntungan project.</FieldDescription>
+        <FieldDescription>Hanya terlihat oleh Owner. Dipakai untuk menghitung keuntungan proyek.</FieldDescription>
         <FieldError>{fieldError("contractValue")}</FieldError>
       </Field>
 
       <FieldSet data-invalid={!!fieldError("icon")}>
         <FieldLegend variant="label">Ikon</FieldLegend>
-        <FieldDescription>Warna kartu project mengikuti ikon yang dipilih.</FieldDescription>
+        <FieldDescription>Warna kartu proyek mengikuti ikon yang dipilih.</FieldDescription>
         <div className="grid grid-cols-6 gap-2">
           {PROJECT_ICONS.map((key) => (
             <label

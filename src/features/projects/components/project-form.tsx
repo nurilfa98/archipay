@@ -41,11 +41,11 @@ export function ProjectForm({ project }: { project?: EditableProject }) {
       }
       if (project) {
         notify.success("Perubahan nama dan klien ikut tampil di uang muka yang sudah ada.", {
-          title: "Project diperbarui",
+          title: "Proyek diperbarui",
         });
       } else {
-        notify.success("Project baru langsung bisa dipakai untuk mengajukan uang muka.", {
-          title: "Project ditambahkan",
+        notify.success("Proyek baru langsung bisa dipakai untuk mengajukan uang muka.", {
+          title: "Proyek ditambahkan",
         });
       }
       router.push(backHref);

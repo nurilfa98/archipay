@@ -23,7 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { assignableRolesFor, canEditBankAccount, canManageUser, canManageUsers } from "@/features/users/access";
 import { UserAccountActions } from "@/features/users/components/user-account-actions";
 import { UserEditForm } from "@/features/users/components/user-edit-form";
-import { StatusBadge } from "@/features/users/components/users-table";
+import { StatusBadge } from "@/features/users/components/user-badges";
 import { getUserDetail } from "@/features/users/queries";
 import { verifySession } from "@/lib/auth/dal";
 import { ROLE_LABELS } from "@/lib/auth/roles";

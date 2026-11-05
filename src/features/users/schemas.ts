@@ -9,7 +9,8 @@
 // - node_modules/next/dist/docs/01-app/02-guides/forms.md (bagian "Form validation")
 
 import { z } from "zod";
-import { ASSIGNABLE_ROLES } from "@/lib/auth/roles";
+import { ASSIGNABLE_ROLES, type AssignableRole } from "@/lib/auth/roles";
+import { USER_STATUS, type UserStatus } from "./constants";
 
 const fullName = z
   .string()
@@ -76,3 +77,15 @@ export { email as emailSchema, fullName as fullNameSchema };
 
 // id user yang dikirim dari browser (event handler) juga wajib divalidasi.
 export const userIdSchema = z.string().min(1).max(36);
+
+// Filter daftar pengguna dari URL (/users?role=FINANCE&status=ACTIVE). Nilai
+// yang tidak valid (diketik manual di URL) diabaikan, bukan error.
+export type UserFilters = { role?: AssignableRole; status?: UserStatus };
+
+export function parseUserFilters(params: Record<string, string | string[] | undefined>): UserFilters {
+  const first = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
+  return {
+    role: z.enum(ASSIGNABLE_ROLES).safeParse(first(params.role)).data,
+    status: z.enum(USER_STATUS).safeParse(first(params.status)).data,
+  };
+}

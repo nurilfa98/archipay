@@ -23,19 +23,19 @@ import { countClaimedSubscriptions } from "@/features/subscriptions/queries";
 import { requirePlatformAdmin } from "@/lib/auth/dal";
 
 export const metadata: Metadata = {
-  title: "Company",
+  title: "Perusahaan",
 };
 
 export default function CompaniesPage() {
   return (
     <>
       <PageHeader
-        title="Company"
+        title="Perusahaan"
         description="Klien ArchiPay. Klik kartu untuk detail, atau Buka untuk melihat semua menunya."
         action={
           <Button nativeButton={false} render={<Link href="/companies/new" />}>
             <PlusIcon />
-            Tambah company
+            Tambah perusahaan
           </Button>
         }
       />
@@ -53,8 +53,8 @@ async function CompaniesContent() {
   if (companies.length === 0) {
     return (
       <div className="flex flex-col gap-1 rounded-lg border border-dashed p-6 text-sm">
-        <p className="font-medium">Belum ada company.</p>
-        <p className="text-muted-foreground">Klik &quot;Tambah company&quot; untuk mendaftarkan klien pertama beserta Owner-nya.</p>
+        <p className="font-medium">Belum ada perusahaan.</p>
+        <p className="text-muted-foreground">Klik &quot;Tambah perusahaan&quot; untuk mendaftarkan klien pertama beserta Owner-nya.</p>
       </div>
     );
   }

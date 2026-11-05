@@ -28,7 +28,7 @@ export async function getLeaveSettings(companyId: string): Promise<LeaveSettings
     .from(companySettings)
     .where(eq(companySettings.companyId, companyId))
     .limit(1);
-  if (!row) throw new Error(`Baris company_settings untuk company ${companyId} tidak ditemukan.`);
+  if (!row) throw new Error(`Baris company_settings untuk perusahaan ${companyId} tidak ditemukan.`);
   return row;
 }
 
@@ -136,6 +136,7 @@ export type LeaveRequestRow = {
   timeMinute: number | null;
   reason: string;
   hasAttachment: boolean;
+  attachmentIsPdf: boolean;
   status: LeaveStatus;
   decidedByName: string | null;
   decidedAt: Date | null;
@@ -163,6 +164,7 @@ function requestQuery() {
       timeMinute: leaveRequests.timeMinute,
       reason: leaveRequests.reason,
       attachmentKey: leaveRequests.attachmentKey,
+      attachmentType: leaveRequests.attachmentType,
       status: leaveRequests.status,
       decidedByName: decider.fullName,
       decidedAt: leaveRequests.decidedAt,
@@ -177,8 +179,14 @@ function requestQuery() {
 }
 
 function toRow(row: Awaited<ReturnType<ReturnType<typeof requestQuery>["execute"]>>[number]): LeaveRequestRow {
-  const { attachmentKey, ...rest } = row;
-  return { ...rest, kind: row.kind as LeaveKind, status: row.status as LeaveStatus, hasAttachment: !!attachmentKey };
+  const { attachmentKey, attachmentType, ...rest } = row;
+  return {
+    ...rest,
+    kind: row.kind as LeaveKind,
+    status: row.status as LeaveStatus,
+    hasAttachment: !!attachmentKey,
+    attachmentIsPdf: attachmentType === "application/pdf",
+  };
 }
 
 export async function listMyLeaves(companyId: string, userId: string, limit = 50): Promise<LeaveRequestRow[]> {

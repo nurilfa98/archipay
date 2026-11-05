@@ -71,10 +71,10 @@ export function ProjectReportDocument({
   const provisional = project.status === "ACTIVE";
 
   return (
-    <Document title={`Laporan Project ${project.name}`} author="ArchiPay" creator="ArchiPay">
+    <Document title={`Laporan Proyek ${project.name}`} author="ArchiPay" creator="ArchiPay">
       <Page size="A4" style={styles.page}>
         <View style={styles.header}>
-          <Text style={styles.eyebrow}>LAPORAN PROJECT</Text>
+          <Text style={styles.eyebrow}>LAPORAN PROYEK</Text>
           <Text style={styles.title}>{project.name}</Text>
           <Text style={styles.subtitle}>
             {project.client ? `Klien: ${project.client}` : "Tanpa nama klien"} | Status:{" "}
@@ -315,7 +315,7 @@ function Cell({
 function Footer({ projectName }: { projectName: string }) {
   return (
     <View style={styles.footer} fixed>
-      <Text>ArchiPay | Laporan project {truncate(projectName, 60)}</Text>
+      <Text>ArchiPay | Laporan proyek {truncate(projectName, 60)}</Text>
       <Text render={({ pageNumber, totalPages }) => `Halaman ${pageNumber} dari ${totalPages}`} />
     </View>
   );

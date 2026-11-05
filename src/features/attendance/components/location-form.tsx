@@ -62,7 +62,7 @@ export function LocationForm({
   const backHref = "/attendance/locations";
 
   const projectItems = [
-    { value: "none", label: "Tanpa project" },
+    { value: "none", label: "Tanpa proyek" },
     ...projects.map((project) => ({
       value: project.id,
       label: project.isActive ? project.name : `${project.name} (selesai)`,
@@ -119,7 +119,7 @@ export function LocationForm({
             <FieldError>{fieldError("name")}</FieldError>
           </Field>
           <Field data-invalid={!!fieldError("projectId")}>
-            <FieldLabel htmlFor="projectId">Project (opsional)</FieldLabel>
+            <FieldLabel htmlFor="projectId">Proyek (opsional)</FieldLabel>
             <Select name="projectId" items={projectItems} defaultValue={location?.projectId ?? "none"}>
               <SelectTrigger id="projectId" className="w-full">
                 <SelectValue />
@@ -132,7 +132,7 @@ export function LocationForm({
                 ))}
               </SelectContent>
             </Select>
-            <FieldDescription>Untuk lokasi proyek. Kantor atau gudang cukup tanpa project.</FieldDescription>
+            <FieldDescription>Untuk lokasi proyek. Kantor atau gudang cukup tanpa proyek.</FieldDescription>
             <FieldError>{fieldError("projectId")}</FieldError>
           </Field>
         </div>
@@ -274,7 +274,7 @@ export function LocationForm({
             </div>
           ) : (
             <FieldDescription>
-              Ikut jam kerja company: {formatMinutes(companyHours.start)} – {formatMinutes(companyHours.end)}.
+              Ikut jam kerja perusahaan: {formatMinutes(companyHours.start)} – {formatMinutes(companyHours.end)}.
             </FieldDescription>
           )}
         </FieldSet>

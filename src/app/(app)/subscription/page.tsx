@@ -51,7 +51,7 @@ export const metadata: Metadata = {
 export default function SubscriptionPage() {
   return (
     <>
-      <PageHeader title="Langganan" description="Masa aktif ArchiPay company Anda, pilihan paket, dan riwayat tagihan." />
+      <PageHeader title="Langganan" description="Masa aktif ArchiPay perusahaan Anda, pilihan paket, dan riwayat tagihan." />
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
         <SubscriptionContent />
       </Suspense>
@@ -90,7 +90,7 @@ async function SubscriptionContent() {
       {access.locked && (
         <Alert variant="destructive">
           <LockIcon />
-          <AlertTitle>Akses company dikunci</AlertTitle>
+          <AlertTitle>Akses perusahaan dikunci</AlertTitle>
           <AlertDescription>
             Masa berlangganan habis. Finance & Karyawan tidak bisa masuk, dan menu lain baru terbuka lagi setelah
             pembayaran diverifikasi admin ArchiPay.
@@ -116,7 +116,7 @@ async function SubscriptionContent() {
             {status === "TRIAL" && `Masa gratis berakhir ${formatDate(access.until)}. `}
             {status === "ACTIVE" && `Langganan aktif sampai ${formatDate(access.until)}. `}
             {status === "GRACE" &&
-              `Masa aktif habis ${formatDate(access.until)}; company dikunci ${formatDate(access.graceUntil)}. `}
+              `Masa aktif habis ${formatDate(access.until)}; perusahaan dikunci ${formatDate(access.graceUntil)}. `}
             Perpanjangan dihitung dari tanggal berakhir, jadi membayar lebih awal tidak merugikan.
           </p>
           {ADDON_KEYS.map((key) => {

@@ -48,12 +48,12 @@ export function CompanyCreateForm({ trialDefaults }: { trialDefaults: TrialDefau
     }
     if (result.data.emailSent) {
       notify.success(`Password sementara Owner sudah dikirim ke ${result.data.ownerEmail}.`, {
-        title: "Company berhasil dibuat",
+        title: "Perusahaan berhasil dibuat",
       });
     } else {
       notify.warning(
-        `Buka company ini, lalu di menu Pengguna tekan "Reset password" pada akun Owner untuk mengirim ulang password ke ${result.data.ownerEmail}.`,
-        { title: "Company dibuat, tetapi email Owner gagal dikirim", timeout: 10000 },
+        `Buka perusahaan ini, lalu di menu Pengguna tekan "Reset password" pada akun Owner untuk mengirim ulang password ke ${result.data.ownerEmail}.`,
+        { title: "Perusahaan dibuat, tetapi email Owner gagal dikirim", timeout: 10000 },
       );
     }
     router.push(`/companies/${result.data.id}`);
@@ -78,7 +78,7 @@ export function CompanyCreateForm({ trialDefaults }: { trialDefaults: TrialDefau
             defaultValue={trialDefaults.freeDays}
             min={1}
             max={MAX_FREE_DAYS}
-            description="Dihitung sejak company dibuat. Bawaan dari Pengaturan platform."
+            description="Dihitung sejak perusahaan dibuat. Bawaan dari Pengaturan platform."
             error={fieldError("freeDays")}
           />
           <NumberField
@@ -112,7 +112,7 @@ export function CompanyCreateForm({ trialDefaults }: { trialDefaults: TrialDefau
         <Field orientation="horizontal">
           <Button type="submit" disabled={pending}>
             {pending && <LoaderCircleIcon className="animate-spin" />}
-            {pending ? "Menyimpan..." : "Buat company"}
+            {pending ? "Menyimpan..." : "Buat perusahaan"}
           </Button>
           <Button variant="outline" nativeButton={false} render={<Link href="/companies" />}>
             Batal
@@ -128,7 +128,7 @@ export function CompanyEditForm({ company }: CompanyFormProps) {
   const fieldError = (name: string) => (state && !state.success ? state.fieldErrors?.[name]?.[0] : undefined);
 
   useActionResult(state, (result) => {
-    if (result.success) notify.success("Data company disimpan.");
+    if (result.success) notify.success("Data perusahaan disimpan.");
     else if (!result.fieldErrors) notify.error(result.message);
   });
 
@@ -165,7 +165,7 @@ function CompanyFields({
     <>
       <TextField
         name="name"
-        label="Nama company"
+        label="Nama perusahaan"
         defaultValue={company?.name}
         placeholder="PT Maju Bersama"
         autoComplete="off"

@@ -20,11 +20,11 @@ export async function OwnerDashboard({ companyId }: { companyId: string }) {
       <AttentionList projects={projects} />
       <section className="flex flex-col gap-2" aria-labelledby="project-finance-title">
         <h2 id="project-finance-title" className="text-sm font-medium">
-          Keuangan per project
+          Keuangan per proyek
         </h2>
         <ProjectFinanceList projects={projects} />
         <p className="text-xs text-muted-foreground">
-          Keuntungan = nilai kontrak − nota yang disetujui. Project aktif ditandai &quot;sementara&quot; karena
+          Keuntungan = nilai kontrak − nota yang disetujui. Proyek aktif ditandai &quot;sementara&quot; karena
           pengeluarannya masih bisa bertambah.
         </p>
       </section>

@@ -335,11 +335,11 @@ export function BulkLocationsEditor({ projectNames }: { projectNames: string[] }
                         ))}
                       </select>
                     </SmallField>
-                    <SmallField label="Project (opsional)">
+                    <SmallField label="Proyek (opsional)">
                       <Input
                         value={row.projectName}
                         list={datalistId}
-                        placeholder="Nama project"
+                        placeholder="Nama proyek"
                         onChange={(event) => update(index, { projectName: event.target.value })}
                       />
                     </SmallField>
@@ -378,7 +378,7 @@ export function BulkLocationsEditor({ projectNames }: { projectNames: string[] }
           ))}
         </datalist>
         <p className="text-sm text-muted-foreground">
-          Jam masuk & pulang dikosongkan = ikut jam kerja company. Nama lokasi yang sudah ada di ArchiPay akan ditolak.
+          Jam masuk & pulang dikosongkan = ikut jam kerja perusahaan. Nama lokasi yang sudah ada di ArchiPay akan ditolak.
         </p>
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={save} disabled={pending || rows.length === 0}>

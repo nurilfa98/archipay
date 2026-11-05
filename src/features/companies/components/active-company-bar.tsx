@@ -20,7 +20,7 @@ export function ActiveCompanyBar({ user }: { user: CurrentUser }) {
       <div className="mx-auto flex w-full max-w-6xl items-center gap-2 px-4 py-1.5 text-sm">
         <Building2Icon className="size-4 shrink-0 text-brand" />
         <span className="min-w-0 truncate">
-          <span className="text-muted-foreground">Melihat company </span>
+          <span className="text-muted-foreground">Melihat perusahaan </span>
           <span className="font-medium">{user.company.name}</span>
           {!user.company.isActive ? (
             <span className="text-muted-foreground"> (nonaktif)</span>

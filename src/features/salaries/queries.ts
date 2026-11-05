@@ -31,7 +31,7 @@ export async function getPayrollSettings(companyId: string): Promise<PayrollSett
     .from(companySettings)
     .where(eq(companySettings.companyId, companyId))
     .limit(1);
-  if (!row) throw new Error(`Baris company_settings untuk company ${companyId} tidak ditemukan.`);
+  if (!row) throw new Error(`Baris company_settings untuk perusahaan ${companyId} tidak ditemukan.`);
   return {
     ...row,
     dailyRateMethod: row.dailyRateMethod as DailyRateMethod,

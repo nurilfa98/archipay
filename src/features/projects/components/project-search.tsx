@@ -34,8 +34,8 @@ export function ProjectSearchList({ entries }: { entries: ProjectSearchEntry[] }
                 type="search"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Cari nama project atau klien"
-                aria-label="Cari project"
+                placeholder="Cari nama proyek atau klien"
+                aria-label="Cari proyek"
                 className="pl-8"
               />
             </div>
@@ -47,13 +47,13 @@ export function ProjectSearchList({ entries }: { entries: ProjectSearchEntry[] }
           </div>
         </div>
         <p className="text-sm text-muted-foreground sm:pt-2" aria-live="polite">
-          {active ? `${visible.length} dari ${entries.length} project` : `${entries.length} project`}
+          {active ? `${visible.length} dari ${entries.length} proyek` : `${entries.length} proyek`}
         </p>
       </div>
 
       {visible.length === 0 ? (
         <p className="rounded-lg border border-dashed p-8 text-center text-sm text-muted-foreground">
-          Project atau klien &quot;{trimmed}&quot; tidak ditemukan.
+          Proyek atau klien &quot;{trimmed}&quot; tidak ditemukan.
         </p>
       ) : (
         // 1 kolom di HP, 2 di tablet, 3 di layar lebar.

@@ -88,7 +88,7 @@ export function CompanySettingsForm({ settings, readOnly = false }: { settings: 
           </Field>
 
           {readOnly ? (
-            <p className="text-sm text-muted-foreground">Baca saja. Pengaturan company diubah oleh Owner.</p>
+            <p className="text-sm text-muted-foreground">Baca saja. Pengaturan perusahaan diubah oleh Owner.</p>
           ) : (
             <Field orientation="horizontal">
               <Button type="submit" disabled={pending}>

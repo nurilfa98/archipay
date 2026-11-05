@@ -397,7 +397,7 @@ beranda, tanpa tombol lapor.
 - Owner hanya bisa mengelola akun tanpa role Owner. Akun Owner (termasuk miliknya sendiri) tampil baca saja; data sendiri diubah lewat menu **Profil**. Role Owner hanya bisa diberikan/dicabut superadmin.
 - Nomor WhatsApp diisi & diverifikasi **pengguna sendiri** dengan kode OTP (bagian 10); pengelola pengguna hanya melihatnya. Rekening bank diisi Owner di halaman edit pengguna atau pengguna sendiri di Profil; tanpa rekening, pencairan Transfer menampilkan peringatan.
 - **Admin HR** ikut mengelola akun di menu Pengguna, tetapi hanya akun yang role-nya **Karyawan saja**: tambah, ubah nama/email, aktif/nonaktif, reset password, dan hanya bisa memberi role Karyawan. Rekening bank tidak bisa diubah Admin HR (tujuan transfer uang muka). Akun Finance, Admin HR, dan Owner tampil baca saja untuknya, karena mengganti email lalu me-reset password akun pemegang uang sama dengan mengambil alih akun itu.
-- **Reset password**: password sementara baru dikirim lewat email, dan pengguna keluar dari semua perangkat.
+- **Reset password**: password sementara dikirim lewat email, dan pengguna keluar dari semua perangkat.
 - **Nonaktifkan**: pengguna tidak bisa login dan sesi berjalan langsung berhenti. Data dan riwayat tetap tersimpan. Tidak ada yang bisa menonaktifkan atau me-reset akunnya sendiri.
 - Sesi login: dengan centang **"Ingat saya"** (14 hari), sesi bertahan di perangkat itu sampai 14 hari sejak login. Tanpa centang, sesi berakhir saat browser ditutup, dan paling lama 12 jam. Sesi tidak diperpanjang karena aktivitas. Sesi berakhir lebih cepat bila user logout, mengganti/mereset password, atau akunnya dinonaktifkan. Login dikunci sementara setelah 5 kali gagal per email (atau 20 kali per IP) dalam 15 menit; selama terkunci tombol **Masuk** tidak bisa ditekan dan menampilkan hitungan mundur sisa waktunya.
 
@@ -696,8 +696,7 @@ daftar itu, kolom boolean di `subscriptions`, dan harga di `platform_settings`.
   - Absensi: kartu Absensi, Hari libur, dan Cuti & izin di Pengaturan
     disembunyikan; cron foto wajah tertunda & delegasi cuti serta digest
     email (foto wajah, cuti) melewati company itu. Denda yang sudah dikunci
-    tetap tampil di Potong Gaji. Penghapusan selfie lewat masa simpan tetap
-    berjalan (UU PDP). Role **Admin HR** tetap bisa mengelola akun Karyawan.
+    tetap tampil di Potong Gaji. Role **Admin HR** tetap bisa mengelola akun Karyawan.
   - Penggajian: menu Penggajian & Slip Gaji tertutup; Potong Gaji tetap
     berjalan seperti biasa (pencatatan manual).
 - **Superadmin**: kartu company menampilkan add-on yang aktif; detail company
@@ -802,7 +801,7 @@ punya role lain.
    - satu lokasi dalam radius → dipilih otomatis;
    - beberapa lokasi dalam radius → karyawan memilih;
    - tidak ada → karyawan memilih lokasi, **wajib mengisi alasan**, dan absen ditandai **Di luar radius** untuk review.
-3. Kamera depan terbuka (tanpa pilihan galeri), cek liveness, HP menghitung embedding dan mengirim selfie terkompres.
+3. Kamera depan terbuka (tanpa pilihan galeri), cek liveness, HP menghitung embedding dan **hanya mengirim embedding**. Foto selfie absen tidak dikirim dan tidak disimpan (sejak 2026-11-05).
 4. Server menghitung ulang jarak dan membandingkan embedding dengan foto acuan (ambang di Pengaturan platform). **Tidak cocok → absen ditolak.** Percobaan gagal dicatat di Audit Log (waktu & skor, foto tidak disimpan).
 5. Waktu absen = **jam server** menurut **zona waktu lokasi**, bukan jam HP. Tanggal kerja juga dihitung dari zona waktu itu.
 6. Bila lewat jam masuk + toleransi → **Terlambat**. Menit terlambat dihitung dari jam masuk (bukan dari akhir toleransi), dan **denda** tercatat bila nominalnya > 0. Alasan terlambat tidak wajib.
@@ -849,7 +848,7 @@ beberapa tanda sekaligus (misal Terlambat + Di luar radius).
 ### 18.9 Review bulanan (Owner)
 
 - **Rekap per karyawan:** hari hadir, terlambat (kali & total menit), pulang cepat, di luar radius, tidak absen pulang, tidak hadir, cuti/sakit/izin (dibayar & tidak dibayar), total denda.
-- **Detail per karyawan:** setiap hari dengan selfie, link peta, jarak, alasan, dan sanggahan.
+- **Detail per karyawan:** setiap hari dengan hasil cocok wajah (skor), link peta, jarak, alasan, dan sanggahan.
 - **Bebaskan denda (Waive Penalty):** setiap denda punya centang; mencabut centang = denda dibebaskan, catatan opsional, sekali klik. Bisa dicentang lagi selama periode belum dikunci.
 - **Koreksi** (misal HP mati): Owner menambah absen yang terlewat atau mengganti jam masuk/pulang satu tanggal (pilih lokasi, jam, alasan wajib). Terlambat, pulang cepat, dan denda dihitung ulang (bila jadi tidak terlambat, dendanya dibebaskan otomatis). Absen hasil koreksi tidak punya selfie dan ditandai "Dikoreksi Owner" beserta alasannya. Cuti/izin tidak perlu dikoreksi manual karena sudah tercatat dari pengajuan.
 - **Kunci periode:** setelah dikunci, absensi, denda, dan cuti/izin bulan itu tidak bisa diubah (mengajukan, menyetujui, membatalkan cuti/izin, koreksi, dan bebaskan denda ditolak). Hanya bulan yang **sudah berakhir** yang bisa dikunci, dan tidak bisa dikunci selama masih ada **pengajuan cuti/izin yang menunggu** di bulan itu. Kunci bisa dibuka lagi selama belum ada denda yang ditandai dipotong.
@@ -869,7 +868,7 @@ kuota); riwayatnya tampil di menu Potong Gaji.
 
 ### 18.11 Penyimpanan
 
-- Selfie absen: R2 `<companyId>/attendance/<recordId>-in|out.jpg`, dihapus otomatis setelah **masa simpan selfie** (Pengaturan platform, bawaan **3 bulan** sejak absen) oleh cron harian (`features/attendance/selfie-retention.ts`, maks. 1.000 absen per hari). Data absen (jam, jarak, skor, alasan) tetap ada. Selfie dibuka lewat `/api/attendance/records/<id>/selfie/<in|out>` (pemilik, Owner, Admin HR, Superadmin).
+- Selfie absen **tidak disimpan** sejak 2026-11-05; yang disimpan hanya data absen (jam, lokasi, jarak, skor cocok wajah, alasan). Tabel absen tidak punya kolom file selfie; tidak ada cron penghapus atau pengaturan masa simpan selfie.
 - Halaman: `/attendance` (tombol absen, riwayat bulan ini, status foto), `/attendance/check` (alur absen di HP), `/attendance/today` (Owner/Admin HR: siapa sudah/belum absen hari ini).
 - Foto acuan: R2 `<companyId>/faces/<userId>/<id>.jpg` (lihat 18.4 untuk penghapusan).
 - Hapus company (bagian 16) ikut menghapus semua data & file absensi.
@@ -886,8 +885,8 @@ kuota); riwayatnya tampil di menu Potong Gaji.
 
 Kamera dan GPS hanya jalan di HTTPS (atau `localhost`); untuk mencoba dari HP
 saat development pakai tunnel (misal `cloudflared`). Pencocokan wajah di HP
-bisa diakali oleh orang yang paham teknis; selfie tetap disimpan sebagai bukti
-review. Jalur upgrade bila perlu verifikasi di server: AWS Rekognition
+bisa diakali oleh orang yang paham teknis; selfie absen tidak disimpan, jadi
+bukti review hanya skor kecocokan wajah, lokasi, dan jam. Jalur upgrade bila perlu verifikasi di server: AWS Rekognition
 CompareFaces (berbayar).
 
 ---

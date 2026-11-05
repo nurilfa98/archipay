@@ -152,8 +152,8 @@ async function LeaveContent() {
           </h2>
           {canSetQuota && (
             <p className="text-sm text-muted-foreground">
-              Isi kuota khusus bila berbeda dari kuota company ({settings.annualLeaveQuota} hari); kosongkan untuk ikut
-              kuota company.
+              Isi kuota khusus bila berbeda dari kuota perusahaan ({settings.annualLeaveQuota} hari); kosongkan untuk ikut
+              kuota perusahaan.
             </p>
           )}
           <LeaveQuotaTable
@@ -202,6 +202,7 @@ function buildRow(
     tone: STATUS_TONES[row.status],
     paid: row.isPaid,
     hasAttachment: row.hasAttachment,
+    attachmentIsPdf: row.attachmentIsPdf,
     decidedText:
       row.decidedAt && row.decidedByName
         ? `${decision} ${row.decidedByName}, ${formatDateTime(row.decidedAt)}${row.decidedByDelegate ? " (delegasi Admin HR)" : ""}`

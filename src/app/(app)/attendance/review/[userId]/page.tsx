@@ -1,6 +1,6 @@
 // Halaman /attendance/review/[userId]?period=2026-11: detail review bulanan
 // satu karyawan (BUSINESS-FLOW §18.9): denda (centang = berlaku, cabut =
-// dibebaskan), hari tidak hadir & cuti, semua absen beserta selfie, alasan &
+// dibebaskan), hari tidak hadir & cuti, semua absen beserta hasil cocok wajah, alasan &
 // sanggahan, dan koreksi absen. Mengubah hanya Owner & selama periode belum
 // dikunci; Admin HR & Superadmin melihat.
 

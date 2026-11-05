@@ -14,7 +14,7 @@ type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export class SeatLimitError extends Error {
   constructor(public readonly limit: number) {
     super(
-      `Batas ${limit} pengguna aktif paket company ini sudah penuh. Nonaktifkan pengguna lain atau tambah kuota pengguna di menu Langganan.`,
+      `Batas ${limit} pengguna aktif paket perusahaan ini sudah penuh. Nonaktifkan pengguna lain atau tambah kuota pengguna di menu Langganan.`,
     );
   }
 }
@@ -26,7 +26,7 @@ export async function assertSeatAvailable(tx: Transaction, companyId: string) {
     .from(companies)
     .where(eq(companies.id, companyId))
     .for("update");
-  if (!company) throw new Error("Company tidak ditemukan");
+  if (!company) throw new Error("Perusahaan tidak ditemukan");
 
   const [row] = await tx
     .select({ total: count() })

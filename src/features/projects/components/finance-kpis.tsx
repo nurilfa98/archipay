@@ -26,20 +26,20 @@ export function FinanceKpis({ totals, scope = "all" }: { totals: FinanceTotals; 
         note={
           single
             ? totals.valuedCount > 0
-              ? "Pendapatan project ini"
-              : "Diisi Owner lewat tombol Ubah project"
+              ? "Pendapatan proyek ini"
+              : "Diisi Owner lewat tombol Ubah proyek"
             : totals.valuedCount > 0
-            ? `Dari ${totals.valuedCount} project${
-                totals.activeWithoutValue > 0 ? `, ${totals.activeWithoutValue} project aktif belum diisi` : ""
+            ? `Dari ${totals.valuedCount} proyek${
+                totals.activeWithoutValue > 0 ? `, ${totals.activeWithoutValue} proyek aktif belum diisi` : ""
               }`
-            : "Isi nilai kontrak di menu Project"
+            : "Isi nilai kontrak di menu Proyek"
         }
       />
       <Kpi
         title="Pengeluaran"
         icon={ReceiptTextIcon}
         value={formatRupiah(totals.expense)}
-        note={single ? "Nota yang sudah disetujui" : "Nota yang sudah disetujui, semua project"}
+        note={single ? "Nota yang sudah disetujui" : "Nota yang sudah disetujui, semua proyek"}
       />
       <Kpi
         title={

@@ -181,7 +181,16 @@ export async function createLeaveRequest(formData: FormData): Promise<ActionResu
 
   const id = crypto.randomUUID();
   const attachmentKey = attachment ? `${actor.company.id}/leave/${id}.${attachment.extension}` : null;
-  if (attachment && attachmentKey) await putObject(attachmentKey, attachment.bytes, attachment.contentType);
+  // Gagal unggah (R2) dijadikan pesan, bukan dilempar: error yang dilempar
+  // Server Action tampil sebagai halaman "React error #441" di production.
+  if (attachment && attachmentKey) {
+    try {
+      await putObject(attachmentKey, attachment.bytes, attachment.contentType);
+    } catch (error) {
+      console.error("[attendance] unggah lampiran cuti gagal:", error);
+      return { success: false, message: "Gagal mengunggah lampiran. Coba lagi beberapa saat." };
+    }
+  }
 
   const ip = await getClientIp();
   let summary: LeaveSummary;

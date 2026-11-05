@@ -164,8 +164,8 @@ export function CorrectionForm({
           <FieldLabel htmlFor="correct-note">Alasan koreksi</FieldLabel>
           <Textarea id="correct-note" name="note" rows={2} maxLength={500} required />
           <FieldDescription>
-            Misal: HP mati, sudah dicek atasan. Bila tanggal itu sudah ada absen, jam masuk/pulangnya diganti (selfie
-            lama tetap tersimpan). Tercatat di Audit Log.
+            Misal: HP mati, sudah dicek atasan. Bila tanggal itu sudah ada absen, jam masuk/pulangnya diganti (hasil
+            cocok wajah absen asli tetap tersimpan). Tercatat di Audit Log.
           </FieldDescription>
           <FieldError>{fieldError("note")}</FieldError>
         </Field>

@@ -9,15 +9,19 @@
 // kode berlaku 10 menit, kirim ulang tiap 60 detik, maks. 3 kode per hari,
 // maks. 5 kali coba per kode.
 //
+// Jeda & batas harian dicek ATOMIK saat menyimpan kode (upsert bersyarat),
+// bukan hanya dari hasil baca sebelumnya. Tanpa itu, dua permintaan yang
+// datang hampir bersamaan (tombol tertekan dua kali, jaringan HP lambat) sama-
+// sama lolos cek dan OTP terkirim 2x, terutama saat pertama mendaftar karena
+// barisnya belum ada.
+//
 // Memakai getCurrentUser(), bukan verifyAccount(), karena verifyAccount()
 // justru mengarahkan user yang belum terverifikasi ke halaman ini.
 
 "use server";
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
-import { eq } from "drizzle-orm";
-import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
+import { eq, sql } from "drizzle-orm";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth/dal";
@@ -78,20 +82,34 @@ export async function requestPhoneOtp(
   }
 
   const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
-  const sendCount = existing && existing.sendDate === today ? existing.sendCount + 1 : 1;
   const values = {
     phoneNumber: phone,
     codeHash: hashCode(user.id, code),
     expiresAt: new Date(now.getTime() + CODE_TTL_MS),
     attempts: 0,
     sendDate: today,
-    sendCount,
     lastSentAt: now,
   };
-  await db
+  // Baris baru: hitungan 1. Baris lama: hanya diganti bila jeda sudah lewat
+  // dan batas harian belum tercapai (dicek database, aman dari balapan).
+  // Tidak ada baris yang dikembalikan = permintaan lain baru saja mengirim.
+  const cooldownCutoff = new Date(now.getTime() - RESEND_COOLDOWN_MS).toISOString();
+  const saved = await db
     .insert(phoneVerifications)
-    .values({ userId: user.id, ...values })
-    .onConflictDoUpdate({ target: phoneVerifications.userId, set: values });
+    .values({ userId: user.id, ...values, sendCount: 1 })
+    .onConflictDoUpdate({
+      target: phoneVerifications.userId,
+      set: {
+        ...values,
+        sendCount: sql`CASE WHEN ${phoneVerifications.sendDate} = ${today} THEN ${phoneVerifications.sendCount} + 1 ELSE 1 END`,
+      },
+      setWhere: sql`${phoneVerifications.lastSentAt} <= ${cooldownCutoff}::timestamptz
+        AND (${phoneVerifications.sendDate} <> ${today} OR ${phoneVerifications.sendCount} < ${MAX_SENDS_PER_DAY})`,
+    })
+    .returning({ userId: phoneVerifications.userId });
+  if (saved.length === 0) {
+    return { success: false, message: "Kode baru saja dikirim. Periksa WhatsApp Anda, atau tunggu sebentar." };
+  }
 
   const sent = await sendWhatsApp({
     to: phone,
@@ -108,7 +126,10 @@ export async function requestPhoneOtp(
   return { success: true, data: { phone, cooldownSeconds: RESEND_COOLDOWN_MS / 1000 } };
 }
 
-export async function verifyPhoneOtp(codeInput: string, returnTo: "home" | "profile"): Promise<ActionResult> {
+export async function verifyPhoneOtp(
+  codeInput: string,
+  returnTo: "home" | "profile",
+): Promise<ActionResult<{ redirectTo: string }>> {
   const user = await getVerifiableUser();
   if (!user) return { success: false, message: "Sesi Anda berakhir. Silakan masuk lagi." };
 
@@ -170,7 +191,10 @@ export async function verifyPhoneOtp(codeInput: string, returnTo: "home" | "prof
     );
   });
 
-  // Data user (termasuk status verifikasi) di-cache per user: muat ulang semua.
-  revalidatePath("/", "layout");
-  redirect(returnTo === "profile" ? "/profile" : "/");
+  // Tidak memakai revalidatePath + redirect(): itu me-render ulang
+  // /verify-phone dulu (user sudah terverifikasi → tampil "Ganti nomor
+  // WhatsApp") dan navigasi browser bisa memakai data user lama yang
+  // di-cache di browser ('use cache: private', lib/auth/dal.ts). Form
+  // memuat ulang halaman tujuan secara penuh (phone-verify-form.tsx).
+  return { success: true, data: { redirectTo: returnTo === "profile" ? "/profile" : "/" } };
 }

@@ -13,7 +13,7 @@ export const IMPORT_COLUMNS = {
   coordinates: "Koordinat",
   radius: "Radius (meter)",
   timezone: "Zona waktu",
-  project: "Project",
+  project: "Proyek",
   workStart: "Jam masuk",
   workEnd: "Jam pulang",
 } as const;
@@ -45,7 +45,8 @@ export async function readLocationFile(file: File, defaults: { radius: string; t
     coordinates: col(IMPORT_COLUMNS.coordinates),
     radius: col(IMPORT_COLUMNS.radius),
     timezone: col(IMPORT_COLUMNS.timezone),
-    project: col(IMPORT_COLUMNS.project),
+    // Template lama (sebelum 2026-11-05) masih berjudul "Project".
+    project: col(IMPORT_COLUMNS.project) !== -1 ? col(IMPORT_COLUMNS.project) : col("Project"),
     workStart: col(IMPORT_COLUMNS.workStart),
     workEnd: col(IMPORT_COLUMNS.workEnd),
   };

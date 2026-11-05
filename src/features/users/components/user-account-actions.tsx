@@ -56,7 +56,7 @@ export function UserAccountActions({ user }: { user: UserDetail }) {
           variant="outline"
           disabled={!user.isActive}
           dialogTitle={`Reset password ${user.fullName}?`}
-          dialogDescription={`Password lama tidak berlaku lagi. Password sementara baru dikirim ke ${user.email}.`}
+          dialogDescription={`Password lama tidak berlaku lagi. Password sementara dikirim ke ${user.email}.`}
           confirmLabel="Reset password"
           onConfirm={handleReset}
         />

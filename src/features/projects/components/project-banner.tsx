@@ -21,15 +21,15 @@ export function ProjectBanner({ project }: { project: ProjectInfo | null }) {
           <ProjectIcon name={project?.icon ?? "building"} className="size-5" />
         </div>
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">Anda sedang di project</p>
-          <p className="truncate font-semibold">{project?.name ?? "Tanpa project"}</p>
+          <p className="text-xs text-muted-foreground">Anda sedang di proyek</p>
+          <p className="truncate font-semibold">{project?.name ?? "Tanpa proyek"}</p>
           {project?.client && <p className="truncate text-xs text-muted-foreground">{project.client}</p>}
         </div>
       </div>
       <div className="flex items-center justify-between gap-2 sm:justify-end">
-        {project?.status === "COMPLETED" && <ToneBadge tone="pending">Project selesai</ToneBadge>}
+        {project?.status === "COMPLETED" && <ToneBadge tone="pending">Proyek selesai</ToneBadge>}
         <Button variant="outline" size="sm" nativeButton={false} render={<Link href="/projects" />}>
-          Ganti project
+          Ganti proyek
         </Button>
       </div>
     </div>

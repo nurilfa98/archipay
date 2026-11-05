@@ -38,7 +38,7 @@ export default function BillingPage({ searchParams }: PageProps<"/billing">) {
     <>
       <PageHeader
         title="Tagihan"
-        description="Pembayaran langganan semua company. Cocokkan bukti dengan mutasi rekening sebelum menerima."
+        description="Pembayaran langganan semua perusahaan. Cocokkan bukti dengan mutasi rekening sebelum menerima."
       />
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
         {searchParams.then((params) => (

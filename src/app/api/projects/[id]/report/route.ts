@@ -27,7 +27,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/projects/[i
   const { id } = await ctx.params;
   const parsedId = projectIdSchema.safeParse(id);
   const report = parsedId.success ? await getProjectReport(user.company.id, parsedId.data) : null;
-  if (!report) return new NextResponse("Project tidak ditemukan.", { status: 404, headers: PRIVATE_HEADERS });
+  if (!report) return new NextResponse("Proyek tidak ditemukan.", { status: 404, headers: PRIVATE_HEADERS });
 
   const now = new Date();
   // Dipanggil sebagai fungsi (tanpa hook) karena renderToBuffer hanya menerima
@@ -40,7 +40,7 @@ export async function GET(_request: Request, ctx: RouteContext<"/api/projects/[i
     headers: {
       ...PRIVATE_HEADERS,
       "Content-Type": "application/pdf",
-      "Content-Disposition": `attachment; filename="laporan-project-${slugify(report.project.name)}-${zonedDateString(now)}.pdf"`,
+      "Content-Disposition": `attachment; filename="laporan-proyek-${slugify(report.project.name)}-${zonedDateString(now)}.pdf"`,
     },
   });
 }
@@ -52,6 +52,6 @@ function slugify(name: string) {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
-      .slice(0, 60) || "project"
+      .slice(0, 60) || "proyek"
   );
 }
