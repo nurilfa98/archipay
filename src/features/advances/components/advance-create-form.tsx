@@ -51,6 +51,7 @@ import {
   type DisbursementMethod,
 } from "@/features/advances/constants";
 import type { RecipientOption } from "@/features/advances/queries";
+import { CopyButton } from "@/components/copy-button";
 import { formatAccountNumber } from "@/lib/bank";
 import { formatRupiah } from "@/lib/format";
 
@@ -330,8 +331,13 @@ function DestinationAccount({ recipient, isSelf }: { recipient: RecipientOption;
   return (
     <div className="rounded-lg border bg-muted/40 p-3 text-sm">
       <p className="text-muted-foreground">Rekening tujuan</p>
-      <p className="font-medium">
+      <p className="flex items-center gap-1 font-medium">
         {recipient.bankName} · {formatAccountNumber(recipient.bankName, recipient.bankAccountNumber)}
+        <CopyButton
+          value={recipient.bankAccountNumber}
+          label={`Salin nomor rekening ${recipient.bankName}`}
+          successMessage="Nomor rekening disalin."
+        />
       </p>
       <p className="text-muted-foreground">
         Sesuai data rekening {isSelf ? "Anda" : recipient.fullName} di menu Pengguna.

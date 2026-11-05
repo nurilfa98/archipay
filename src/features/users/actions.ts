@@ -35,10 +35,13 @@ import { db, isUniqueViolation } from "@/lib/db";
 import { faceProfiles, roles, userRoles, users } from "@/lib/db/schema";
 import { assertSeatAvailable, SeatLimitError } from "@/features/subscriptions/seats";
 import { sendEmail } from "@/lib/email";
+import { emailChangedEmail } from "@/features/auth/emails";
+import { maskEmail } from "@/features/auth/device-info";
+import { revokeOtherSessionsOf } from "@/features/auth/sessions";
 import { getClientIp } from "@/lib/request";
 import { deleteObject } from "@/lib/storage";
 import type { ActionResult } from "@/types/action-result";
-import { assignableRolesFor, canEditBankAccount, canManageUser, canManageUsers } from "./access";
+import { assignableRolesFor, canEditBankAccount, canEditEmail, canManageUser, canManageUsers } from "./access";
 import { credentialsEmail } from "./emails";
 import { getOwnProfile, getUserDetail, type UserDetail } from "./queries";
 import { createUserSchema, profileSchema, updateUserSchema, userIdSchema } from "./schemas";
@@ -159,9 +162,12 @@ export async function updateUser(
   const { roles: newRoles, ...input } = parsed.data;
   // Admin HR tidak boleh mengubah rekening bank (tujuan transfer uang muka):
   // nilai lama dipertahankan apa pun isian dari browser.
-  const profile = canEditBankAccount(actor)
+  const withBank = canEditBankAccount(actor)
     ? input
     : { ...input, bankName: before.bankName, bankAccountNumber: before.bankAccountNumber };
+  // Email hanya boleh diubah Owner/Superadmin (access.ts → canEditEmail): untuk
+  // Admin HR nilai lama dipertahankan apa pun isian dari browser.
+  const profile = canEditEmail(actor) ? withBank : { ...withBank, email: before.email };
   const allowedRoles = assignableRolesFor(actor);
   if (!newRoles.every((role) => allowedRoles.includes(role))) {
     return { success: false, message: "Periksa kembali isian Anda.", fieldErrors: { roles: [ROLE_NOT_ALLOWED] } };
@@ -208,6 +214,26 @@ export async function updateUser(
     throw error;
   }
 
+  // Email berubah: pemilik akun diberi tahu lewat email LAMA (inbox yang
+  // mungkin tidak dikuasai penyerang), dan semua perangkat yang sedang login
+  // dikeluarkan karena identitas akun berubah.
+  if (profile.email !== before.email) {
+    await revokeOtherSessionsOf(before.id, null, "REVOKED");
+    after(() =>
+      sendEmail(
+        emailChangedEmail({
+          to: before.email,
+          fullName: before.fullName,
+          isOwner: before.roles.includes("OWNER"),
+          oldEmail: before.email,
+          newEmailMasked: maskEmail(profile.email),
+          byName: actor.fullName,
+          when: new Date(),
+        }),
+      ),
+    );
+  }
+
   revalidateUsers();
   return { success: true, data: undefined };
 }
@@ -216,9 +242,10 @@ export async function updateUser(
 // Profil sendiri (menu Profil)
 // ---------------------------------------------------------------------------
 
-// Pengguna melengkapi datanya sendiri: nomor WhatsApp, rekening, dan kontak.
-// Tidak butuh user:manage, dan hanya mengubah akun yang sedang login. Role
-// tidak ikut diubah di sini.
+// Pengguna melengkapi datanya sendiri: nama dan rekening. Tidak butuh
+// user:manage, dan hanya mengubah akun yang sedang login. Role tidak ikut
+// diubah di sini. EMAIL dan nomor WhatsApp juga tidak: email hanya bisa diubah
+// Owner/Superadmin, nomor lewat verifikasi OTP.
 export async function updateOwnProfile(
   _prevState: ActionResult | undefined,
   formData: FormData,
@@ -227,7 +254,6 @@ export async function updateOwnProfile(
 
   const parsed = profileSchema.safeParse({
     fullName: formData.get("fullName"),
-    email: formData.get("email"),
     bankName: formData.get("bankName"),
     bankAccountNumber: formData.get("bankAccountNumber"),
   });
@@ -316,6 +342,7 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
       // Dinonaktifkan: foto acuan wajah & embedding-nya dihapus (data minimal,
       // UU PDP; BUSINESS-FLOW §18.4). Bila diaktifkan lagi, user mendaftar ulang.
       if (!activate) {
+        await revokeOtherSessionsOf(targetId, null, "REVOKED", tx);
         const removed = await tx
           .delete(faceProfiles)
           .where(eq(faceProfiles.userId, targetId))
@@ -395,6 +422,8 @@ export async function resetUserPassword(
         sessionVersion: sql`${users.sessionVersion} + 1`,
       })
       .where(eq(users.id, target.id));
+    // Daftar "perangkat yang sedang login" ikut dibersihkan.
+    await revokeOtherSessionsOf(target.id, null, "PASSWORD", tx);
     await logAudit(
       {
         companyId: actor.company.id,

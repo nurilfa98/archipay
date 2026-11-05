@@ -19,12 +19,12 @@
 // - node_modules/next/dist/docs/01-app/02-guides/data-security.md
 
 import "server-only";
-import { and, asc, eq, inArray, not, type SQL } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, not, sql, type SQL } from "drizzle-orm";
 import { io } from "next/cache";
 import { isRole, type Role } from "@/lib/auth/roles";
 import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
-import { roles, userRoles, users } from "@/lib/db/schema";
+import { auditLogs, roles, userRoles, users } from "@/lib/db/schema";
 import type { UserStatus } from "./constants";
 import type { UserFilters } from "./schemas";
 
@@ -82,6 +82,34 @@ export async function listUsers(companyId: string, filters: UserFilters = {}): P
 
   const rolesByUser = await getRolesByUserIds(rows.map((row) => row.id));
   return rows.map((row) => ({ ...row, roles: rolesByUser.get(row.id) ?? [] }));
+}
+
+// Email akun ini diubah dalam 7 hari terakhir? Dipakai dialog "Reset password":
+// perubahan email baru-baru ini adalah tanda pengambilalihan akun, jadi Owner
+// diminta memastikan dulu permintaan reset benar dari orangnya. Perubahan oleh
+// Superadmin tidak tercatat di audit log, jadi tidak muncul di sini.
+export async function getRecentEmailChange(companyId: string, userId: string) {
+  await io();
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const [row] = await db
+    .select({ at: auditLogs.createdAt, oldValues: auditLogs.oldValues, byName: users.fullName })
+    .from(auditLogs)
+    .leftJoin(users, eq(auditLogs.userId, users.id))
+    .where(
+      and(
+        eq(auditLogs.companyId, companyId),
+        eq(auditLogs.entityName, "users"),
+        eq(auditLogs.entityId, userId),
+        eq(auditLogs.action, "USER_UPDATED"),
+        gte(auditLogs.createdAt, since),
+        sql`jsonb_exists(${auditLogs.newValues}, 'email')`,
+      ),
+    )
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(1);
+  if (!row) return null;
+  const oldEmail = (row.oldValues as { email?: unknown } | null)?.email;
+  return { at: row.at, byName: row.byName, oldEmail: typeof oldEmail === "string" ? oldEmail : null };
 }
 
 // Satu pengguna di company tertentu. Tidak menyaring superadmin (company-nya

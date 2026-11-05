@@ -49,6 +49,7 @@ import { getPayrollSettings, getRun, type Payslip, type PayslipLine } from "@/fe
 import { periodSchema } from "@/features/salaries/schemas";
 import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
+import { CopyButton } from "@/components/copy-button";
 import { formatAccountNumber } from "@/lib/bank";
 import { formatDateOnly, formatDateTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
@@ -248,10 +249,19 @@ function PayslipCard({ slip, draft, editable }: { slip: Payslip; draft: boolean;
           <span>{slip.fullName}</span>
           <span className="tabular-nums">{formatRupiah(slip.netPay)}</span>
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          {slip.bankName && slip.bankAccountNumber
-            ? `${slip.bankName} ${formatAccountNumber(slip.bankName, slip.bankAccountNumber)}`
-            : "Rekening belum diisi"}{" "}
+        <p className="flex flex-wrap items-center gap-x-1 text-sm text-muted-foreground">
+          {slip.bankName && slip.bankAccountNumber ? (
+            <>
+              {slip.bankName} {formatAccountNumber(slip.bankName, slip.bankAccountNumber)}
+              <CopyButton
+                value={slip.bankAccountNumber}
+                label={`Salin nomor rekening ${slip.fullName}`}
+                successMessage="Nomor rekening disalin."
+              />
+            </>
+          ) : (
+            "Rekening belum diisi"
+          )}{" "}
           · {days}
         </p>
       </CardHeader>

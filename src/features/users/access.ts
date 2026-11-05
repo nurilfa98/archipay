@@ -46,3 +46,12 @@ export function canManageUser(actor: Actor, target: { roles: readonly Role[] }) 
 export function canEditBankAccount(actor: Actor) {
   return can(actor, "user:manage");
 }
+
+// Boleh mengubah EMAIL akun lain? Hanya Owner (akun staf) dan Superadmin (akun
+// Owner): email adalah identitas login sekaligus tujuan password sementara,
+// jadi pemilik akun tidak bisa mengubahnya sendiri (menu Profil baca saja) dan
+// Admin HR juga tidak. Tanpa ini, orang yang menguasai sesi akun bisa mengganti
+// email ke miliknya lalu "reset password" mengirim password ke penyerang.
+export function canEditEmail(actor: Actor) {
+  return can(actor, "user:manage");
+}

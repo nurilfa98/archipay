@@ -25,9 +25,14 @@ import { env } from "@/lib/env";
 // iron-session tidak bisa "ditarik" dari browser, jadi untuk mengeluarkan
 // semua perangkat (setelah ganti/reset password), angka di database dinaikkan.
 // Cookie yang angkanya tidak sama lagi dianggap tidak berlaku.
+//
+// sessionId = id baris di tabel user_sessions (perangkat ini). Cookie hanya
+// berlaku bila barisnya ada dan belum dicabut (lib/auth/dal.ts), sehingga satu
+// perangkat bisa dikeluarkan dari menu Profil tanpa menyentuh perangkat lain.
 export type SessionData = {
   userId: string;
   sessionVersion: number;
+  sessionId: string;
   // Batas waktu absolut (epoch ms). Diperiksa di getSession, bukan hanya
   // mengandalkan masa berlaku cookie, karena session cookie tidak punya Max-Age.
   expiresAt: number;
@@ -43,6 +48,35 @@ const SHORT_SESSION_MS = 12 * 60 * 60 * 1000;
 
 // Masa berlaku segel & cookie untuk sesi "Ingat saya". Harus >= REMEMBER_ME_MS.
 const SESSION_TTL_SECONDS = 14 * 24 * 60 * 60;
+
+// Batas absolut sesi baru (sama dengan yang ditulis createSession).
+export function sessionExpiry(rememberMe: boolean) {
+  return new Date(Date.now() + (rememberMe ? REMEMBER_ME_MS : SHORT_SESSION_MS));
+}
+
+// ID acak browser ini, untuk mengenali "perangkat yang sama" antar login
+// (tanpa itu setiap login terlihat seperti perangkat baru). Cookie terpisah,
+// httpOnly, bertahan 1 tahun, dan tidak berisi data pribadi.
+const DEVICE_COOKIE = "archipay_device";
+const DEVICE_COOKIE_MAX_AGE = 365 * 24 * 60 * 60;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Hanya dari Server Action / Route Handler (menulis cookie).
+export async function ensureDeviceId() {
+  await io();
+  const cookieStore = await cookies();
+  const existing = cookieStore.get(DEVICE_COOKIE)?.value;
+  if (existing && UUID_PATTERN.test(existing)) return existing;
+  const deviceId = crypto.randomUUID();
+  cookieStore.set(DEVICE_COOKIE, deviceId, {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: DEVICE_COOKIE_MAX_AGE,
+  });
+  return deviceId;
+}
 
 const sessionOptions: SessionOptions = {
   cookieName: "archipay_session",
@@ -87,12 +121,13 @@ export async function getSession() {
 
   const session = await getIronSession<SessionData>(cookieStore, sessionOptions);
   // Sesi yang sudah lewat batas absolutnya, atau dibuat sebelum batas ini ada
-  // (tidak punya expiresAt), dianggap belum login. Akibatnya setelah deploy
-  // ini semua user perlu login sekali lagi.
-  const expired = !session.expiresAt || Date.now() > session.expiresAt;
+  // (tidak punya expiresAt / sessionId), dianggap belum login. Akibatnya
+  // setelah deploy yang menambah field ini semua user perlu login sekali lagi.
+  const expired = !session.expiresAt || !session.sessionId || Date.now() > session.expiresAt;
   return {
     userId: expired ? undefined : session.userId,
     sessionVersion: expired ? undefined : session.sessionVersion,
+    sessionId: expired ? undefined : session.sessionId,
     rememberMe: !expired && session.rememberMe === true,
   };
 }
@@ -103,7 +138,13 @@ export async function getSession() {
 // rememberMe = true: cookie bertahan 14 hari (Max-Age).
 // rememberMe = false: session cookie. iron-session menganggap "maxAge: undefined"
 // sebagai ttl 0 (segel tanpa batas), jadi batas waktunya dijaga oleh expiresAt.
-export async function createSession(userId: string, sessionVersion: number, rememberMe: boolean) {
+export async function createSession(
+  userId: string,
+  sessionVersion: number,
+  rememberMe: boolean,
+  sessionId: string,
+  expiresAt: Date,
+) {
   await io();
   const options: SessionOptions = rememberMe
     ? sessionOptions
@@ -111,8 +152,9 @@ export async function createSession(userId: string, sessionVersion: number, reme
   const session = await getIronSession<SessionData>(await cookies(), options);
   session.userId = userId;
   session.sessionVersion = sessionVersion;
+  session.sessionId = sessionId;
   session.rememberMe = rememberMe;
-  session.expiresAt = Date.now() + (rememberMe ? REMEMBER_ME_MS : SHORT_SESSION_MS);
+  session.expiresAt = expiresAt.getTime();
   await session.save();
 }
 

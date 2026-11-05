@@ -30,6 +30,7 @@ export type AuditAction =
   | "LOGIN_SUCCESS"
   | "LOGIN_FAILED"
   | "LOGOUT"
+  | "SESSION_REVOKED"
   | "PASSWORD_CHANGED"
   | "USER_CREATED"
   | "USER_UPDATED"

@@ -37,14 +37,18 @@ import { TextField } from "./text-field";
 // `roles` = role yang boleh diberikan pengelola (features/users/access.ts).
 // canEditBank = false (Admin HR): rekening bank tampil tetapi tidak bisa diubah;
 // server juga mengabaikan isiannya (features/users/actions.ts).
+// canEditEmail = false (Admin HR): email tampil baca saja; hanya Owner/Superadmin
+// yang boleh mengubahnya (features/users/access.ts).
 export function UserEditForm({
   user,
   roles,
   canEditBank,
+  canEditEmail,
 }: {
   user: UserDetail;
   roles: AssignableRole[];
   canEditBank: boolean;
+  canEditEmail: boolean;
 }) {
   const [state, formAction, pending] = useActionState(updateUser, undefined);
 
@@ -74,15 +78,25 @@ export function UserEditForm({
           required
           error={fieldError("fullName")}
         />
-        <TextField
-          name="email"
-          label="Email"
-          type="email"
-          defaultValue={user.email}
-          autoComplete="off"
-          required
-          error={fieldError("email")}
-        />
+        {canEditEmail ? (
+          <TextField
+            name="email"
+            label="Email"
+            type="email"
+            defaultValue={user.email}
+            autoComplete="off"
+            description="Mengubah email mengeluarkan pengguna dari semua perangkat, dan email lama diberi tahu."
+            required
+            error={fieldError("email")}
+          />
+        ) : (
+          <Field>
+            <FieldLabel>Email</FieldLabel>
+            <input type="hidden" name="email" value={user.email} />
+            <p className="text-sm">{user.email}</p>
+            <FieldDescription>Email hanya bisa diubah oleh Owner.</FieldDescription>
+          </Field>
+        )}
         <Field>
           <FieldLabel>Nomor WhatsApp</FieldLabel>
           <p className="text-sm">{user.phoneNumber ? formatPhone(user.phoneNumber) : "Belum diisi"}</p>

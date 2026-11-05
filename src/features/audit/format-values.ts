@@ -8,7 +8,7 @@
 import "server-only";
 import { ADVANCE_STATUS_LABELS, DISBURSEMENT_METHOD_LABELS } from "@/features/advances/constants";
 import { LEDGER_ENTRY_LABELS, LEDGER_METHOD_LABELS } from "@/features/settlements/constants";
-import { timezoneLabel } from "@/features/attendance/constants";
+import { LEAVE_KIND_LABELS, timezoneLabel } from "@/features/attendance/constants";
 import { formatMinutes, formatWorkDays } from "@/features/attendance/schedule";
 import { isRole, ROLE_LABELS, type Role } from "@/lib/auth/roles";
 import { formatDateOnly, formatDateTime } from "@/lib/dates";
@@ -61,6 +61,9 @@ const FIELDS: Record<string, { label: string; format?: Formatter }> = {
   bankName: { label: "Bank" },
   bankAccountNumber: { label: "No. rekening" },
   wasTemporary: { label: "Password sementara" },
+  device: { label: "Perangkat" },
+  location: { label: "Lokasi (perkiraan)" },
+  devices: { label: "Jumlah perangkat" },
   isActive: { label: "Aktif" },
   recipientName: { label: "Penerima" },
   projectName: { label: "Proyek" },
@@ -138,7 +141,7 @@ const FIELDS: Record<string, { label: string; format?: Formatter }> = {
   penaltyCount: { label: "Jumlah denda" },
   workDate: { label: "Tanggal kerja", format: (value) => (typeof value === "string" ? formatDateOnly(value) : text(value)) },
   correctionNote: { label: "Alasan koreksi" },
-  leaveKind: { label: "Bentuk izin" },
+  leaveKind: { label: "Bentuk izin", format: label(LEAVE_KIND_LABELS) },
   startDate: { label: "Mulai", format: (value) => (typeof value === "string" ? formatDateOnly(value) : text(value)) },
   endDate: { label: "Selesai", format: (value) => (typeof value === "string" ? formatDateOnly(value) : text(value)) },
   days: { label: "Hari kerja" },

@@ -28,6 +28,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { useEffect, useState, useTransition, type FormEvent } from "react";
+import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -493,8 +494,13 @@ export function PaymentPanel({
             {payment.banks.map((bank) => (
               <li key={bank.id} className={cn("rounded-lg border-2 p-3 text-sm", bankAccentClass(bank.bankName))}>
                 <p className="font-semibold">Transfer {bank.bankName}</p>
-                <p className="font-mono text-lg font-semibold text-foreground tabular-nums">
+                <p className="flex items-center gap-1 font-mono text-lg font-semibold text-foreground tabular-nums">
                   {formatAccountNumber(bank.bankName, bank.accountNumber)}
+                  <CopyButton
+                    value={bank.accountNumber}
+                    label={`Salin nomor rekening ${bank.bankName}`}
+                    successMessage="Nomor rekening disalin."
+                  />
                 </p>
                 <p className="text-foreground">a.n. {bank.accountName}</p>
               </li>

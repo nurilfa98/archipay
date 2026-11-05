@@ -37,6 +37,7 @@ export const AUDIT_ACTIONS = {
   LOGIN_SUCCESS: { label: "Login", category: "AUTH", tone: "pending" },
   LOGIN_FAILED: { label: "Login gagal", category: "AUTH", tone: "danger" },
   LOGOUT: { label: "Logout", category: "AUTH", tone: "pending" },
+  SESSION_REVOKED: { label: "Keluarkan perangkat", category: "AUTH", tone: "warning" },
   PASSWORD_CHANGED: { label: "Ganti password", category: "AUTH", tone: "active" },
   USER_CREATED: { label: "Tambah pengguna", category: "USER", tone: "success" },
   USER_UPDATED: { label: "Ubah pengguna", category: "USER", tone: "active" },

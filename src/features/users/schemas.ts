@@ -60,9 +60,14 @@ function bankPairRule(data: { bankName: string | null; bankAccountNumber: string
 
 // Data profil yang boleh diisi pengguna sendiri (menu Profil), tanpa role.
 // Nomor WhatsApp TIDAK di sini: hanya bisa diganti lewat verifikasi OTP.
+// `profileShape` (dengan email) dipakai form edit oleh pengelola pengguna.
 const profileShape = { fullName, email, bankName, bankAccountNumber };
 
-export const profileSchema = z.object(profileShape).superRefine(bankPairRule);
+// Email TIDAK ada di sini: hanya Owner/Superadmin yang boleh mengubahnya
+// (features/users/access.ts → canEditEmail).
+export const profileSchema = z
+  .object({ fullName, bankName, bankAccountNumber })
+  .superRefine(bankPairRule);
 
 // Edit oleh pengelola pengguna: profil + role. SUPERADMIN tidak bisa dipilih.
 export const updateUserSchema = z

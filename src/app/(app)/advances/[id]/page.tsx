@@ -35,6 +35,7 @@ import { EDITABLE_ADVANCE_STATUSES, toSettlementStatus } from "@/features/settle
 import { getSettlementRefByAdvance } from "@/features/settlements/queries";
 import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
+import { CopyButton } from "@/components/copy-button";
 import { formatAccountNumber } from "@/lib/bank";
 import { formatDate, formatDateTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
@@ -282,9 +283,18 @@ function AdvanceDetails({
       <Item label="Metode pencairan">{DISBURSEMENT_METHOD_LABELS[advance.disbursementMethod]}</Item>
       {isTransfer && advance.disbursedAt && (
         <Item label="Rekening tujuan">
-          {advance.destinationBankName && advance.destinationAccountNumber
-            ? `${advance.destinationBankName} · ${formatAccountNumber(advance.destinationBankName, advance.destinationAccountNumber)}`
-            : "Belum tercatat"}
+          {advance.destinationBankName && advance.destinationAccountNumber ? (
+            <span className="inline-flex items-center gap-1">
+              {advance.destinationBankName} · {formatAccountNumber(advance.destinationBankName, advance.destinationAccountNumber)}
+              <CopyButton
+                value={advance.destinationAccountNumber}
+                label={`Salin nomor rekening ${advance.destinationBankName}`}
+                successMessage="Nomor rekening disalin."
+              />
+            </span>
+          ) : (
+            "Belum tercatat"
+          )}
           {advance.transferReference && (
             <span className="block text-muted-foreground">Ref. {advance.transferReference}</span>
           )}

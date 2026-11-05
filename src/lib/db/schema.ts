@@ -153,6 +153,41 @@ export const phoneVerifications = pgTable("phone_verifications", {
   lastSentAt: timestamptz("last_sent_at").notNull(),
 });
 
+// Perangkat yang sedang login: SATU baris per login (BUSINESS-FLOW §2.1).
+// `id` disimpan di cookie sesi; cookie hanya berlaku bila barisnya ada dan
+// belum dicabut (lib/auth/dal.ts), sehingga satu perangkat bisa dikeluarkan
+// tanpa menyentuh perangkat lain (session_version hanya untuk "semua
+// perangkat", misal setelah ganti/reset password). Ditulis hanya saat login,
+// logout, dan pencabutan, tidak di setiap request.
+//
+// device_id = ID acak browser (cookie tahan lama): login ulang dari browser
+// yang sama bukan "perangkat baru" (tidak ada email peringatan). Baris
+// kedaluwarsa dibersihkan cron harian setelah 90 hari.
+export const userSessions = pgTable(
+  "user_sessions",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    deviceId: varchar("device_id", { length: 36 }).notNull(),
+    // Hasil baca User-Agent, mis. "Chrome di Android".
+    deviceLabel: varchar("device_label", { length: 120 }).notNull(),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    // Perkiraan kota dari IP (header Vercel), mis. "Jakarta, Indonesia".
+    location: varchar("location", { length: 100 }),
+    createdAt: createdAt(),
+    expiresAt: timestamptz("expires_at").notNull(),
+    revokedAt: timestamptz("revoked_at"),
+    // LOGOUT | REVOKED (dikeluarkan dari perangkat lain) | PASSWORD | REPLACED | LIMIT
+    revokedReason: varchar("revoked_reason", { length: 20 }),
+  },
+  (t) => [
+    index("user_sessions_user_idx").on(t.userId, t.createdAt),
+    index("user_sessions_expires_idx").on(t.expiresAt),
+  ],
+);
+
 // Tabel penghubung many-to-many: satu user bisa punya lebih dari satu role.
 export const userRoles = pgTable(
   "user_roles",

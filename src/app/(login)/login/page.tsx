@@ -14,8 +14,10 @@
 // (bagian "Route groups")
 
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { LogoMark } from "@/components/layout/logo-mark";
 import { LoginForm } from "@/features/auth/components/login-form";
+import { SessionEndedNotice } from "@/features/auth/components/session-ended-notice";
 import { LoginBackdrop, LoginShowcase } from "@/features/auth/components/login-showcase";
 import { InstallAppButton } from "@/features/pwa/components/install-app-button";
 import { COMPANY_NAME, COPYRIGHT_YEAR, PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/brand";
@@ -24,7 +26,7 @@ export const metadata: Metadata = {
   title: "Masuk",
 };
 
-export default function LoginPage() {
+export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <div className="relative flex min-h-svh bg-background lg:items-center lg:overflow-hidden lg:bg-linear-to-br lg:from-indigo-600 lg:via-indigo-800 lg:to-indigo-950">
       <LoginBackdrop />
@@ -50,6 +52,11 @@ export default function LoginPage() {
               <h2 className="text-2xl font-semibold tracking-tight">Selamat datang</h2>
               <p className="text-sm text-muted-foreground">Masuk dengan email dan password yang diberikan admin.</p>
             </div>
+
+            {/* /login?reason=ended: sesi berakhir (dikeluarkan dari perangkat lain, dll). */}
+            <Suspense>
+              <SessionEndedNotice searchParams={searchParams} />
+            </Suspense>
 
             <LoginForm />
 

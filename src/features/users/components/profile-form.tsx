@@ -1,6 +1,8 @@
 // Form profil sendiri (menu Profil). Isinya sama dengan form data pengguna di
 // halaman detail OWNER, tetapi tanpa pilihan role, karena role hanya diatur OWNER.
-// Nomor WhatsApp tampil baca saja; menggantinya lewat /verify-phone (kode OTP).
+// Email dan nomor WhatsApp tampil baca saja: email hanya diubah Owner (akun Owner:
+// admin ArchiPay), nomor lewat /verify-phone (kode OTP). Email adalah jangkar
+// kepemilikan akun, jadi tidak bisa diganti dari sesi yang sedang login.
 // Polanya sama dengan user-edit-form.tsx (onSubmit + startTransition agar isian
 // tidak hilang saat validasi gagal). Hasil simpan tampil sebagai toast.
 
@@ -47,15 +49,14 @@ export function ProfileForm({ user }: { user: UserDetail }) {
           required
           error={fieldError("fullName")}
         />
-        <TextField
-          name="email"
-          label="Email"
-          type="email"
-          defaultValue={user.email}
-          autoComplete="off"
-          required
-          error={fieldError("email")}
-        />
+        <Field>
+          <FieldLabel>Email</FieldLabel>
+          <p className="text-sm">{user.email}</p>
+          <FieldDescription>
+            Dipakai untuk login dan menerima password sementara. Email hanya bisa diubah oleh{" "}
+            {user.roles.includes("OWNER") ? "admin ArchiPay" : "Owner"}.
+          </FieldDescription>
+        </Field>
         {/* Nomor WhatsApp hanya bisa diganti lewat verifikasi kode OTP. */}
         <Field>
           <FieldLabel>Nomor WhatsApp</FieldLabel>

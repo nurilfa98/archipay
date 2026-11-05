@@ -16,6 +16,7 @@ import { SalaryProfileForm } from "@/features/salaries/components/salary-profile
 import { getPayrollSettings, getSalaryProfile } from "@/features/salaries/queries";
 import { idSchema } from "@/features/salaries/schemas";
 import { requirePermission } from "@/lib/auth/dal";
+import { CopyButton } from "@/components/copy-button";
 import { formatAccountNumber } from "@/lib/bank";
 
 export const metadata: Metadata = {
@@ -48,9 +49,18 @@ async function SalaryProfileContent({ params }: Pick<PageProps<"/payroll/salarie
       <PageHeader
         title={person.fullName}
         description={
-          person.bankName && person.bankAccountNumber
-            ? `Rekening ${person.bankName} ${formatAccountNumber(person.bankName, person.bankAccountNumber)}`
-            : "Rekening bank belum diisi (ubah di menu Pengguna)."
+          person.bankName && person.bankAccountNumber ? (
+            <span className="inline-flex items-center gap-1">
+              Rekening {person.bankName} {formatAccountNumber(person.bankName, person.bankAccountNumber)}
+              <CopyButton
+                value={person.bankAccountNumber}
+                label={`Salin nomor rekening ${person.fullName}`}
+                successMessage="Nomor rekening disalin."
+              />
+            </span>
+          ) : (
+            "Rekening bank belum diisi (ubah di menu Pengguna)."
+          )
         }
         action={
           profile && !readOnly ? <DeleteSalaryProfileButton userId={person.id} fullName={person.fullName} /> : undefined

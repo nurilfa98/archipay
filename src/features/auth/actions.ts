@@ -15,21 +15,33 @@
 
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { clearActiveCompanyCookie } from "@/lib/auth/active-company";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
-import { createSession, destroySession, getSession } from "@/lib/auth/session";
+import { createSession, destroySession, ensureDeviceId, getSession, sessionExpiry } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { sendEmail } from "@/lib/email";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { getClientIp } from "@/lib/request";
 import { getCompanyAccess } from "@/lib/subscription-access";
 import type { ActionResult } from "@/types/action-result";
+import { describeDevice, describeLocation } from "./device-info";
+import { newDeviceEmail } from "./emails";
 import { findUserCredentials, findUserForLogin, findUserRoleNames } from "./queries";
 import { checkLoginRateLimit, recordLoginAttempt } from "./rate-limit";
 import { changePasswordSchema, loginSchema } from "./schemas";
+import {
+  extendSession,
+  isSessionActive,
+  openSession,
+  revokeOtherSessionsOf,
+  revokeSessionOf,
+} from "./sessions";
 
 // Dipakai bersama useActionState di login-form.tsx. Karena itu parameter
 // pertamanya adalah state sebelumnya, baru formData.
@@ -107,17 +119,47 @@ export async function login(
 
   // 4. Catat, lalu buat session (menulis cookie terenkripsi)
   await recordLoginAttempt(email, ip, true);
+  // Checkbox "Ingat saya" di login-form.tsx: value="1" bila dicentang.
+  const rememberMe = formData.get("rememberMe") === "1";
+  const device = await readDevice();
+  const expiresAt = sessionExpiry(rememberMe);
+  // Setiap login = satu baris "perangkat yang sedang login" (menu Profil).
+  const { sessionId, isNewDevice } = await openSession({
+    userId: user.id,
+    deviceId: device.id,
+    deviceLabel: device.label,
+    ipAddress: ip,
+    location: device.location,
+    expiresAt,
+  });
   await logAudit({
     companyId: user.companyId,
     userId: user.id,
     action: "LOGIN_SUCCESS",
     entityName: "users",
     entityId: user.id,
+    newValues: { device: device.label, location: device.location },
     ipAddress: ip,
   });
-  // Checkbox "Ingat saya" di login-form.tsx: value="1" bila dicentang.
-  const rememberMe = formData.get("rememberMe") === "1";
-  await createSession(user.id, user.sessionVersion, rememberMe);
+  await createSession(user.id, user.sessionVersion, rememberMe, sessionId, expiresAt);
+  // Login dari perangkat yang belum dikenal → email peringatan ke email
+  // terdaftar (tidak menunda login; Superadmin tanpa company dilewati).
+  if (isNewDevice && user.companyId) {
+    after(async () => {
+      const isOwner = (await findUserRoleNames(user.id)).includes("OWNER");
+      await sendEmail(
+        newDeviceEmail({
+          to: user.email,
+          fullName: user.fullName,
+          isOwner,
+          device: device.label,
+          location: device.location,
+          ip,
+          when: new Date(),
+        }),
+      );
+    });
+  }
   // Superadmin (tanpa company) selalu mulai dari daftar company, bukan dari
   // company yang terakhir dibuka di sesi sebelumnya.
   if (!user.companyId) await clearActiveCompanyCookie();
@@ -139,9 +181,16 @@ export async function changePassword(
   // 1. Pastikan session masih berlaku (lihat alasan findUserCredentials).
   const session = await getSession();
   const account = session.userId ? await findUserCredentials(session.userId) : undefined;
-  if (!account || !account.isActive || account.sessionVersion !== session.sessionVersion) {
+  if (
+    !account ||
+    !account.isActive ||
+    account.sessionVersion !== session.sessionVersion ||
+    !session.sessionId ||
+    !(await isSessionActive(account.id, session.sessionId))
+  ) {
     redirect("/login");
   }
+  const currentSessionId = session.sessionId;
 
   // 2. Validasi input
   const parsed = changePasswordSchema.safeParse({
@@ -168,14 +217,18 @@ export async function changePassword(
     };
   }
 
-  // 4. Simpan. sessionVersion dinaikkan → session di perangkat lain berakhir.
+  // 4. Simpan. sessionVersion dinaikkan → session di perangkat lain berakhir
+  // (barisnya di daftar perangkat ikut dicabut, kecuali perangkat ini).
   const sessionVersion = account.sessionVersion + 1;
   const passwordHash = await hashPassword(newPassword);
+  const expiresAt = sessionExpiry(session.rememberMe);
   await db.transaction(async (tx) => {
     await tx
       .update(users)
       .set({ passwordHash, mustChangePassword: false, sessionVersion })
       .where(eq(users.id, account.id));
+    await revokeOtherSessionsOf(account.id, currentSessionId, "PASSWORD", tx);
+    await extendSession(currentSessionId, expiresAt, tx);
     await logAudit(
       {
         companyId: account.companyId,
@@ -192,7 +245,7 @@ export async function changePassword(
 
   // 5. Perangkat ini tetap login dengan session versi baru.
   // Pilihan "Ingat saya" dari sesi sebelumnya dipertahankan.
-  await createSession(account.id, sessionVersion, session.rememberMe);
+  await createSession(account.id, sessionVersion, session.rememberMe, currentSessionId, expiresAt);
   clearClientCache();
   redirect(homePath(account.companyId));
 }
@@ -217,8 +270,10 @@ function homePath(companyId: string | null) {
 // Referensi: node_modules/next/dist/docs/01-app/03-api-reference/05-config/01-next-config-js/cacheComponents.md
 export async function logout() {
   // Ambil userId SEBELUM session dihapus, untuk dicatat di audit log.
-  const { userId } = await getSession();
+  const { userId, sessionId } = await getSession();
   const account = userId ? await findUserCredentials(userId) : undefined;
+  // Perangkat ini keluar dari daftar "perangkat yang sedang login".
+  if (userId && sessionId) await revokeSessionOf(userId, sessionId, "LOGOUT");
 
   if (account) {
     await logAudit({
@@ -232,6 +287,17 @@ export async function logout() {
   }
 
   await destroySession();
+}
+
+// ID perangkat (cookie), label perangkat dari User-Agent, dan perkiraan kota
+// dari header Vercel (kosong di localhost).
+async function readDevice() {
+  const requestHeaders = await headers();
+  return {
+    id: await ensureDeviceId(),
+    label: describeDevice(requestHeaders.get("user-agent")),
+    location: describeLocation(requestHeaders.get("x-vercel-ip-city"), requestHeaders.get("x-vercel-ip-country")),
+  };
 }
 
 // Halaman yang sudah di-prefetch untuk user (lihat 'use cache: private' di

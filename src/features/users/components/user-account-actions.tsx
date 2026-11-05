@@ -25,9 +25,23 @@ import { Button } from "@/components/ui/button";
 import { resetUserPassword, setUserActive } from "@/features/users/actions";
 import type { UserDetail } from "@/features/users/queries";
 
+export type RecentEmailChange = { whenLabel: string; byName: string | null; oldEmail: string | null };
+
 // Hanya ditampilkan untuk akun yang boleh dikelola (features/users/access.ts),
 // jadi tidak pernah untuk akun sendiri.
-export function UserAccountActions({ user }: { user: UserDetail }) {
+// recentEmailChange: email akun ini baru diubah → peringatan di baris & dialog
+// Reset password (tanda pengambilalihan akun: password sementara akan dikirim
+// ke email yang baru).
+export function UserAccountActions({
+  user,
+  recentEmailChange,
+}: {
+  user: UserDetail;
+  recentEmailChange: RecentEmailChange | null;
+}) {
+  const emailWarning = recentEmailChange
+    ? `Perhatian: email akun ini diubah ${recentEmailChange.whenLabel}${recentEmailChange.byName ? ` oleh ${recentEmailChange.byName}` : ""}${recentEmailChange.oldEmail ? ` (sebelumnya ${recentEmailChange.oldEmail})` : ""}. Pastikan permintaan reset benar dari orangnya, mis. konfirmasi lewat telepon atau WhatsApp, sebelum melanjutkan.`
+    : null;
   async function handleReset() {
     const result = await resetUserPassword(user.id);
     if (!result.success) notify.error(result.message);
@@ -48,7 +62,7 @@ export function UserAccountActions({ user }: { user: UserDetail }) {
         description={
           !user.isActive
             ? "Aktifkan akun terlebih dahulu untuk me-reset password."
-            : "Kirim password sementara baru ke email pengguna. Pengguna akan keluar dari semua perangkat."
+            : `Kirim password sementara baru ke email pengguna. Pengguna akan keluar dari semua perangkat.${emailWarning ? ` ${emailWarning}` : ""}`
         }
       >
         <ConfirmButton
@@ -56,7 +70,7 @@ export function UserAccountActions({ user }: { user: UserDetail }) {
           variant="outline"
           disabled={!user.isActive}
           dialogTitle={`Reset password ${user.fullName}?`}
-          dialogDescription={`Password lama tidak berlaku lagi. Password sementara dikirim ke ${user.email}.`}
+          dialogDescription={`Password lama tidak berlaku lagi. Password sementara dikirim ke ${user.email}.${emailWarning ? ` ${emailWarning}` : ""}`}
           confirmLabel="Reset password"
           onConfirm={handleReset}
         />

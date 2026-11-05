@@ -22,16 +22,20 @@
 
 import { createHash, randomInt, timingSafeEqual } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
+import { after } from "next/server";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth/dal";
 import { zonedDateString } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { phoneVerifications, users } from "@/lib/db/schema";
+import { sendEmail } from "@/lib/email";
 import { normalizeIndonesianPhone } from "@/lib/phone";
 import { getClientIp } from "@/lib/request";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import type { ActionResult } from "@/types/action-result";
+import { maskPhone } from "./device-info";
+import { phoneChangedEmail } from "./emails";
 
 const CODE_TTL_MS = 10 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
@@ -190,6 +194,22 @@ export async function verifyPhoneOtp(
       tx,
     );
   });
+
+  // Nomor yang SUDAH terverifikasi diganti → beri tahu lewat email terdaftar,
+  // agar pemilik tahu bila nomornya dipindah ke nomor lain tanpa sepengetahuannya.
+  if (before?.phoneNumber && before.phoneNumber !== pending.phoneNumber) {
+    after(() =>
+      sendEmail(
+        phoneChangedEmail({
+          to: user.email,
+          fullName: user.fullName,
+          isOwner: user.roles.includes("OWNER"),
+          newPhoneMasked: maskPhone(pending.phoneNumber),
+          when: new Date(),
+        }),
+      ),
+    );
+  }
 
   // Tidak memakai revalidatePath + redirect(): itu me-render ulang
   // /verify-phone dulu (user sudah terverifikasi → tampil "Ganti nomor

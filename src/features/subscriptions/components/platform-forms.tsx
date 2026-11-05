@@ -7,6 +7,7 @@
 
 import { ImageUpIcon, LoaderCircleIcon, PlusIcon, Trash2Icon } from "lucide-react";
 import { useRef, useState, useTransition } from "react";
+import { CopyButton } from "@/components/copy-button";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -322,8 +323,13 @@ export function BankAccountsManager({ accounts }: { accounts: BankAccount[] }) {
             <li key={account.id} className="flex items-center justify-between gap-3 p-3 text-sm">
               <div className={cn("min-w-0 border-l-4 pl-3", bankAccentClass(account.bankName))}>
                 <p className="font-semibold">{account.bankName}</p>
-                <p className="font-mono text-base text-foreground tabular-nums">
+                <p className="flex items-center gap-1 font-mono text-base text-foreground tabular-nums">
                   {formatAccountNumber(account.bankName, account.accountNumber)}
+                  <CopyButton
+                    value={account.accountNumber}
+                    label={`Salin nomor rekening ${account.bankName}`}
+                    successMessage="Nomor rekening disalin."
+                  />
                 </p>
                 <p className="truncate text-muted-foreground">a.n. {account.accountName}</p>
               </div>

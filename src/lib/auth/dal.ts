@@ -31,7 +31,7 @@ import { redirect } from "next/navigation";
 import type { AddonFlags } from "@/lib/addons";
 import { addonFlagColumns } from "@/lib/addons-db";
 import { db } from "@/lib/db";
-import { companies, roles, subscriptions, userRoles, users } from "@/lib/db/schema";
+import { companies, roles, subscriptions, userRoles, userSessions, users } from "@/lib/db/schema";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { getCompanyAccess, type CompanyAccess } from "@/lib/subscription-access";
 import { readActiveCompanyCookie } from "./active-company";
@@ -99,8 +99,8 @@ async function loadCurrentUser(activeCompanyId: string | null): Promise<CurrentU
   "use cache: private";
   cacheLife("minutes");
 
-  const { userId, sessionVersion } = await getSession();
-  if (!userId) return null;
+  const { userId, sessionVersion, sessionId } = await getSession();
+  if (!userId || !sessionId) return null;
 
   // Cookie session tetap valid sampai kedaluwarsa walau user sudah
   // dinonaktifkan. Karena itu status user selalu dicek ulang ke database.
@@ -122,15 +122,22 @@ async function loadCurrentUser(activeCompanyId: string | null): Promise<CurrentU
       subscriptionUntil: companies.subscriptionUntil,
       hasPaid: hasPaidSubscription,
       addons: addonFlagColumns(db),
+      // Baris perangkat ini (tabel user_sessions); lewat join yang sama, jadi
+      // tidak ada query tambahan.
+      sessionRowId: userSessions.id,
+      sessionRevokedAt: userSessions.revokedAt,
     })
     .from(users)
     .leftJoin(companies, eq(users.companyId, companies.id))
+    .leftJoin(userSessions, and(eq(userSessions.id, sessionId), eq(userSessions.userId, users.id)))
     .where(eq(users.id, userId))
     .limit(1);
 
   if (!user || !user.isActive) return null;
   // Password sudah diganti/di-reset setelah cookie ini dibuat → login ulang.
   if (user.sessionVersion !== sessionVersion) return null;
+  // Perangkat ini dikeluarkan (dari menu Profil / logout) atau barisnya hilang.
+  if (!user.sessionRowId || user.sessionRevokedAt) return null;
 
   const roleRows = await db
     .select({ name: roles.name })
@@ -198,6 +205,14 @@ async function accessOf(subscriptionUntil: Date, hasPaid: boolean) {
   return getCompanyAccess({ subscriptionUntil, hasPaid, graceDays });
 }
 
+// Cookie masih ada tetapi sesinya tidak berlaku lagi (dikeluarkan dari
+// perangkat lain, password diubah, akun dinonaktifkan): login ulang dengan
+// pesan penjelasan. Tanpa cookie sama sekali: /login biasa.
+async function loginUrl() {
+  const { userId } = await getSession();
+  return userId ? "/login?reason=ended" : "/login";
+}
+
 // Untuk halaman yang WAJIB login, tetapi tidak membutuhkan company: kotak menu
 // (/), Profil, dan menu Company milik Superadmin. Kalau belum login → /login.
 // redirect() bertipe `never`, jadi setelah baris itu TypeScript tahu `user`
@@ -211,7 +226,7 @@ async function accessOf(subscriptionUntil: Date, hasPaid: boolean) {
 // getCurrentUser() agar tidak redirect loop (begitu pula /verify-phone).
 export async function verifyAccount() {
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect(await loginUrl());
   if (user.mustChangePassword) redirect("/change-password");
   if (user.mustVerifyPhone) redirect("/verify-phone");
   return user;

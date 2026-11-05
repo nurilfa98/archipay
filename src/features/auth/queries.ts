@@ -14,6 +14,8 @@ import { companies, roles, userRoles, users } from "@/lib/db/schema";
 
 const credentialColumns = {
   id: users.id,
+  fullName: users.fullName,
+  email: users.email,
   companyId: users.companyId,
   passwordHash: users.passwordHash,
   isActive: users.isActive,

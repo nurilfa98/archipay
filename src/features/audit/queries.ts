@@ -12,7 +12,15 @@ import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
 import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
-import { advanceRequests, auditLogs, expenseCategories, projects, settlements, users } from "@/lib/db/schema";
+import {
+  advanceRequests,
+  auditLogs,
+  expenseCategories,
+  leaveTypes,
+  projects,
+  settlements,
+  users,
+} from "@/lib/db/schema";
 import { env } from "@/lib/env";
 import { AUDIT_PAGE_LIMIT, auditActionsOf } from "./constants";
 import type { AuditFilters } from "./schemas";
@@ -73,7 +81,8 @@ export async function listAuditLogs(companyId: string, filter: AuditFilters): Pr
         'Draf ' || ${settlementAdvance.number},
         ${targetUser.fullName},
         ${expenseCategories.name},
-        ${projects.name}
+        ${projects.name},
+        ${leaveTypes.name}
       )`,
       oldValues: auditLogs.oldValues,
       newValues: auditLogs.newValues,
@@ -92,6 +101,7 @@ export async function listAuditLogs(companyId: string, filter: AuditFilters): Pr
       and(eq(auditLogs.entityName, "expense_categories"), eq(expenseCategories.id, auditLogs.entityId)),
     )
     .leftJoin(projects, and(eq(auditLogs.entityName, "projects"), eq(projects.id, auditLogs.entityId)))
+    .leftJoin(leaveTypes, and(eq(auditLogs.entityName, "leave_types"), eq(leaveTypes.id, auditLogs.entityId)))
     .where(
       and(
         eq(auditLogs.companyId, companyId),

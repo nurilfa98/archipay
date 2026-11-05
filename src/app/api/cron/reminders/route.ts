@@ -9,6 +9,7 @@
 //   WhatsApp, sekali per foto (features/attendance/reminders.ts)
 // - hapus file nota yang lewat masa simpan (features/settlements/receipt-retention.ts)
 // - kabar delegasi cuti/izin ke Admin HR (features/attendance/leave-reminders.ts)
+// - hapus riwayat perangkat login yang sudah kedaluwarsa > 90 hari (features/auth/sessions.ts)
 //
 // Keamanan: wajib header `Authorization: Bearer <CRON_SECRET>`. Vercel Cron
 // mengirim header ini otomatis bila env CRON_SECRET diisi (jadwal di
@@ -26,6 +27,7 @@ import { NextResponse } from "next/server";
 import { notifyDelegatedLeaves } from "@/features/attendance/leave-reminders";
 import { notifyPendingFaces } from "@/features/attendance/reminders";
 import { sendDailyDigests } from "@/features/digest/run";
+import { purgeOldSessions } from "@/features/auth/sessions";
 import { runReminders } from "@/features/reminders/run";
 import { purgeExpiredReceipts } from "@/features/settlements/receipt-retention";
 import { sendSubscriptionReminders } from "@/features/subscriptions/reminders";
@@ -60,8 +62,12 @@ export async function GET(request: Request) {
     console.error("[cron] kabar delegasi cuti/izin:", error);
     return null;
   });
+  const sessions = await purgeOldSessions().catch((error: unknown) => {
+    console.error("[cron] hapus riwayat perangkat login:", error);
+    return null;
+  });
   return NextResponse.json(
-    { ok: true, sent, digests, subscriptionReminders, pendingFaces, delegatedLeaves, receipts },
+    { ok: true, sent, digests, subscriptionReminders, pendingFaces, delegatedLeaves, receipts, sessions },
     { headers: { "Cache-Control": "no-store" } },
   );
 }
