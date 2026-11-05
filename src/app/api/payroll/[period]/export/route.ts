@@ -1,6 +1,6 @@
 // GET /api/payroll/2026-11/export?format=slips|recap|xlsx (BUSINESS-FLOW §20.5):
 // semua Slip Gaji (PDF, satu halaman per karyawan), rekap (PDF), atau Excel
-// (sheet Transfer & Rincian). Hanya Owner (salary:manage) selama add-on
+// (sheet Transfer & Rincian). Owner & Finance (salary:prepare) selama add-on
 // Penggajian aktif. Slip & Excel hanya untuk penggajian yang sudah selesai;
 // rekap boleh untuk draf (ditandai DRAF). Dibuat saat diminta, tidak disimpan.
 
@@ -19,7 +19,7 @@ const PRIVATE_HEADERS = { "Cache-Control": "private, no-store", "X-Content-Type-
 export async function GET(request: Request, { params }: RouteContext<"/api/payroll/[period]/export">) {
   const user = await getCurrentUser();
   if (!user || user.mustChangePassword) return new NextResponse("Unauthorized", { status: 401 });
-  if (!user.company || !can(user, "salary:manage")) return new NextResponse("Forbidden", { status: 403 });
+  if (!user.company || !can(user, "salary:prepare")) return new NextResponse("Forbidden", { status: 403 });
 
   const period = periodSchema.safeParse((await params).period);
   const format = new URL(request.url).searchParams.get("format");

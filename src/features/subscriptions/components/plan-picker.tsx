@@ -6,11 +6,28 @@
 //
 // Client Component: data paket, rekening, dan teks tanggal sudah disiapkan
 // server (app/(app)/subscription/page.tsx).
+//
+// Harga khusus perusahaan (diatur Superadmin) yang lebih murah dari harga
+// standar ditampilkan dengan harga standar dicoret, supaya Owner tahu harga
+// normalnya. Harga coret = harga standar untuk paket & periode yang SAMA
+// (diskon 6/12 bulan ikut), jadi selisihnya murni potongan harga khusus.
 
 "use client";
 
-import { ArrowLeftIcon, CheckIcon, LoaderCircleIcon, MinusIcon, PlusIcon, PuzzleIcon, SendIcon, UsersIcon } from "lucide-react";
-import { useState, useTransition, type FormEvent } from "react";
+import {
+  ArrowLeftIcon,
+  BanknoteIcon,
+  CheckIcon,
+  LoaderCircleIcon,
+  MinusIcon,
+  PlusIcon,
+  PuzzleIcon,
+  ScanFaceIcon,
+  SendIcon,
+  UsersIcon,
+  type LucideIcon,
+} from "lucide-react";
+import { useEffect, useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -26,26 +43,41 @@ import { claimSubscriptionPaid } from "../actions";
 import { PLAN_LABELS, PLAN_MONTHS, PROOF_MAX_BYTES, type PlanMonths } from "../constants";
 import { addonPrice, discountOf, MAX_USERS, planPrice, topupPrice, type Pricing } from "../pricing";
 import type { BankAccount } from "../queries";
+import { usePlanFocus } from "./plan-focus";
 
 type PaymentInfo = { banks: BankAccount[]; hasQris: boolean };
 
+const ADDON_ICONS: Record<AddonKey, LucideIcon> = { attendance: ScanFaceIcon, payroll: BanknoteIcon };
+
 export function PlanPicker({
   pricing,
+  standard,
   minUsers,
   defaultUsers,
   defaultAddons,
   payment,
 }: {
-  pricing: Pricing;
+  pricing: Pricing; // harga yang berlaku untuk perusahaan ini
+  standard: Pricing; // harga standar platform (untuk harga coret)
   minUsers: number; // termasuk harga dasar / pengguna aktif saat ini
   defaultUsers: number;
   defaultAddons: AddonFlags; // tercentang bila add-on itu sedang aktif
   payment: PaymentInfo;
 }) {
-  const [selected, setSelected] = useState<PlanMonths | null>(null);
+  const [selected, setSelectedState] = useState<PlanMonths | null>(null);
   const [userCount, setUserCount] = useState(Math.max(defaultUsers, minUsers));
   const [addons, setAddons] = useState<AddonFlags>(defaultAddons);
+  const { setFocused } = usePlanFocus();
   const chosen = addonKeysOf(addons);
+  // Komponen hilang (mis. tagihan baru muncul) → mode fokus ikut mati.
+  useEffect(() => () => setFocused(false), [setFocused]);
+
+  // Langkah bayar = mode fokus (bagian lain halaman disembunyikan).
+  function setSelected(months: PlanMonths | null) {
+    setSelectedState(months);
+    setFocused(months !== null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
   if (selected) {
     return (
@@ -81,30 +113,40 @@ export function PlanPicker({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-5">
       <UserCountField
         id="plan-users"
         label="Jumlah pengguna aktif yang dibutuhkan"
         value={userCount}
         min={minUsers}
         onChange={setUserCount}
-        description={`Owner, Finance, dan Karyawan yang aktif. Minimal ${minUsers}. Harga dasar sudah termasuk ${pricing.includedUsers} pengguna, tambahan ${formatRupiah(pricing.extraUserPrice)}/pengguna/bulan.`}
+        description={`Minimal ${minUsers}. Harga dasar sudah termasuk ${pricing.includedUsers} pengguna, tambahan ${formatRupiah(pricing.extraUserPrice)}/pengguna/bulan.`}
       />
-      <div className="grid gap-3 sm:grid-cols-2">
-        {ADDON_KEYS.map((key) => (
-          <AddonField
-            key={key}
-            addon={key}
-            checked={addons[key]}
-            onCheckedChange={(checked) => setAddons((current) => ({ ...current, [key]: checked }))}
-            pricing={pricing}
-            users={userCount}
-          />
-        ))}
-      </div>
+      <section className="flex flex-col gap-2" aria-labelledby="plan-addons-title">
+        <div>
+          <h3 id="plan-addons-title" className="flex items-center gap-1.5 font-medium">
+            <PuzzleIcon className="size-4 text-brand" />
+            Add-on <span className="font-normal text-muted-foreground">(opsional)</span>
+          </h3>
+          <p className="text-sm text-muted-foreground">Centang untuk ikut dibayar bersama paket.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {ADDON_KEYS.map((key) => (
+            <AddonField
+              key={key}
+              addon={key}
+              checked={addons[key]}
+              onCheckedChange={(checked) => setAddons((current) => ({ ...current, [key]: checked }))}
+              pricing={pricing}
+              users={userCount}
+            />
+          ))}
+        </div>
+      </section>
       <div className="grid gap-4 sm:grid-cols-3">
         {PLAN_MONTHS.map((months) => {
           const total = planPrice(pricing, months, userCount, chosen);
+          const normal = planPrice(standard, months, userCount, chosen);
           const discount = discountOf(pricing, months);
           return (
             <button
@@ -125,6 +167,14 @@ export function PlanPicker({
                 )}
               </div>
               <div>
+                {normal > total && (
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                    <span className="text-muted-foreground tabular-nums line-through">{formatRupiah(normal)}</span>
+                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
+                      Harga khusus
+                    </span>
+                  </p>
+                )}
                 <p className="text-2xl font-semibold tabular-nums">{formatRupiah(total)}</p>
                 {months > 1 && (
                   <p className="text-xs text-muted-foreground">setara {formatRupiah(Math.round(total / months))}/bulan</p>
@@ -134,11 +184,6 @@ export function PlanPicker({
                 <li className="flex items-center gap-1.5">
                   <UsersIcon className="size-3.5" />
                   Maksimal {userCount} pengguna aktif
-                </li>
-                <li>
-                  Termasuk {pricing.includedUsers} pengguna
-                  {userCount > pricing.includedUsers &&
-                    ` + ${userCount - pricing.includedUsers} × ${formatRupiah(pricing.extraUserPrice)}/bulan`}
                 </li>
                 {chosen.map((key) => (
                   <li key={key} className="flex items-center gap-1.5">
@@ -163,12 +208,14 @@ export function PlanPicker({
 // hari (pricing.ts). Setelah lunas, batas pengguna bertambah.
 export function TopupPicker({
   pricing,
+  standard,
   daysLeft,
   addonDays,
   untilLabel,
   payment,
 }: {
   pricing: Pricing;
+  standard: Pricing; // harga standar platform (untuk harga coret)
   daysLeft: number;
   addonDays: Record<AddonKey, number>; // sisa hari add-on yang sudah dibayar (0 = tidak aktif)
   untilLabel: string;
@@ -177,6 +224,7 @@ export function TopupPicker({
   const [extra, setExtra] = useState(5);
   const [confirmed, setConfirmed] = useState(false);
   const price = topupPrice(pricing, extra, daysLeft, addonDays);
+  const normal = topupPrice(standard, extra, daysLeft, addonDays);
   const addonText = ADDON_KEYS.filter((key) => addonDays[key] > 0)
     .map(
       (key) =>
@@ -219,7 +267,12 @@ export function TopupPicker({
         description={`${formatRupiah(pricing.extraUserPrice)}/pengguna/bulan × sisa ${daysLeft} hari (s.d. ${untilLabel}).${addonText}`}
       />
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-2xl font-semibold tabular-nums">{formatRupiah(price)}</p>
+        <div>
+          {normal > price && (
+            <p className="text-sm text-muted-foreground tabular-nums line-through">{formatRupiah(normal)}</p>
+          )}
+          <p className="text-2xl font-semibold tabular-nums">{formatRupiah(price)}</p>
+        </div>
         <Button variant="brand" onClick={() => setConfirmed(true)} disabled={price <= 0}>
           Lanjut bayar
         </Button>
@@ -275,14 +328,17 @@ export function AddonPicker({
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-xl border bg-card p-5">
-      <div className="flex flex-col gap-1 text-sm">
-        <p className="font-medium">Add-on {label}</p>
-        <p className="text-muted-foreground">{ADDON_DESCRIPTIONS[addon]}</p>
-        <p className="text-muted-foreground">
-          {users} pengguna × {formatRupiah(pricing.addonUserPrices[addon])}/pengguna/bulan × sisa {days} hari (s.d.{" "}
-          {untilLabel}).
-        </p>
+    <div className="flex flex-col gap-4 rounded-xl border-2 border-brand/30 bg-card p-5">
+      <div className="flex gap-3 text-sm">
+        <AddonIcon addon={addon} />
+        <div className="flex flex-col gap-1">
+          <p className="font-semibold">Add-on {label}</p>
+          <p className="text-muted-foreground">{ADDON_DESCRIPTIONS[addon]}</p>
+          <p className="text-muted-foreground">
+            {users} pengguna × {formatRupiah(pricing.addonUserPrices[addon])}/pengguna/bulan × sisa {days} hari (s.d.{" "}
+            {untilLabel}).
+          </p>
+        </div>
       </div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-2xl font-semibold tabular-nums">{formatRupiah(price)}</p>
@@ -310,18 +366,40 @@ function AddonField({
   const id = `plan-addon-${addon}`;
   const price = pricing.addonUserPrices[addon];
   return (
-    <Field orientation="horizontal" className="rounded-lg border p-3">
-      <Checkbox id={id} checked={checked} onCheckedChange={(value) => onCheckedChange(value === true)} />
-      <div className="flex flex-col gap-0.5">
-        <FieldLabel htmlFor={id}>
-          Add-on {ADDON_LABELS[addon]} (+{formatRupiah(price)}/pengguna/bulan)
-        </FieldLabel>
-        <FieldDescription>
-          {ADDON_DESCRIPTIONS[addon]} Untuk {users} pengguna: +{formatRupiah(users * price)}/bulan sebelum diskon. Tanpa
-          add-on, menunya disembunyikan; datanya tetap tersimpan.
-        </FieldDescription>
-      </div>
+    <Field
+      orientation="horizontal"
+      className={cn(
+        "items-start rounded-xl border-2 p-4 transition-colors",
+        checked ? "border-brand bg-brand/5" : "border-dashed hover:border-brand/50 hover:bg-muted/40",
+      )}
+    >
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(value) => onCheckedChange(value === true)}
+        className="mt-1"
+      />
+      <FieldLabel htmlFor={id} className="flex min-w-0 flex-1 cursor-pointer items-start gap-3 font-normal">
+        <AddonIcon addon={addon} />
+        <span className="flex min-w-0 flex-col gap-1">
+          <span className="font-semibold">{ADDON_LABELS[addon]}</span>
+          <span className="text-sm text-muted-foreground">{ADDON_DESCRIPTIONS[addon]}</span>
+          <span className="text-sm">
+            <strong className="tabular-nums">+{formatRupiah(price)}</strong>/pengguna/bulan
+            <span className="text-muted-foreground"> · {users} pengguna = +{formatRupiah(users * price)}/bulan</span>
+          </span>
+        </span>
+      </FieldLabel>
     </Field>
+  );
+}
+
+function AddonIcon({ addon }: { addon: AddonKey }) {
+  const Icon = ADDON_ICONS[addon];
+  return (
+    <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+      <Icon className="size-5" />
+    </span>
   );
 }
 
@@ -345,7 +423,15 @@ function UserCountField({
     <Field>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <div className="flex items-center gap-2">
-        <Button type="button" variant="outline" size="icon" onClick={() => onChange(clamp(value - 1))} aria-label="Kurangi">
+        <Button
+          type="button"
+          variant="brand"
+          size="icon-lg"
+          onClick={() => onChange(clamp(value - 1))}
+          disabled={value <= min}
+          aria-label="Kurangi"
+          className="rounded-full shadow-sm"
+        >
           <MinusIcon />
         </Button>
         <Input
@@ -359,9 +445,17 @@ function UserCountField({
             const next = event.target.valueAsNumber;
             if (Number.isFinite(next)) onChange(clamp(next));
           }}
-          className="w-24 text-center tabular-nums"
+          className="h-9 w-24 text-center text-base font-semibold tabular-nums"
         />
-        <Button type="button" variant="outline" size="icon" onClick={() => onChange(clamp(value + 1))} aria-label="Tambah">
+        <Button
+          type="button"
+          variant="brand"
+          size="icon-lg"
+          onClick={() => onChange(clamp(value + 1))}
+          disabled={value >= MAX_USERS}
+          aria-label="Tambah"
+          className="rounded-full shadow-sm"
+        >
           <PlusIcon />
         </Button>
       </div>

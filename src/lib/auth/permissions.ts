@@ -54,8 +54,10 @@ export const PERMISSIONS = [
   "leave:approve", // menyetujui/menolak cuti & izin kapan saja (Owner)
   "leave:approve-delegated", // menyetujui/menolak setelah waktu delegasi lewat (Admin HR)
   "attendance:review", // review bulanan: koreksi absen, bebaskan denda, kunci periode (Owner)
-  // Penggajian (add-on, BUSINESS-FLOW §20). Data gaji rahasia: Superadmin tidak punya keduanya.
-  "salary:manage", // data gaji, penggajian bulanan, rekap & Excel transfer (Owner)
+  // Penggajian (add-on, BUSINESS-FLOW §20). Data gaji rahasia: Superadmin tidak punya semuanya.
+  // Pola maker–checker: Finance menyiapkan, Owner mengesahkan.
+  "salary:prepare", // lihat data gaji & penggajian, siapkan draf, rekap & Excel transfer (Owner, Finance)
+  "salary:manage", // pengaturan penggajian, Selesaikan & Buka kunci, ubah data gaji siapa pun (Owner)
   "salary:view-own", // melihat & mengunduh Slip Gaji milik sendiri
 ] as const;
 
@@ -91,6 +93,7 @@ const ROLE_PERMISSIONS = {
         "leave:approve",
         "leave:approve-delegated",
         "attendance:review",
+        "salary:prepare",
         "salary:manage",
         "salary:view-own",
       ].includes(permission),
@@ -120,6 +123,9 @@ const ROLE_PERMISSIONS = {
     "payroll:view",
     "payroll:manage",
     "attendance:check-in",
+    // Menyiapkan penggajian; data gaji diri sendiri, Owner & Finance lain hanya
+    // bisa dilihat (features/salaries/access.ts). Selesaikan tetap Owner.
+    "salary:prepare",
     "salary:view-own",
   ],
   // Admin HR mengurus absensi & akun Karyawan (features/users/access.ts).
@@ -149,7 +155,7 @@ const ADDON_PERMISSIONS: Record<AddonKey, readonly Permission[]> = {
     "leave:approve-delegated",
     "attendance:review",
   ],
-  payroll: ["salary:manage", "salary:view-own"],
+  payroll: ["salary:prepare", "salary:manage", "salary:view-own"],
 };
 
 export type PermissionSubject = {

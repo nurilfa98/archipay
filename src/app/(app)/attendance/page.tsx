@@ -16,6 +16,7 @@ import {
   ScanFaceIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
+import { io } from "next/cache";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -65,6 +66,9 @@ async function AttendanceContent() {
   }
 
   const companyId = user.company.id;
+  // Cache Components: new Date() wajib setelah io(), agar tidak ikut prerender
+  // (node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md).
+  await io();
   const now = new Date();
   const [settings, faces, consented, locationCount, pendingFaces, latest, records, pendingLeaves] = await Promise.all([
     getAttendanceSettings(companyId),

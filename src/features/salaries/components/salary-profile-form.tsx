@@ -2,6 +2,8 @@
 // tunjangan (tetap bulanan / per hari hadir), potongan tetap (BPJS, PPh 21
 // diisi manual), masa kerja, nominal per hari, dan pengecualian potong otomatis.
 // Daftar tunjangan/potongan dikirim sebagai JSON di isian tersembunyi.
+// `readOnly` (Finance melihat data gaji dirinya sendiri, Owner, atau Finance
+// lain): semua isian dinonaktifkan lewat <fieldset disabled>, tanpa tombol simpan.
 
 "use client";
 
@@ -44,10 +46,12 @@ export function SalaryProfileForm({
   userId,
   profile,
   dailyRateMethod,
+  readOnly = false,
 }: {
   userId: string;
   profile: SalaryProfileInput | null;
   dailyRateMethod: DailyRateMethod;
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>(() => (profile?.components ?? []).map(toRow));
@@ -93,79 +97,82 @@ export function SalaryProfileForm({
 
   return (
     <form onSubmit={handleSubmit} className="max-w-2xl">
-      <FieldGroup>
-        <div className="grid gap-5 sm:grid-cols-2">
-          <RupiahInput
-            name="baseSalary"
-            label="Gaji pokok per bulan"
-            defaultValue={profile?.baseSalary ?? null}
-            error={fieldError("baseSalary")}
-          />
-          {dailyRateMethod === "FIXED_AMOUNT" && (
+      <fieldset disabled={readOnly} className="min-w-0">
+        <FieldGroup>
+          <div className="grid gap-5 sm:grid-cols-2">
             <RupiahInput
-              name="dailyRate"
-              label="Nominal per hari"
-              defaultValue={profile?.dailyRate ?? null}
-              description="Tarif potongan tidak hadir & prorata (Pengaturan → Penggajian)."
-              optional
-              error={fieldError("dailyRate")}
+              name="baseSalary"
+              label="Gaji pokok per bulan"
+              defaultValue={profile?.baseSalary ?? null}
+              error={fieldError("baseSalary")}
             />
-          )}
-        </div>
-
-        <ComponentList
-          type="ALLOWANCE"
-          title="Tunjangan"
-          description="Tetap bulanan, atau per hari hadir (mis. uang makan/transport = nominal × hari hadir)."
-          rows={allowances}
-          onAdd={() => add("ALLOWANCE")}
-          onChange={update}
-          onRemove={remove}
-          disabled={rows.length >= MAX_COMPONENTS}
-        />
-        <ComponentList
-          type="DEDUCTION"
-          title="Potongan tetap"
-          description="Mis. BPJS Kesehatan, BPJS Ketenagakerjaan, PPh 21, cicilan koperasi. Diisi manual, dipotong setiap bulan."
-          rows={deductions}
-          onAdd={() => add("DEDUCTION")}
-          onChange={update}
-          onRemove={remove}
-          disabled={rows.length >= MAX_COMPONENTS}
-        />
-
-        <div className="grid gap-5 sm:grid-cols-2">
-          <Field data-invalid={!!fieldError("startDate")}>
-            <FieldLabel htmlFor="startDate">Tanggal mulai kerja (opsional)</FieldLabel>
-            <Input id="startDate" name="startDate" type="date" defaultValue={profile?.startDate ?? ""} />
-            <FieldDescription>Hari kerja sebelum tanggal ini dipotong prorata.</FieldDescription>
-            <FieldError>{fieldError("startDate")}</FieldError>
-          </Field>
-          <Field data-invalid={!!fieldError("endDate")}>
-            <FieldLabel htmlFor="endDate">Tanggal berhenti (opsional)</FieldLabel>
-            <Input id="endDate" name="endDate" type="date" defaultValue={profile?.endDate ?? ""} />
-            <FieldDescription>Hari kerja setelah tanggal ini dipotong prorata.</FieldDescription>
-            <FieldError>{fieldError("endDate")}</FieldError>
-          </Field>
-        </div>
-
-        <Field orientation="horizontal" className="rounded-lg border p-3">
-          <Checkbox
-            id="absenceExempt"
-            name="absenceExempt"
-            value="1"
-            defaultChecked={profile?.absenceExempt ?? false}
-          />
-          <div className="flex flex-col gap-0.5">
-            <FieldLabel htmlFor="absenceExempt">Tidak dipotong otomatis</FieldLabel>
-            <FieldDescription>
-              Ketidakhadiran karyawan ini tidak dipotong (mis. manajer, staf lapangan).
-            </FieldDescription>
+            {dailyRateMethod === "FIXED_AMOUNT" && (
+              <RupiahInput
+                name="dailyRate"
+                label="Nominal per hari"
+                defaultValue={profile?.dailyRate ?? null}
+                description="Tarif potongan tidak hadir & prorata (Pengaturan → Penggajian)."
+                optional
+                error={fieldError("dailyRate")}
+              />
+            )}
           </div>
-        </Field>
 
-        <SubmitButton pending={pending} label="Simpan data gaji" />
-      </FieldGroup>
+          <ComponentList
+            type="ALLOWANCE"
+            title="Tunjangan"
+            description="Tetap bulanan, atau per hari hadir (mis. uang makan/transport = nominal × hari hadir)."
+            rows={allowances}
+            onAdd={() => add("ALLOWANCE")}
+            onChange={update}
+            onRemove={remove}
+            disabled={rows.length >= MAX_COMPONENTS}
+          />
+          <ComponentList
+            type="DEDUCTION"
+            title="Potongan tetap"
+            description="Mis. BPJS Kesehatan, BPJS Ketenagakerjaan, PPh 21, cicilan koperasi. Diisi manual, dipotong setiap bulan."
+            rows={deductions}
+            onAdd={() => add("DEDUCTION")}
+            onChange={update}
+            onRemove={remove}
+            disabled={rows.length >= MAX_COMPONENTS}
+          />
+
+          <div className="grid gap-5 sm:grid-cols-2">
+            <Field data-invalid={!!fieldError("startDate")}>
+              <FieldLabel htmlFor="startDate">Tanggal mulai kerja (opsional)</FieldLabel>
+              <Input id="startDate" name="startDate" type="date" defaultValue={profile?.startDate ?? ""} />
+              <FieldDescription>Hari kerja sebelum tanggal ini dipotong prorata.</FieldDescription>
+              <FieldError>{fieldError("startDate")}</FieldError>
+            </Field>
+            <Field data-invalid={!!fieldError("endDate")}>
+              <FieldLabel htmlFor="endDate">Tanggal berhenti (opsional)</FieldLabel>
+              <Input id="endDate" name="endDate" type="date" defaultValue={profile?.endDate ?? ""} />
+              <FieldDescription>Hari kerja setelah tanggal ini dipotong prorata.</FieldDescription>
+              <FieldError>{fieldError("endDate")}</FieldError>
+            </Field>
+          </div>
+
+          <Field orientation="horizontal" className="rounded-lg border p-3">
+            <Checkbox
+              id="absenceExempt"
+              name="absenceExempt"
+              value="1"
+              defaultChecked={profile?.absenceExempt ?? false}
+              disabled={readOnly}
+            />
+            <div className="flex flex-col gap-0.5">
+              <FieldLabel htmlFor="absenceExempt">Tidak dipotong otomatis</FieldLabel>
+              <FieldDescription>
+                Ketidakhadiran karyawan ini tidak dipotong (mis. manajer, staf lapangan).
+              </FieldDescription>
+            </div>
+          </Field>
+
+          {!readOnly && <SubmitButton pending={pending} label="Simpan data gaji" />}
+        </FieldGroup>
+      </fieldset>
     </form>
   );
 }

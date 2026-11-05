@@ -3,6 +3,7 @@
 // lokasi WITA/WIT tetap tercatat dengan tanggal kerja zona lokasinya.
 
 import type { Metadata } from "next";
+import { io } from "next/cache";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -32,6 +33,9 @@ export default function TodayPage() {
 
 async function TodayContent() {
   const user = await requirePermission("attendance:view-all");
+  // Cache Components: new Date() wajib setelah io(), agar tidak ikut prerender
+  // (node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md).
+  await io();
   const now = new Date();
   const today = zonedDateString(now);
   const [people, records, leaves] = await Promise.all([

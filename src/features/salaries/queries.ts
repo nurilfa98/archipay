@@ -1,9 +1,10 @@
 // Query Penggajian (BUSINESS-FLOW §20). Pemanggil WAJIB sudah mengecek hak
-// akses (salary:manage untuk data gaji & penggajian, salary:view-own untuk
+// akses (salary:prepare untuk data gaji & penggajian, salary:view-own untuk
 // slip milik sendiri) dan membatasi ke company yang sedang dibuka.
 
 import "server-only";
 import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
 import { db } from "@/lib/db";
 import {
@@ -248,8 +249,13 @@ export type RunDetail = {
   calculatedAt: Date;
   finalizedAt: Date | null;
   finalizedByName: string | null;
+  // Finance menekan "Kirim ke Owner" (null = belum / draf berubah sesudahnya).
+  reviewRequestedAt: Date | null;
+  reviewRequestedByName: string | null;
   payslips: Payslip[];
 };
+
+const reviewRequester = alias(users, "review_requester");
 
 export async function getRun(companyId: string, period: string): Promise<RunDetail | null> {
   await io();
@@ -262,9 +268,12 @@ export async function getRun(companyId: string, period: string): Promise<RunDeta
       calculatedAt: payrollRuns.calculatedAt,
       finalizedAt: payrollRuns.finalizedAt,
       finalizedByName: users.fullName,
+      reviewRequestedAt: payrollRuns.reviewRequestedAt,
+      reviewRequestedByName: reviewRequester.fullName,
     })
     .from(payrollRuns)
     .leftJoin(users, eq(payrollRuns.finalizedById, users.id))
+    .leftJoin(reviewRequester, eq(payrollRuns.reviewRequestedById, reviewRequester.id))
     .where(and(eq(payrollRuns.companyId, companyId), eq(payrollRuns.period, period)))
     .limit(1);
   if (!run) return null;

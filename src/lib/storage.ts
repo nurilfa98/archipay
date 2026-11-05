@@ -55,7 +55,7 @@ export async function putObject(key: string, body: Uint8Array<ArrayBuffer>, cont
     const headers = new Headers(signed.headers);
     headers.set("content-length", String(body.byteLength));
     const response = await fetch(signed.url, { method: "PUT", headers, body });
-    if (!response.ok) throw new Error(`Gagal mengunggah ke R2 (${response.status})`);
+    if (!response.ok) throw new Error(`Gagal mengunggah ke R2 (${response.status}${await r2ErrorCode(response)})`);
     return;
   }
   assertLocalAllowed();
@@ -68,7 +68,9 @@ export async function deleteObject(key: string) {
   if (r2) {
     const response = await r2.client.fetch(objectUrl(key), { method: "DELETE" });
     // 404 = sudah tidak ada, anggap berhasil.
-    if (!response.ok && response.status !== 404) throw new Error(`Gagal menghapus dari R2 (${response.status})`);
+    if (!response.ok && response.status !== 404) {
+      throw new Error(`Gagal menghapus dari R2 (${response.status}${await r2ErrorCode(response)})`);
+    }
     return;
   }
   await rm(localPath(key), { force: true });
@@ -86,6 +88,14 @@ export async function getPresignedUrl(key: string) {
 export async function readLocalObject(key: string) {
   assertLocalAllowed();
   return readFile(localPath(key));
+}
+
+// Kode error S3 dari body XML R2, untuk log (mis. " InvalidAccessKeyId",
+// " SignatureDoesNotMatch", " AccessDenied"). Tidak berisi data rahasia.
+async function r2ErrorCode(response: Response) {
+  const body = await response.text().catch(() => "");
+  const code = body.match(/<Code>([^<]+)<\/Code>/)?.[1];
+  return code ? ` ${code}` : "";
 }
 
 function objectUrl(key: string) {

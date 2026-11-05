@@ -85,7 +85,7 @@ export const MENU_ITEMS: MenuItem[] = [
     icon: BanknoteIcon,
     description: "Data gaji, penggajian bulanan & slip gaji",
     keywords: ["gaji", "payroll", "slip", "tunjangan", "bpjs", "thr"],
-    permission: "salary:manage",
+    permission: "salary:prepare",
   },
   {
     title: "Slip Gaji",

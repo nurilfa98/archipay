@@ -1,5 +1,10 @@
-// Server Action penggajian bulanan (BUSINESS-FLOW §20.4). Hanya Owner
-// (salary:manage) selama add-on Penggajian aktif.
+// Server Action penggajian bulanan (BUSINESS-FLOW §20.1, §20.4) selama add-on
+// Penggajian aktif. Pola maker–checker:
+// - Owner & Finance (salary:prepare): buat, hitung ulang, ubah baris draf,
+//   tanggal bayar. Finance tidak bisa mengubah slip dirinya sendiri, Owner,
+//   atau Finance lain (access.ts). Finance menekan "Kirim ke Owner" ->
+//   WhatsApp langsung ke Owner (notifications.ts).
+// - Owner (salary:manage): Selesaikan & Buka kunci.
 //
 // - Buat penggajian / Hitung ulang: draf disusun ulang dari data terbaru
 //   (run-data.ts). Baris MANUAL tetap; baris otomatis diganti (perubahan pada
@@ -15,6 +20,7 @@
 
 import { and, eq, inArray, isNull, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { isPeriodLocked } from "@/features/attendance/period-lock";
 import { postBalanceEntry } from "@/features/settlements/ledger";
@@ -28,7 +34,9 @@ import { attendancePenalties, payrollRuns, payslipLines, payslips } from "@/lib/
 import { zonedDateString } from "@/lib/dates";
 import { getClientIp } from "@/lib/request";
 import type { ActionResult } from "@/types/action-result";
+import { SALARY_EDIT_DENIED, salaryEditChecker } from "./access";
 import { EDITABLE_SOURCES, REMOVABLE_SOURCES, type LineSource } from "./constants";
+import { notifyPayrollReviewRequested } from "./notifications";
 import { totalsOf } from "./payslip-math";
 import { getPayrollSettings } from "./queries";
 import { buildPayslipDrafts, type PayslipDraft } from "./run-data";
@@ -48,6 +56,20 @@ async function getSalaryManager() {
   return can(actor, "salary:manage") ? actor : null;
 }
 
+async function getSalaryPreparer() {
+  const actor = await verifySession();
+  return can(actor, "salary:prepare") ? actor : null;
+}
+
+// Draf berubah -> permintaan periksa yang lama tidak berlaku lagi; Finance bisa
+// mengirim ulang ke Owner.
+async function clearReviewRequest(tx: Transaction, runId: string) {
+  await tx
+    .update(payrollRuns)
+    .set({ reviewRequestedAt: null, reviewRequestedById: null })
+    .where(eq(payrollRuns.id, runId));
+}
+
 async function findRun(companyId: string, period: string) {
   const [run] = await db
     .select({ id: payrollRuns.id, status: payrollRuns.status, payDate: payrollRuns.payDate })
@@ -65,7 +87,7 @@ export async function createPayrollRun(
   _prevState: ActionResult<{ period: string }> | undefined,
   formData: FormData,
 ): Promise<ActionResult<{ period: string }>> {
-  const actor = await getSalaryManager();
+  const actor = await getSalaryPreparer();
   if (!actor) return FORBIDDEN;
   const parsed = createRunSchema.safeParse({ period: formData.get("period") });
   if (!parsed.success) return invalid(parsed.error);
@@ -115,7 +137,7 @@ export async function createPayrollRun(
 }
 
 export async function recalculatePayrollRun(period: string): Promise<ActionResult> {
-  const actor = await getSalaryManager();
+  const actor = await getSalaryPreparer();
   if (!actor) return FORBIDDEN;
   const parsedPeriod = periodSchema.safeParse(period);
   if (!parsedPeriod.success) return NOT_FOUND;
@@ -135,7 +157,10 @@ export async function recalculatePayrollRun(period: string): Promise<ActionResul
       .for("update");
     if (locked?.status !== "DRAFT") return;
     await saveDrafts(tx, actor.company.id, run.id, drafts);
-    await tx.update(payrollRuns).set({ calculatedAt: new Date() }).where(eq(payrollRuns.id, run.id));
+    await tx
+      .update(payrollRuns)
+      .set({ calculatedAt: new Date(), reviewRequestedAt: null, reviewRequestedById: null })
+      .where(eq(payrollRuns.id, run.id));
     await logAudit(
       {
         companyId: actor.company.id,
@@ -256,6 +281,7 @@ async function lockLine(tx: Transaction, companyId: string, lineId: string) {
     .select({
       id: payslipLines.id,
       payslipId: payslipLines.payslipId,
+      userId: payslips.userId,
       source: payslipLines.source,
       label: payslipLines.label,
       postedAt: payslipLines.postedAt,
@@ -273,7 +299,7 @@ async function lockLine(tx: Transaction, companyId: string, lineId: string) {
 }
 
 export async function updatePayslipLineAmount(lineId: string, formData: FormData): Promise<ActionResult> {
-  const actor = await getSalaryManager();
+  const actor = await getSalaryPreparer();
   if (!actor) return FORBIDDEN;
   const id = idSchema.safeParse(lineId);
   const parsed = lineAmountSchema.safeParse({ amount: formData.get("amount") ?? "" });
@@ -291,7 +317,7 @@ export async function updatePayslipLineAmount(lineId: string, formData: FormData
 }
 
 export async function removePayslipLine(lineId: string): Promise<ActionResult> {
-  const actor = await getSalaryManager();
+  const actor = await getSalaryPreparer();
   if (!actor) return FORBIDDEN;
   const id = idSchema.safeParse(lineId);
   if (!id.success) return { success: false, message: "Baris tidak ditemukan." };
@@ -310,14 +336,17 @@ async function changeLine(
   apply: (tx: Transaction, line: NonNullable<Awaited<ReturnType<typeof lockLine>>>) => Promise<string | null>,
 ): Promise<ActionResult> {
   const ip = await getClientIp();
+  const canEdit = await salaryEditChecker(actor);
   const result = await db.transaction(async (tx) => {
     const line = await lockLine(tx, actor.company.id, lineId);
     if (!line) return "Baris tidak ditemukan.";
     if (line.runStatus !== "DRAFT") return NOT_DRAFT.message;
+    if (!canEdit(line.userId)) return SALARY_EDIT_DENIED;
     if (line.postedAt) return "Baris ini sudah tercatat (ledger/denda) dan tidak bisa diubah.";
     const error = await apply(tx, line);
     if (error) return error;
     await refreshTotals(tx, [line.payslipId]);
+    await clearReviewRequest(tx, line.runId);
     await logAudit(
       {
         companyId: actor.company.id,
@@ -338,7 +367,7 @@ async function changeLine(
 }
 
 export async function addManualLine(payslipId: string, formData: FormData): Promise<ActionResult> {
-  const actor = await getSalaryManager();
+  const actor = await getSalaryPreparer();
   if (!actor) return FORBIDDEN;
   const id = idSchema.safeParse(payslipId);
   const parsed = manualLineSchema.safeParse({
@@ -350,11 +379,13 @@ export async function addManualLine(payslipId: string, formData: FormData): Prom
   if (!parsed.success) return invalid(parsed.error);
 
   const ip = await getClientIp();
+  const canEdit = await salaryEditChecker(actor);
   const error = await db.transaction(async (tx) => {
     const [slip] = await tx
       .select({
         id: payslips.id,
         runId: payslips.runId,
+        userId: payslips.userId,
         fullName: payslips.fullName,
         status: payrollRuns.status,
         period: payrollRuns.period,
@@ -365,6 +396,7 @@ export async function addManualLine(payslipId: string, formData: FormData): Prom
       .for("update", { of: payrollRuns });
     if (!slip) return "Slip tidak ditemukan.";
     if (slip.status !== "DRAFT") return NOT_DRAFT.message;
+    if (!canEdit(slip.userId)) return SALARY_EDIT_DENIED;
     await tx.insert(payslipLines).values({
       payslipId: slip.id,
       companyId: actor.company.id,
@@ -375,6 +407,7 @@ export async function addManualLine(payslipId: string, formData: FormData): Prom
       sortOrder: 1000,
     });
     await refreshTotals(tx, [slip.id]);
+    await clearReviewRequest(tx, slip.runId);
     await logAudit(
       {
         companyId: actor.company.id,
@@ -400,7 +433,7 @@ export async function addManualLine(payslipId: string, formData: FormData): Prom
 }
 
 export async function setPayDate(period: string, formData: FormData): Promise<ActionResult> {
-  const actor = await getSalaryManager();
+  const actor = await getSalaryPreparer();
   if (!actor) return FORBIDDEN;
   const parsedPeriod = periodSchema.safeParse(period);
   const parsed = payDateSchema.safeParse({ payDate: formData.get("payDate") ?? "" });
@@ -409,7 +442,7 @@ export async function setPayDate(period: string, formData: FormData): Promise<Ac
 
   const [updated] = await db
     .update(payrollRuns)
-    .set({ payDate: parsed.data.payDate })
+    .set({ payDate: parsed.data.payDate, reviewRequestedAt: null, reviewRequestedById: null })
     .where(
       and(
         eq(payrollRuns.companyId, actor.company.id),
@@ -419,6 +452,65 @@ export async function setPayDate(period: string, formData: FormData): Promise<Ac
     )
     .returning({ id: payrollRuns.id });
   if (!updated) return NOT_DRAFT;
+  revalidatePayroll();
+  return { success: true, data: undefined };
+}
+
+// ---------------------------------------------------------------------------
+// Kirim ke Owner (Finance)
+// ---------------------------------------------------------------------------
+
+// Finance selesai menyiapkan draf -> WhatsApp langsung ke semua Owner aktif.
+// Sekali per versi draf: tanda dikosongkan setiap draf berubah
+// (clearReviewRequest), jadi tombol yang ditekan berulang tidak mengirim ganda.
+export async function requestPayrollReview(period: string): Promise<ActionResult> {
+  const actor = await getSalaryPreparer();
+  if (!actor) return FORBIDDEN;
+  const parsedPeriod = periodSchema.safeParse(period);
+  if (!parsedPeriod.success) return NOT_FOUND;
+  const run = await findRun(actor.company.id, parsedPeriod.data);
+  if (!run) return NOT_FOUND;
+  if (run.status !== "DRAFT") return NOT_DRAFT;
+  if (!run.payDate) return { success: false, message: "Isi tanggal bayar terlebih dahulu." };
+
+  const ip = await getClientIp();
+  const people = await db.$count(payslips, eq(payslips.runId, run.id));
+  if (people === 0) return { success: false, message: "Belum ada slip di penggajian ini." };
+
+  const requested = await db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(payrollRuns)
+      .set({ reviewRequestedAt: new Date(), reviewRequestedById: actor.id })
+      .where(and(eq(payrollRuns.id, run.id), eq(payrollRuns.status, "DRAFT"), isNull(payrollRuns.reviewRequestedAt)))
+      .returning({ id: payrollRuns.id });
+    if (!updated) return false;
+    await logAudit(
+      {
+        companyId: actor.company.id,
+        userId: actor.id,
+        action: "PAYROLL_REVIEW_REQUESTED",
+        entityName: "payroll_runs",
+        entityId: run.id,
+        newValues: { period: parsedPeriod.data, people },
+        ipAddress: ip,
+      },
+      tx,
+    );
+    return true;
+  });
+  if (!requested) {
+    return { success: false, message: "Sudah dikirim ke Owner. Kirim lagi setelah ada perubahan." };
+  }
+
+  // Tombol tidak menunggu Fonnte.
+  after(() =>
+    notifyPayrollReviewRequested(actor.company.id, {
+      period: parsedPeriod.data,
+      people,
+      requesterId: actor.id,
+      requesterName: actor.fullName,
+    }),
+  );
   revalidatePayroll();
   return { success: true, data: undefined };
 }
@@ -580,7 +672,13 @@ export async function reopenPayrollRun(period: string): Promise<ActionResult> {
   const reopened = await db.transaction(async (tx) => {
     const [run] = await tx
       .update(payrollRuns)
-      .set({ status: "DRAFT", finalizedAt: null, finalizedById: null })
+      .set({
+        status: "DRAFT",
+        finalizedAt: null,
+        finalizedById: null,
+        reviewRequestedAt: null,
+        reviewRequestedById: null,
+      })
       .where(
         and(
           eq(payrollRuns.companyId, actor.company.id),

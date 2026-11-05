@@ -6,6 +6,7 @@
 
 import { FileDownIcon, FileSpreadsheetIcon, LockIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { io } from "next/cache";
 import Link from "next/link";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -40,6 +41,9 @@ export default function ReviewPage({ searchParams }: PageProps<"/attendance/revi
 
 async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/review">, "searchParams">) {
   const user = await requirePermission("attendance:view-all");
+  // Cache Components: new Date() wajib setelah io(), agar tidak ikut prerender
+  // (node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md).
+  await io();
   const today = zonedDateString(new Date());
   const requested = (await searchParams).period;
   // Bawaan: bulan lalu (yang biasanya sedang direview & dikunci).

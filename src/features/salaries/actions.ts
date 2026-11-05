@@ -1,7 +1,11 @@
 // Server Action Penggajian bagian data (BUSINESS-FLOW §20.2–20.3): pengaturan
-// penggajian dan data gaji per karyawan. Hanya Owner (salary:manage) selama
-// add-on Penggajian aktif (lib/auth/permissions.ts). Audit log mencatat siapa
-// mengubah apa tanpa nominal (Superadmin bisa membuka audit log).
+// penggajian dan data gaji per karyawan, selama add-on Penggajian aktif
+// (lib/auth/permissions.ts).
+// - Pengaturan penggajian: Owner (salary:manage).
+// - Data gaji: Owner & Finance (salary:prepare). Finance tidak bisa mengubah
+//   data gajinya sendiri, Owner, atau Finance lain (access.ts).
+// Audit log mencatat siapa mengubah apa tanpa nominal (Superadmin bisa membuka
+// audit log).
 
 "use server";
 
@@ -15,6 +19,7 @@ import { db } from "@/lib/db";
 import { companySettings, salaryComponents, salaryProfiles, users } from "@/lib/db/schema";
 import { getClientIp } from "@/lib/request";
 import type { ActionResult } from "@/types/action-result";
+import { SALARY_EDIT_DENIED, salaryEditChecker } from "./access";
 import { idSchema, payrollSettingsSchema, salaryProfileSchema } from "./schemas";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
@@ -22,6 +27,11 @@ const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as c
 async function getSalaryManager() {
   const actor = await verifySession();
   return can(actor, "salary:manage") ? actor : null;
+}
+
+async function getSalaryPreparer() {
+  const actor = await verifySession();
+  return can(actor, "salary:prepare") ? actor : null;
 }
 
 export async function updatePayrollSettings(
@@ -71,10 +81,11 @@ export async function updatePayrollSettings(
 }
 
 export async function saveSalaryProfile(userId: string, formData: FormData): Promise<ActionResult> {
-  const actor = await getSalaryManager();
+  const actor = await getSalaryPreparer();
   if (!actor) return FORBIDDEN;
   const id = idSchema.safeParse(userId);
   if (!id.success) return { success: false, message: "Pengguna tidak ditemukan." };
+  if (!(await salaryEditChecker(actor))(id.data)) return { success: false, message: SALARY_EDIT_DENIED };
 
   const parsed = salaryProfileSchema.safeParse({
     baseSalary: formData.get("baseSalary") ?? "",
@@ -140,10 +151,11 @@ export async function saveSalaryProfile(userId: string, formData: FormData): Pro
 
 // Hapus data gaji: pengguna tidak ikut penggajian berikutnya. Slip lama tetap ada.
 export async function deleteSalaryProfile(userId: string): Promise<ActionResult> {
-  const actor = await getSalaryManager();
+  const actor = await getSalaryPreparer();
   if (!actor) return FORBIDDEN;
   const id = idSchema.safeParse(userId);
   if (!id.success) return { success: false, message: "Data gaji tidak ditemukan." };
+  if (!(await salaryEditChecker(actor))(id.data)) return { success: false, message: SALARY_EDIT_DENIED };
 
   const ip = await getClientIp();
   const deleted = await db.transaction(async (tx) => {

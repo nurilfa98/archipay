@@ -7,6 +7,7 @@
 
 import { PlusIcon } from "lucide-react";
 import type { Metadata } from "next";
+import { io } from "next/cache";
 import Link from "next/link";
 import { Suspense } from "react";
 import type { Tone } from "@/components/tone-badge";
@@ -67,6 +68,9 @@ async function LeaveContent() {
   }
 
   const companyId = user.company.id;
+  // Cache Components: new Date() wajib setelah io(), agar tidak ikut prerender
+  // (node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md).
+  await io();
   const now = new Date();
   const today = zonedDateString(now);
   const year = Number(today.slice(0, 4));

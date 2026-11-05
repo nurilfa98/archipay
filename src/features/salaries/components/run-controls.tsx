@@ -1,7 +1,8 @@
-// Tombol & form penggajian bulanan (Owner, BUSINESS-FLOW §20.4): buat
-// penggajian, hitung ulang, tanggal bayar, selesaikan, buka kunci, ubah/hapus
-// baris, tambah baris manual, dan hapus data gaji. Server Action selalu
-// memeriksa ulang status draf & hak akses.
+// Tombol & form penggajian bulanan (BUSINESS-FLOW §20.1, §20.4): buat
+// penggajian, hitung ulang, tanggal bayar, ubah/hapus baris, tambah baris
+// manual, hapus data gaji (Owner & Finance), kirim ke Owner (Finance),
+// selesaikan & buka kunci (Owner). Server Action selalu memeriksa ulang status
+// draf & hak akses.
 
 "use client";
 
@@ -12,6 +13,7 @@ import {
   PencilIcon,
   PlusIcon,
   RefreshCwIcon,
+  SendIcon,
   Trash2Icon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -32,6 +34,7 @@ import {
   recalculatePayrollRun,
   removePayslipLine,
   reopenPayrollRun,
+  requestPayrollReview,
   setPayDate,
   updatePayslipLineAmount,
 } from "../run-actions";
@@ -151,6 +154,24 @@ export function FinalizeButton({
       confirmLabel="Selesaikan"
       successMessage="Penggajian selesai. Slip gaji sudah bisa diunduh."
       onConfirm={() => finalizePayrollRun(period)}
+    />
+  );
+}
+
+// Finance: draf siap diperiksa → WhatsApp langsung ke Owner.
+export function RequestReviewButton({ period, disabled }: { period: string; disabled?: boolean }) {
+  return (
+    <ActionDialog
+      label="Kirim ke Owner"
+      icon={<SendIcon />}
+      showLabel
+      variant="brand"
+      disabled={disabled}
+      title="Kirim ke Owner untuk diperiksa?"
+      description="Owner menerima WhatsApp bahwa penggajian ini siap diperiksa dan diselesaikan. Bila draf diubah lagi, kirim ulang setelahnya."
+      confirmLabel="Kirim"
+      successMessage="Terkirim ke Owner."
+      onConfirm={() => requestPayrollReview(period)}
     />
   );
 }

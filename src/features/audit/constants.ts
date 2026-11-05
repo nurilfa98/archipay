@@ -99,6 +99,7 @@ export const AUDIT_ACTIONS = {
   PAYROLL_RUN_CREATED: { label: "Buat penggajian", category: "PAYROLL", tone: "pending" },
   PAYROLL_RECALCULATED: { label: "Hitung ulang penggajian", category: "PAYROLL", tone: "active" },
   PAYSLIP_LINE_CHANGED: { label: "Ubah baris slip gaji", category: "PAYROLL", tone: "active" },
+  PAYROLL_REVIEW_REQUESTED: { label: "Kirim penggajian ke Owner", category: "PAYROLL", tone: "pending" },
   PAYROLL_FINALIZED: { label: "Selesaikan penggajian", category: "PAYROLL", tone: "success" },
   PAYROLL_REOPENED: { label: "Buka kunci penggajian", category: "PAYROLL", tone: "warning" },
 } as const satisfies Record<AuditAction, ActionInfo>;

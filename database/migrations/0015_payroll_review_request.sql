@@ -1,0 +1,3 @@
+ALTER TABLE "payroll_runs" ADD COLUMN "review_requested_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "payroll_runs" ADD COLUMN "review_requested_by_id" varchar(36);--> statement-breakpoint
+ALTER TABLE "payroll_runs" ADD CONSTRAINT "payroll_runs_review_requested_by_id_users_id_fk" FOREIGN KEY ("review_requested_by_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;

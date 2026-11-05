@@ -969,11 +969,30 @@ membantu). Kode: `src/features/salaries/`.
 
 | | Owner | Finance | Admin HR | Karyawan | Superadmin |
 |---|---|---|---|---|---|
-| Data gaji, penggajian bulanan, rekap & Excel | ✓ | | | | |
+| Lihat data gaji semua orang, penggajian bulanan, semua slip, rekap & Excel | ✓ | ✓ | | | |
+| Ubah data gaji & baris slip draf; buat / hitung ulang penggajian; tanggal bayar | ✓ | ✓¹ | | | |
+| Kirim draf ke Owner (WhatsApp langsung ke Owner) | | ✓ | | | |
+| **Selesaikan** & **Buka kunci** penggajian | ✓ | | | | |
 | Pengaturan penggajian (Pengaturan → #penggajian) | ✓ | | | | |
 | Slip Gaji milik sendiri (setelah diselesaikan) | ✓ | ✓ | ✓ | ✓ | |
 
-- **Data gaji rahasia: hanya Owner** (`salary:manage`). **Superadmin tidak bisa
+¹ Kecuali data gaji / slip **dirinya sendiri, akun Owner, dan Finance lain**:
+Finance bisa melihatnya, tetapi hanya Owner yang bisa mengubahnya
+(`features/salaries/access.ts`), agar Finance tidak bisa menaikkan gajinya
+sendiri atau gaji rekannya.
+
+- **Pola maker–checker (keputusan 2026-11-05):** Finance menyiapkan
+  (`salary:prepare`), Owner mengesahkan (`salary:manage`). Finance otomatis
+  punya akses begitu add-on Penggajian aktif (tanpa pengaturan tambahan).
+- **Kirim ke Owner:** setelah draf siap (tanggal bayar terisi), Finance menekan
+  **Kirim ke Owner** → WhatsApp langsung ke semua Owner aktif, berisi bulan &
+  jumlah karyawan **tanpa nominal** (`features/salaries/notifications.ts`).
+  Sekali per versi draf: setiap perubahan draf (hitung ulang, ubah/tambah/hapus
+  baris, tanggal bayar, buka kunci) mengosongkan tanda kirim
+  (`payroll_runs.review_requested_at`), jadi Finance bisa mengirim ulang
+  setelah ada perubahan. Halaman penggajian menampilkan "Siap diperiksa"
+  untuk Owner.
+- **Data gaji rahasia: hanya Owner & Finance.** **Superadmin tidak bisa
   melihat data gaji sama sekali**, walau sedang membuka company (berbeda dengan
   data lain yang boleh ia lihat).
 - Setiap pengguna melihat slipnya sendiri (`salary:view-own`) di menu **Slip
@@ -1045,7 +1064,7 @@ Periode = **bulan kalender** ("2026-11"). Satu penggajian per bulan per company.
    (PP 36/2021 Pasal 40: upah tidak dibayar bila tidak masuk kerja, kecuali
    alasan tertentu seperti sakit, cuti, menikah). Owner mengatur jenis mana
    yang dibayar di Pengaturan → Cuti & izin.
-3. Owner memeriksa dan menyesuaikan sebelum selesai:
+3. Owner (atau Finance, lihat 20.1) memeriksa dan menyesuaikan sebelum selesai:
    - mengubah nominal / menghapus baris otomatis (sisa uang muka boleh
      dikurangi = dicicil; denda hanya bisa dihapus = ditunda ke bulan lain);
    - menambah baris **manual** (lembur, bonus, THR, potongan lain);

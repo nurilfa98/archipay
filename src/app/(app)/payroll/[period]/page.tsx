@@ -1,9 +1,19 @@
-// Halaman /payroll/[period] (Owner / salary:manage, BUSINESS-FLOW §20.4–20.5):
-// draf atau hasil penggajian satu bulan. Draf: tanggal bayar, hitung ulang,
-// ubah/hapus baris, tambah baris manual, selesaikan. Selesai: unduh slip,
-// rekap, Excel transfer; buka kunci.
+// Halaman /payroll/[period] (Owner & Finance / salary:prepare, BUSINESS-FLOW
+// §20.1, §20.4–20.5): draf atau hasil penggajian satu bulan.
+// - Draf: tanggal bayar, hitung ulang, ubah/hapus baris, tambah baris manual.
+//   Finance tidak bisa mengubah slip dirinya sendiri, Owner, atau Finance lain
+//   (features/salaries/access.ts), lalu menekan "Kirim ke Owner".
+// - Selesaikan & Buka kunci: hanya Owner (salary:manage).
+// - Selesai: unduh slip, rekap, Excel transfer.
 
-import { CircleAlertIcon, DownloadIcon, FileSpreadsheetIcon, LockIcon, TriangleAlertIcon } from "lucide-react";
+import {
+  CircleAlertIcon,
+  DownloadIcon,
+  FileSpreadsheetIcon,
+  LockIcon,
+  SendIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -24,7 +34,9 @@ import {
   RecalculateButton,
   ReopenButton,
   RemoveLineButton,
+  RequestReviewButton,
 } from "@/features/salaries/components/run-controls";
+import { salaryEditChecker } from "@/features/salaries/access";
 import {
   EDITABLE_SOURCES,
   MAX_DEDUCTION_PERCENT,
@@ -36,6 +48,7 @@ import { exceedsDeductionLimit } from "@/features/salaries/payslip-math";
 import { getPayrollSettings, getRun, type Payslip, type PayslipLine } from "@/features/salaries/queries";
 import { periodSchema } from "@/features/salaries/schemas";
 import { requirePermission } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/permissions";
 import { formatAccountNumber } from "@/lib/bank";
 import { formatDateOnly, formatDateTime } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
@@ -54,16 +67,19 @@ export default function PayrollRunPage({ params }: PageProps<"/payroll/[period]"
 }
 
 async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">, "params">) {
-  const user = await requirePermission("salary:manage");
+  const user = await requirePermission("salary:prepare");
   const period = periodSchema.safeParse((await params).period);
   if (!period.success) notFound();
   const companyId = user.company.id;
-  const [run, settings, attendanceLocked] = await Promise.all([
+  const [run, settings, attendanceLocked, canEditSlip] = await Promise.all([
     getRun(companyId, period.data),
     getPayrollSettings(companyId),
     isPeriodLocked(companyId, period.data),
+    salaryEditChecker(user),
   ]);
   if (!run) notFound();
+  // Owner mengesahkan; Finance menyiapkan lalu mengirim ke Owner.
+  const isOwner = can(user, "salary:manage");
 
   const label = periodLabel(run.period);
   const draft = run.status === "DRAFT";
@@ -93,7 +109,7 @@ async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">
         }
         description={
           draft
-            ? `Dihitung ${formatDateTime(run.calculatedAt)}. Periksa, sesuaikan, lalu selesaikan.`
+            ? `Dihitung ${formatDateTime(run.calculatedAt)}. ${isOwner ? "Periksa, sesuaikan, lalu selesaikan." : "Siapkan, lalu kirim ke Owner untuk diselesaikan."}`
             : `Diselesaikan ${run.finalizedAt ? formatDateTime(run.finalizedAt) : ""}${run.finalizedByName ? ` oleh ${run.finalizedByName}` : ""}${run.payDate ? ` · dibayar ${formatDateOnly(run.payDate)}` : ""}.`
         }
       />
@@ -101,6 +117,17 @@ async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">
         ← Kembali ke Penggajian
       </Link>
 
+      {draft && run.reviewRequestedAt && (
+        <Alert>
+          <SendIcon />
+          <AlertTitle>{isOwner ? "Siap diperiksa" : "Sudah dikirim ke Owner"}</AlertTitle>
+          <AlertDescription>
+            {run.reviewRequestedByName ?? "Finance"} mengirim penggajian ini ke Owner{" "}
+            {formatDateTime(run.reviewRequestedAt)}.{" "}
+            {isOwner ? "Periksa lalu tekan Selesaikan." : "Bila draf diubah lagi, kirim ulang setelahnya."}
+          </AlertDescription>
+        </Alert>
+      )}
       {draft && needsAttendanceLock && (
         <Alert>
           <LockIcon />
@@ -137,15 +164,22 @@ async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">
               <>
                 <PayDateForm period={run.period} payDate={run.payDate} />
                 <RecalculateButton period={run.period} />
-                <FinalizeButton
-                  period={run.period}
-                  periodLabel={label}
-                  totalNet={totals.net}
-                  people={run.payslips.length}
-                  pendingAdvances={pendingAdvances.length}
-                  pendingPenalties={pendingPenalties.length}
-                  disabled={!run.payDate || needsAttendanceLock || negative.length > 0 || run.payslips.length === 0}
-                />
+                {isOwner ? (
+                  <FinalizeButton
+                    period={run.period}
+                    periodLabel={label}
+                    totalNet={totals.net}
+                    people={run.payslips.length}
+                    pendingAdvances={pendingAdvances.length}
+                    pendingPenalties={pendingPenalties.length}
+                    disabled={!run.payDate || needsAttendanceLock || negative.length > 0 || run.payslips.length === 0}
+                  />
+                ) : (
+                  <RequestReviewButton
+                    period={run.period}
+                    disabled={!run.payDate || run.payslips.length === 0 || !!run.reviewRequestedAt}
+                  />
+                )}
               </>
             ) : (
               <>
@@ -161,19 +195,21 @@ async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">
                   <FileSpreadsheetIcon />
                   Excel transfer
                 </Button>
-                <ReopenButton period={run.period} />
+                {isOwner && <ReopenButton period={run.period} />}
               </>
             )}
           </div>
           {draft && !run.payDate && (
-            <p className="text-sm text-muted-foreground">Isi tanggal bayar sebelum menyelesaikan.</p>
+            <p className="text-sm text-muted-foreground">
+              {isOwner ? "Isi tanggal bayar sebelum menyelesaikan." : "Isi tanggal bayar sebelum mengirim ke Owner."}
+            </p>
           )}
         </CardContent>
       </Card>
 
       <div className="flex flex-col gap-4">
         {run.payslips.map((slip) => (
-          <PayslipCard key={slip.id} slip={slip} draft={draft} />
+          <PayslipCard key={slip.id} slip={slip} draft={draft} editable={draft && canEditSlip(slip.userId)} />
         ))}
       </div>
     </>
@@ -189,7 +225,9 @@ function Stat({ label, value, strong }: { label: string; value: string; strong?:
   );
 }
 
-function PayslipCard({ slip, draft }: { slip: Payslip; draft: boolean }) {
+// `editable` = draf DAN aktor boleh mengubah slip orang ini (Finance tidak
+// bisa mengubah slip dirinya sendiri, Owner, atau Finance lain).
+function PayslipCard({ slip, draft, editable }: { slip: Payslip; draft: boolean; editable: boolean }) {
   const earnings = slip.lines.filter((line) => line.type === "EARNING");
   const deductions = slip.lines.filter((line) => line.type === "DEDUCTION");
   const overLimit = exceedsDeductionLimit({ earnings: slip.totalEarnings, deductions: slip.totalDeductions });
@@ -219,8 +257,8 @@ function PayslipCard({ slip, draft }: { slip: Payslip; draft: boolean }) {
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-4 lg:grid-cols-2">
-          <LineTable title="Pendapatan" lines={earnings} total={slip.totalEarnings} draft={draft} />
-          <LineTable title="Potongan" lines={deductions} total={slip.totalDeductions} draft={draft} />
+          <LineTable title="Pendapatan" lines={earnings} total={slip.totalEarnings} draft={editable} />
+          <LineTable title="Potongan" lines={deductions} total={slip.totalDeductions} draft={editable} />
         </div>
         {overLimit && (
           <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-300">
@@ -230,7 +268,11 @@ function PayslipCard({ slip, draft }: { slip: Payslip; draft: boolean }) {
         )}
         <div>
           {draft ? (
-            <AddManualLineButton payslipId={slip.id} fullName={slip.fullName} />
+            editable ? (
+              <AddManualLineButton payslipId={slip.id} fullName={slip.fullName} />
+            ) : (
+              <p className="text-sm text-muted-foreground">Slip ini hanya bisa diubah Owner.</p>
+            )
           ) : (
             <Button variant="outline" size="sm" nativeButton={false} render={<a href={`/api/payslips/${slip.id}`} />}>
               <DownloadIcon />

@@ -1,4 +1,4 @@
-// Halaman /payroll/salaries (Data gaji, Owner / salary:manage, BUSINESS-FLOW
+// Halaman /payroll/salaries (Data gaji, Owner & Finance / salary:prepare, BUSINESS-FLOW
 // §20.3): pengguna aktif company beserta gaji pokok, tunjangan & potongan
 // tetap per bulan. Yang belum diisi tidak ikut penggajian.
 
@@ -23,7 +23,7 @@ export default function SalariesPage() {
     <>
       <PageHeader
         title="Data gaji"
-        description="Gaji pokok, tunjangan, dan potongan tetap per karyawan. Hanya Owner yang bisa melihat."
+        description="Gaji pokok, tunjangan, dan potongan tetap per karyawan. Hanya Owner dan Finance yang bisa melihat."
       />
       <Suspense fallback={<Skeleton className="h-64 w-full" />}>
         <SalariesContent />
@@ -33,7 +33,7 @@ export default function SalariesPage() {
 }
 
 async function SalariesContent() {
-  const user = await requirePermission("salary:manage");
+  const user = await requirePermission("salary:prepare");
   const people = await listSalaryPeople(user.company.id);
   const missing = people.filter((person) => person.isActive && !person.profile).length;
 

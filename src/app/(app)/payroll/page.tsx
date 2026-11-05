@@ -1,4 +1,4 @@
-// Halaman /payroll (Penggajian, add-on, khusus Owner / salary:manage,
+// Halaman /payroll (Penggajian, add-on, Owner & Finance / salary:prepare,
 // BUSINESS-FLOW §20): buat penggajian bulan tertentu, daftar penggajian per
 // bulan, dan tautan ke Data gaji. Superadmin tidak bisa membuka (data gaji rahasia).
 
@@ -16,6 +16,7 @@ import { CreateRunForm } from "@/features/salaries/components/run-controls";
 import { RUN_STATUS_LABELS, RUN_STATUS_TONES } from "@/features/salaries/constants";
 import { listRuns, listSalaryPeople } from "@/features/salaries/queries";
 import { requirePermission } from "@/lib/auth/dal";
+import { can } from "@/lib/auth/permissions";
 import { formatDateOnly, zonedDateString } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 
@@ -44,7 +45,8 @@ export default function PayrollPage() {
 }
 
 async function PayrollContent() {
-  const user = await requirePermission("salary:manage");
+  const user = await requirePermission("salary:prepare");
+  const isOwner = can(user, "salary:manage");
   const [runs, people] = await Promise.all([listRuns(user.company.id), listSalaryPeople(user.company.id)]);
   const thisMonth = zonedDateString(new Date()).slice(0, 7);
   const withSalary = people.filter((person) => person.profile).length;
@@ -59,7 +61,7 @@ async function PayrollContent() {
           <CardDescription>
             {withSalary === 0
               ? "Belum ada karyawan dengan data gaji. Isi Data gaji dulu."
-              : `${withSalary} karyawan punya data gaji. ArchiPay menyusun draf slip; Anda memeriksa lalu menyelesaikannya.`}
+              : `${withSalary} karyawan punya data gaji. ArchiPay menyusun draf slip; ${isOwner ? "Anda memeriksa lalu menyelesaikannya." : "Anda menyiapkannya lalu mengirim ke Owner untuk diselesaikan."}`}
           </CardDescription>
         </CardHeader>
         <CardContent>

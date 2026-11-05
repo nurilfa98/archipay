@@ -21,9 +21,10 @@ export async function GET(_request: Request, { params }: RouteContext<"/api/pays
   const id = idSchema.safeParse((await params).id);
   if (!id.success) return new NextResponse("Not found", { status: 404, headers: PRIVATE_HEADERS });
   const found = await getPayslipWithRun(user.company.id, id.data);
-  const isOwner = can(user, "salary:manage");
+  // Owner & Finance (salary:prepare) boleh membuka slip siapa pun.
+  const isPreparer = can(user, "salary:prepare");
   const isOwn = !!found && found.userId === user.id && can(user, "salary:view-own") && found.status === "FINALIZED";
-  if (!found || !(isOwner || isOwn)) return new NextResponse("Not found", { status: 404, headers: PRIVATE_HEADERS });
+  if (!found || !(isPreparer || isOwn)) return new NextResponse("Not found", { status: 404, headers: PRIVATE_HEADERS });
 
   const meta = await documentMeta(user.company.id, found);
   const file = await renderToBuffer(PayslipsDocument({ meta, slips: [toPayslipDoc(found.payslip)] }));

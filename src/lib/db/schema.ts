@@ -1216,6 +1216,10 @@ export const payrollRuns = pgTable(
     calculatedAt: timestamptz("calculated_at").notNull().defaultNow(),
     finalizedAt: timestamptz("finalized_at"),
     finalizedById: userRef("finalized_by_id"),
+    // Finance menekan "Kirim ke Owner" (BUSINESS-FLOW §20.1). Dikosongkan lagi
+    // setiap draf berubah, agar bisa dikirim ulang setelah ada perubahan.
+    reviewRequestedAt: timestamptz("review_requested_at"),
+    reviewRequestedById: userRef("review_requested_by_id"),
     createdById: userRef("created_by_id").notNull(),
     createdAt: createdAt(),
     updatedAt: timestamptz("updated_at")
