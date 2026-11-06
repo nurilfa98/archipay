@@ -98,7 +98,7 @@ export function createDataTableColumns<TData extends RowData>() {
 
 const PAGE_SIZE = 10;
 // Jumlah kartu yang ditambahkan setiap kali daftar kartu (HP) di-scroll ke bawah.
-const CARD_BATCH = 10;
+export const CARD_BATCH = 10;
 // Pencarian baru berjalan setelah minimal 3 karakter, supaya ketikan 1-2
 // huruf tidak langsung menyaring tabel. Langsung saat mengetik, tanpa Enter.
 export const SEARCH_MIN_LENGTH = 3;
@@ -333,7 +333,7 @@ export function DataTable<TData extends RowData>({
 // Tombol "Tampilkan 10 lagi" yang juga otomatis "ditekan" saat terlihat di
 // layar (IntersectionObserver), sehingga kartu bertambah sendiri ketika
 // daftar di-scroll sampai bawah. rootMargin memuat sedikit lebih awal.
-function LoadMoreTrigger({ onLoadMore }: { onLoadMore: () => void }) {
+export function LoadMoreTrigger({ onLoadMore }: { onLoadMore: () => void }) {
   const ref = useRef<HTMLButtonElement>(null);
   const callback = useRef(onLoadMore);
 

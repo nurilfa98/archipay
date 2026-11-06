@@ -161,6 +161,7 @@ export function SelfieCamera({
   disabled?: boolean;
   idleText?: string;
 }) {
+  const frameRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const humanRef = useRef<Human | null>(null);
@@ -188,6 +189,9 @@ export function SelfieCamera({
     onChange(null);
     setProgress(0);
     setPhase("loading");
+    // Bingkai kamera dibawa ke tengah layar, jadi tidak tertinggal di bawah
+    // teks/kartu di atasnya (terutama di HP).
+    frameRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     setHint({ text: "Menyiapkan pendeteksi wajah...", tone: "info" });
     try {
       humanRef.current = await loadHuman();
@@ -307,21 +311,25 @@ export function SelfieCamera({
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="relative aspect-square w-full max-w-sm overflow-hidden rounded-2xl border bg-muted">
+      {/* Grid satu sel: penyangga persegi (aspect-square) dan semua isi menumpuk di sel yang
+          sama, sehingga bingkai tetap persegi tetapi MELEBAR bila teksnya lebih tinggi
+          (tidak terpotong di layar sempit). */}
+      <div ref={frameRef} className="relative grid w-full max-w-sm overflow-hidden rounded-2xl border bg-muted">
+        <div className="col-start-1 row-start-1 aspect-square" aria-hidden />
         {/* Tampilan kamera dicerminkan seperti cermin; foto hasilnya juga dicerminkan. */}
         <video
           ref={videoRef}
           playsInline
           muted
-          className={cn("size-full -scale-x-100 object-cover", phase !== "camera" && "hidden")}
+          className={cn("absolute inset-0 size-full -scale-x-100 object-cover", phase !== "camera" && "hidden")}
         />
         {phase === "captured" && photo && (
           // eslint-disable-next-line @next/next/no-img-element -- pratinjau blob lokal
-          <img src={photo.url} alt="Pratinjau foto wajah" className="size-full object-cover" />
+          <img src={photo.url} alt="Pratinjau foto wajah" className="absolute inset-0 size-full object-cover" />
         )}
         {phase === "camera" && <FaceGuide progress={progress} />}
         {(phase === "idle" || phase === "loading") && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
+          <div className="z-10 col-start-1 row-start-1 flex flex-col items-center justify-center gap-3 px-5 py-6 text-center text-sm text-muted-foreground">
             {phase === "loading" ? (
               <LoaderCircleIcon className="size-8 animate-spin" />
             ) : (
@@ -428,7 +436,11 @@ export function FaceCapture() {
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <SelfieCamera onChange={setSelfie} disabled={pending} />
+      <SelfieCamera
+        onChange={setSelfie}
+        disabled={pending}
+        idleText="Cari tempat yang terang dan lepas masker/kacamata hitam. Hadapkan wajah ke bingkai sampai garis hijau setengah, lalu tersenyum. Foto diambil otomatis."
+      />
       {selfie && (
         <Button onClick={send} disabled={pending}>
           {pending ? <LoaderCircleIcon className="animate-spin" /> : <SendIcon />}

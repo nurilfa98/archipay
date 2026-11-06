@@ -11,7 +11,6 @@
 
 import { ClockIcon, ReceiptTextIcon, WalletIcon, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AdvanceStatus } from "@/features/advances/constants";
 import type { AdvanceSummary } from "@/features/advances/queries";
 import { formatRupiah } from "@/lib/format";
@@ -22,7 +21,7 @@ export function AdvanceSummaryCards({ summary }: { summary: AdvanceSummary }) {
   const awaitingReceipt = total(summary, ["ACKNOWLEDGED", "REVISION_REQUESTED"]);
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-3 sm:grid-cols-3">
       <SummaryCard
         title="Dana beredar"
         icon={WalletIcon}
@@ -75,18 +74,17 @@ function SummaryCard({
   value: string;
   note: ReactNode;
 }) {
+  // Ikon di kiri, angka dan keterangan di kanan: ringkas di HP, tiga kolom di layar lebar.
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardDescription>{title}</CardDescription>
-        <div className="flex size-8 items-center justify-center rounded-lg bg-brand/10 text-brand">
-          <Icon className="size-4" />
-        </div>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-1">
-        <CardTitle className="text-2xl font-semibold tabular-nums">{value}</CardTitle>
+    <div className="flex items-start gap-3 rounded-2xl border bg-card p-4">
+      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
+        <Icon className="size-5" />
+      </div>
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <p className="text-sm text-muted-foreground">{title}</p>
+        <p className="text-2xl leading-tight font-semibold tabular-nums">{value}</p>
         <p className="text-xs text-muted-foreground">{note}</p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

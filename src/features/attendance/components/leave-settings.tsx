@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import { PersonAvatar } from "./person-avatar";
 import { useActionResult } from "@/hooks/use-action-result";
 import { notify } from "@/lib/notify";
 import type { ActionResult } from "@/types/action-result";
@@ -306,6 +307,7 @@ function TypeActiveSwitch({ type, readOnly }: { type: LeaveType; readOnly: boole
 export type QuotaTableRow = {
   userId: string;
   fullName: string;
+  photoId: string | null;
   customQuota: number | null;
   quota: number;
   used: number;
@@ -324,7 +326,7 @@ export function LeaveQuotaTable({
 }) {
   if (rows.length === 0) return <p className="text-sm text-muted-foreground">Belum ada karyawan yang wajib absen.</p>;
   return (
-    <ul className="divide-y rounded-lg border">
+    <ul className="divide-y rounded-xl border bg-card">
       {rows.map((row) => (
         <QuotaRow key={row.userId} row={row} companyQuota={companyQuota} canEdit={canEdit} />
       ))}
@@ -337,13 +339,29 @@ function QuotaRow({ row, companyQuota, canEdit }: { row: QuotaTableRow; companyQ
   const [pending, startSaving] = useTransition();
   const dirty = value !== (row.customQuota === null ? "" : String(row.customQuota));
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 p-3">
-      <div className="min-w-0">
-        <p className="font-medium">{row.fullName}</p>
-        <p className="text-sm text-muted-foreground">
-          Terpakai {row.used} · menunggu {row.pending} ·{" "}
-          <span className="font-medium text-foreground">sisa {row.remaining}</span> dari {row.quota} hari
-        </p>
+    <li className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
+      <div className="flex min-w-0 flex-1 basis-60 items-center gap-3">
+        <PersonAvatar name={row.fullName} photoId={row.photoId} />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-medium">{row.fullName}</p>
+          <p className="text-sm text-muted-foreground">
+            Terpakai {row.used} · menunggu {row.pending} ·{" "}
+            <span className="font-medium text-foreground">sisa {row.remaining}</span> dari {row.quota} hari
+          </p>
+          <div
+            className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"
+            role="progressbar"
+            aria-label={`Cuti terpakai ${row.fullName}`}
+            aria-valuemin={0}
+            aria-valuemax={row.quota}
+            aria-valuenow={Math.min(row.used, row.quota)}
+          >
+            <div
+              className="h-full rounded-full bg-brand"
+              style={{ width: `${row.quota > 0 ? Math.min(100, ((row.used + row.pending) / row.quota) * 100) : 0}%` }}
+            />
+          </div>
+        </div>
       </div>
       {canEdit ? (
         <div className="flex items-center gap-2">

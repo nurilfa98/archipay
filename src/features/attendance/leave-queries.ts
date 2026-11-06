@@ -253,7 +253,12 @@ export async function listApprovedLeavesOn(companyId: string, userId: string, da
 export async function listFullDayLeavesOn(companyId: string, date: string) {
   await io();
   return db
-    .select({ userId: leaveRequests.userId, typeName: leaveTypes.name, number: leaveRequests.number })
+    .select({
+      userId: leaveRequests.userId,
+      typeName: leaveTypes.name,
+      number: leaveRequests.number,
+      endDate: leaveRequests.endDate,
+    })
     .from(leaveRequests)
     .innerJoin(leaveTypes, eq(leaveRequests.leaveTypeId, leaveTypes.id))
     .where(

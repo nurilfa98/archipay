@@ -14,9 +14,16 @@ import { notSuperadmin } from "@/lib/auth/superadmin";
 import { db } from "@/lib/db";
 import {
   advanceRequests,
+  attendanceHolidays,
+  attendanceLocations,
+  attendancePenalties,
+  attendanceRecords,
   auditLogs,
   expenseCategories,
+  faceProfiles,
+  leaveRequests,
   leaveTypes,
+  payrollRuns,
   projects,
   settlements,
   users,
@@ -29,6 +36,13 @@ const tz = env.APP_TIMEZONE;
 const actor = alias(users, "actor");
 const targetUser = alias(users, "target_user");
 const settlementAdvance = alias(advanceRequests, "settlement_advance");
+// Pemilik foto wajah (face_profiles) dan pemberi persetujuan data (attendance_consents).
+const faceOwner = alias(users, "face_owner");
+const consentUser = alias(users, "consent_user");
+// Pemilik absen / denda / pengajuan cuti.
+const recordUser = alias(users, "record_user");
+const penaltyUser = alias(users, "penalty_user");
+const leaveUser = alias(users, "leave_user");
 
 export type AuditLogRow = {
   id: string;
@@ -41,6 +55,9 @@ export type AuditLogRow = {
   entityName: string;
   entityId: string;
   entityLabel: string | null;
+  // Keterangan tambahan sesuai jenis data: tanggal (absen, hari libur), periode
+  // "2026-11" (denda, penggajian), atau nama karyawan (cuti/izin).
+  entityExtra: string | null;
   oldValues: Record<string, unknown> | null;
   newValues: Record<string, unknown> | null;
 };
@@ -82,7 +99,21 @@ export async function listAuditLogs(companyId: string, filter: AuditFilters): Pr
         ${targetUser.fullName},
         ${expenseCategories.name},
         ${projects.name},
-        ${leaveTypes.name}
+        ${leaveTypes.name},
+        ${faceOwner.fullName},
+        ${consentUser.fullName},
+        ${recordUser.fullName},
+        ${penaltyUser.fullName},
+        ${leaveRequests.number},
+        ${attendanceLocations.name},
+        ${attendanceHolidays.name}
+      )`,
+      entityExtra: sql<string | null>`coalesce(
+        ${attendanceRecords.workDate}::text,
+        ${attendancePenalties.period},
+        ${leaveUser.fullName},
+        ${attendanceHolidays.date}::text,
+        ${payrollRuns.period}
       )`,
       oldValues: auditLogs.oldValues,
       newValues: auditLogs.newValues,
@@ -102,6 +133,30 @@ export async function listAuditLogs(companyId: string, filter: AuditFilters): Pr
     )
     .leftJoin(projects, and(eq(auditLogs.entityName, "projects"), eq(projects.id, auditLogs.entityId)))
     .leftJoin(leaveTypes, and(eq(auditLogs.entityName, "leave_types"), eq(leaveTypes.id, auditLogs.entityId)))
+    .leftJoin(faceProfiles, and(eq(auditLogs.entityName, "face_profiles"), eq(faceProfiles.id, auditLogs.entityId)))
+    .leftJoin(faceOwner, eq(faceProfiles.userId, faceOwner.id))
+    .leftJoin(consentUser, and(eq(auditLogs.entityName, "attendance_consents"), eq(consentUser.id, auditLogs.entityId)))
+    .leftJoin(
+      attendanceRecords,
+      and(eq(auditLogs.entityName, "attendance_records"), eq(attendanceRecords.id, auditLogs.entityId)),
+    )
+    .leftJoin(recordUser, eq(attendanceRecords.userId, recordUser.id))
+    .leftJoin(
+      attendancePenalties,
+      and(eq(auditLogs.entityName, "attendance_penalties"), eq(attendancePenalties.id, auditLogs.entityId)),
+    )
+    .leftJoin(penaltyUser, eq(attendancePenalties.userId, penaltyUser.id))
+    .leftJoin(leaveRequests, and(eq(auditLogs.entityName, "leave_requests"), eq(leaveRequests.id, auditLogs.entityId)))
+    .leftJoin(leaveUser, eq(leaveRequests.userId, leaveUser.id))
+    .leftJoin(
+      attendanceLocations,
+      and(eq(auditLogs.entityName, "attendance_locations"), eq(attendanceLocations.id, auditLogs.entityId)),
+    )
+    .leftJoin(
+      attendanceHolidays,
+      and(eq(auditLogs.entityName, "attendance_holidays"), eq(attendanceHolidays.id, auditLogs.entityId)),
+    )
+    .leftJoin(payrollRuns, and(eq(auditLogs.entityName, "payroll_runs"), eq(payrollRuns.id, auditLogs.entityId)))
     .where(
       and(
         eq(auditLogs.companyId, companyId),

@@ -45,7 +45,7 @@ export function AdvanceTodoList({
   );
 }
 
-function todoLabel(advance: AdvanceListItem, viewer: AdvanceViewer) {
+export function todoLabel(advance: AdvanceListItem, viewer: AdvanceViewer) {
   const actions = getAvailableActions(advance, viewer);
   if (actions.acknowledge) return "Konfirmasi penerimaan dana";
   if (actions.decide) return "Setujui atau tolak pengajuan";

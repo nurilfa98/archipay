@@ -21,13 +21,13 @@ import {
 import { useState } from "react";
 import { FilePreview } from "@/components/file-preview";
 import { ToneBadge } from "@/components/tone-badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { RoleBadges } from "@/features/users/components/user-badges";
 import type { Role } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
 import { ActionDialog, ReasonField } from "@/features/advances/components/action-dialog";
 import { approveFaceProfile, rejectFaceProfile } from "../face-actions";
+import { PersonAvatar } from "./person-avatar";
 
 export type FaceReviewRow = {
   userId: string;
@@ -245,36 +245,6 @@ function statusDetail(row: FaceReviewRow, key: StatusKey) {
   }
 }
 
-const initialsOf = (name: string) =>
-  name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]!.toUpperCase())
-    .join("");
-
-// Avatar inisial; bila fotonya sudah disetujui (siap absen), berganti jadi foto
-// itu. Foto dimuat malas (loading="lazy") agar daftar panjang tidak memicu
-// puluhan permintaan sekaligus, dan bila gagal dimuat inisial tetap tampil.
-function PersonAvatar({ name, photoId, className }: { name: string; photoId: string | null; className: string }) {
-  const [failed, setFailed] = useState(false);
-  return (
-    <Avatar size="lg" className={cn("mt-0.5 ring-2", className)}>
-      <AvatarFallback className={cn("text-xs font-semibold", className)}>{initialsOf(name)}</AvatarFallback>
-      {photoId && !failed && (
-        // eslint-disable-next-line @next/next/no-img-element -- file privat lewat route berizin
-        <img
-          src={`/api/attendance/faces/${photoId}/photo`}
-          alt={`Foto ${name}`}
-          loading="lazy"
-          onError={() => setFailed(true)}
-          className="absolute inset-0 size-full rounded-full object-cover object-[50%_30%]"
-        />
-      )}
-    </Avatar>
-  );
-}
-
 function FaceStatusSection({ rows }: { rows: FaceReviewRow[] }) {
   const [filter, setFilter] = useState<Filter>("ALL");
   const [query, setQuery] = useState("");
@@ -355,7 +325,7 @@ function FaceStatusSection({ rows }: { rows: FaceReviewRow[] }) {
                     <PersonAvatar
                       name={row.fullName}
                       photoId={key === "READY" ? row.approvedPhotoId : null}
-                      className={status.avatar}
+                      className={cn("mt-0.5", status.avatar)}
                     />
                     <div className="flex min-w-0 flex-1 flex-col gap-1">
                       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-1">

@@ -5,18 +5,20 @@
 
 "use client";
 
-import { CheckIcon, PaperclipIcon, XIcon } from "lucide-react";
+import { CalendarDaysIcon, CheckIcon, PaperclipIcon, TicketIcon, XIcon } from "lucide-react";
 import { FilePreview } from "@/components/file-preview";
 import { ToneBadge, type Tone } from "@/components/tone-badge";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ActionDialog, ReasonField } from "@/features/advances/components/action-dialog";
+import { PersonAvatar } from "./person-avatar";
 import { approveLeave, cancelLeave, rejectLeave } from "../leave-actions";
 
 export type LeaveListRow = {
   id: string;
   number: string;
   userName: string;
+  photoId: string | null; // foto acuan wajah yang disetujui (avatar), bila ada
   typeName: string;
   periodText: string;
   reason: string;
@@ -44,26 +46,53 @@ export function LeaveList({
   emptyText: string;
 }) {
   if (rows.length === 0) {
-    return <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{emptyText}</p>;
+    return (
+      <p className="rounded-xl border border-dashed bg-card p-6 text-center text-sm text-muted-foreground">
+        {emptyText}
+      </p>
+    );
   }
   return (
     <ul className="flex flex-col gap-3">
       {rows.map((row) => (
-        <li key={row.id} className="flex flex-col gap-2 rounded-lg border bg-card p-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0">
-              <p className="font-medium">
-                {showName ? `${row.userName} · ` : ""}
-                {row.typeName}
-              </p>
-              <p className="text-sm text-muted-foreground">
-                {row.number} · {row.periodText}
-                {row.paid ? "" : " · tidak dibayar"}
-              </p>
+        <li key={row.id} className="flex flex-col gap-3 rounded-xl border bg-card p-3 sm:p-4">
+          <div className="flex items-start gap-3">
+            {showName ? (
+              <PersonAvatar name={row.userName} photoId={row.photoId} />
+            ) : (
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand/10 text-brand">
+                <CalendarDaysIcon className="size-5" />
+              </span>
+            )}
+            <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-x-3 gap-y-1">
+              <div className="min-w-0">
+                <p className="truncate font-medium">{showName ? row.userName : row.typeName}</p>
+                <p className="truncate text-sm text-muted-foreground">
+                  {showName ? row.typeName : row.number}
+                  {row.paid ? "" : " · tidak dibayar"}
+                </p>
+              </div>
+              <ToneBadge tone={row.tone} className="shrink-0">
+                {row.statusLabel}
+              </ToneBadge>
             </div>
-            <ToneBadge tone={row.tone}>{row.statusLabel}</ToneBadge>
           </div>
-          <p className="text-sm">Alasan: {row.reason}</p>
+          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <CalendarDaysIcon className="size-4 shrink-0" />
+              {row.periodText}
+            </span>
+            {showName && (
+              <span className="inline-flex items-center gap-1.5">
+                <TicketIcon className="size-4 shrink-0" />
+                {row.number}
+              </span>
+            )}
+          </div>
+          <p className="rounded-md bg-muted/60 px-3 py-2 text-sm">
+            <span className="text-muted-foreground">Alasan: </span>
+            {row.reason}
+          </p>
           {row.hasAttachment && (
             <FilePreview
               src={`/api/attendance/leave/${row.id}/attachment`}
@@ -79,7 +108,7 @@ export function LeaveList({
           {row.decideHint && <p className="text-sm text-muted-foreground">{row.decideHint}</p>}
 
           {(row.canDecide || row.cancel) && (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2 border-t pt-3">
               {row.canDecide && (
                 <>
                   <ActionDialog

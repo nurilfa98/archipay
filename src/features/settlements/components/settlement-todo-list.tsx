@@ -9,7 +9,7 @@ import Link from "next/link";
 import type { SettlementTodo } from "@/features/settlements/queries";
 import { formatRupiah } from "@/lib/format";
 
-const LABELS: Record<SettlementTodo["kind"], string> = {
+export const SETTLEMENT_TODO_LABELS: Record<SettlementTodo["kind"], string> = {
   fill: "Isi & kirim nota",
   revise: "Perbaiki lalu kirim ulang nota",
   return: "Kembalikan sisa dana",
@@ -37,7 +37,7 @@ export function SettlementTodoList({ todos }: { todos: SettlementTodo[] }) {
             >
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <p className="text-sm font-medium">
-                  {LABELS[todo.kind]}
+                  {SETTLEMENT_TODO_LABELS[todo.kind]}
                   <Warning todo={todo} />
                 </p>
                 <p className="truncate text-xs text-muted-foreground">
@@ -66,7 +66,7 @@ function Warning({ todo }: { todo: SettlementTodo }) {
 }
 
 // Untuk pengembalian/penggantian yang ditampilkan adalah sisa saldo, bukan dana awal.
-function todoAmount(todo: SettlementTodo) {
+export function todoAmount(todo: SettlementTodo) {
   if (todo.kind === "ack-reimburse") return todo.ackAmount;
   return todo.kind === "return" ||
     todo.kind === "record-return" ||

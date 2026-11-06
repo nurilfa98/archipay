@@ -21,7 +21,7 @@ export default function EnrollFacePage() {
     <>
       <PageHeader
         title="Daftar foto wajah"
-        description="Foto ini menjadi acuan setiap kali Anda absen. Setelah dikirim, Owner atau Admin HR akan memeriksanya."
+        description="Foto acuan untuk absen. Setelah dikirim, Owner atau Admin HR memeriksanya."
       />
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
         <EnrollContent />
@@ -49,12 +49,6 @@ async function EnrollContent() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Ambil foto</CardTitle>
-        <CardDescription>
-          Hadapkan wajah ke kamera di dalam bingkai sampai garis hijau setengah, lalu tersenyum. Foto diambil otomatis.
-        </CardDescription>
-      </CardHeader>
       <CardContent>
         <FaceCapture />
       </CardContent>

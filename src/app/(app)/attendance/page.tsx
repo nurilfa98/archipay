@@ -19,6 +19,7 @@ import type { Metadata } from "next";
 import { io } from "next/cache";
 import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
+import { FilePreview } from "@/components/file-preview";
 import { PageHeader } from "@/components/layout/page-header";
 import { ToneBadge } from "@/components/tone-badge";
 import { Button } from "@/components/ui/button";
@@ -213,12 +214,20 @@ function MyFaceStatus({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       {approved && (
-        // eslint-disable-next-line @next/next/no-img-element -- file privat lewat route berizin
-        <img
+        // Klik foto → pratinjau mengambang (components/file-preview.tsx).
+        <FilePreview
           src={`/api/attendance/faces/${approved.id}/photo`}
-          alt="Foto acuan wajah Anda"
-          className="size-24 rounded-lg bg-muted object-cover"
-        />
+          isPdf={false}
+          title="Foto acuan wajah Anda"
+          className="group block size-24 shrink-0 cursor-zoom-in overflow-hidden rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element -- file privat lewat route berizin */}
+          <img
+            src={`/api/attendance/faces/${approved.id}/photo`}
+            alt="Foto acuan wajah Anda"
+            className="size-full bg-muted object-cover object-[50%_30%] transition-transform duration-200 group-hover:scale-105"
+          />
+        </FilePreview>
       )}
       <div className="flex flex-1 flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">

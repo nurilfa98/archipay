@@ -29,7 +29,7 @@ import {
   type LeaveSettings,
 } from "@/features/attendance/leave-queries";
 import { delegatedAt, leaveDecisionRight } from "@/features/attendance/leave-rules";
-import { listCheckInPeople } from "@/features/attendance/queries";
+import { listApprovedFaceIds, listCheckInPeople } from "@/features/attendance/queries";
 import { requireAttendanceAddon, type CompanyUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { formatDateTime, zonedDateString } from "@/lib/dates";
@@ -75,12 +75,13 @@ async function LeaveContent() {
   const today = zonedDateString(now);
   const year = Number(today.slice(0, 4));
   const settings = await getLeaveSettings(companyId);
-  const [quota, mine, pending, recent, people] = await Promise.all([
+  const [quota, mine, pending, recent, people, photos] = await Promise.all([
     checksIn ? getLeaveQuota(companyId, user.id, year) : null,
     checksIn ? listMyLeaves(companyId, user.id) : [],
     viewsAll ? listCompanyLeaves(companyId, ["PENDING"]) : [],
     viewsAll ? listCompanyLeaves(companyId, ["APPROVED", "REJECTED", "CANCELLED"], 30) : [],
     viewsAll ? listCheckInPeople(companyId) : [],
+    viewsAll ? listApprovedFaceIds(companyId) : new Map<string, string>(),
   ]);
   const [quotaPeople, quotas] = await Promise.all([
     listQuotaPeople(
@@ -92,7 +93,7 @@ async function LeaveContent() {
   const quotaById = new Map(people.map((person, index) => [person.id, quotas[index]]));
   const canSetQuota = can(user, "settings:manage");
 
-  const toRow = (row: LeaveRequestRow, own: boolean) => buildRow(row, { user, settings, now, today, own });
+  const toRow = (row: LeaveRequestRow, own: boolean) => buildRow(row, { user, settings, now, today, own, photos });
 
   return (
     <>
@@ -163,7 +164,11 @@ async function LeaveContent() {
           <LeaveQuotaTable
             companyQuota={settings.annualLeaveQuota}
             canEdit={canSetQuota}
-            rows={quotaPeople.map((person) => ({ ...person, ...quotaById.get(person.userId)! }))}
+            rows={quotaPeople.map((person) => ({
+              ...person,
+              ...quotaById.get(person.userId)!,
+              photoId: photos.get(person.userId) ?? null,
+            }))}
           />
         </section>
       )}
@@ -173,9 +178,16 @@ async function LeaveContent() {
 
 function buildRow(
   row: LeaveRequestRow,
-  ctx: { user: CompanyUser; settings: LeaveSettings; now: Date; today: string; own: boolean },
+  ctx: {
+    user: CompanyUser;
+    settings: LeaveSettings;
+    now: Date;
+    today: string;
+    own: boolean;
+    photos: Map<string, string>;
+  },
 ): LeaveListRow {
-  const { user, settings, now, today, own } = ctx;
+  const { user, settings, now, today, own, photos } = ctx;
   const right = row.status === "PENDING" ? leaveDecisionRight(user, row, settings, now) : null;
   let decideHint: string | null = null;
   if (row.status === "PENDING" && !right && row.userId !== user.id && can(user, "leave:approve-delegated")) {
@@ -199,6 +211,7 @@ function buildRow(
     id: row.id,
     number: row.number,
     userName: row.userName,
+    photoId: photos.get(row.userId) ?? null,
     typeName: row.typeName,
     periodText: leavePeriodText(row),
     reason: row.reason,

@@ -382,24 +382,37 @@ export async function listRecordsOnDate(companyId: string, workDate: string): Pr
 }
 
 // Pengguna aktif yang wajib absen (Owner tidak), untuk daftar "belum absen".
-export async function listCheckInPeople(companyId: string): Promise<{ id: string; fullName: string }[]> {
+export async function listCheckInPeople(
+  companyId: string,
+): Promise<{ id: string; fullName: string; email: string }[]> {
   await io();
   const people = await db
-    .select({ id: users.id, fullName: users.fullName, role: roles.name })
+    .select({ id: users.id, fullName: users.fullName, email: users.email, role: roles.name })
     .from(users)
     .innerJoin(userRoles, eq(userRoles.userId, users.id))
     .innerJoin(roles, eq(userRoles.roleId, roles.id))
     .where(and(eq(users.companyId, companyId), eq(users.isActive, true)))
     .orderBy(asc(users.fullName));
-  const byUser = new Map<string, { fullName: string; roles: Role[] }>();
+  const byUser = new Map<string, { fullName: string; email: string; roles: Role[] }>();
   for (const person of people) {
-    const entry = byUser.get(person.id) ?? { fullName: person.fullName, roles: [] };
+    const entry = byUser.get(person.id) ?? { fullName: person.fullName, email: person.email, roles: [] };
     if (isRole(person.role)) entry.roles.push(person.role);
     byUser.set(person.id, entry);
   }
   return [...byUser]
     .filter(([, person]) => can({ roles: person.roles }, "attendance:check-in"))
-    .map(([id, person]) => ({ id, fullName: person.fullName }));
+    .map(([id, person]) => ({ id, fullName: person.fullName, email: person.email }));
+}
+
+// id foto acuan yang DISETUJUI per pengguna (userId → id foto), untuk avatar di
+// daftar absensi. Pengguna tanpa foto tersetuju tidak ada di hasil.
+export async function listApprovedFaceIds(companyId: string): Promise<Map<string, string>> {
+  await io();
+  const rows = await db
+    .select({ id: faceProfiles.id, userId: faceProfiles.userId })
+    .from(faceProfiles)
+    .where(and(eq(faceProfiles.companyId, companyId), eq(faceProfiles.status, "APPROVED")));
+  return new Map(rows.map((row) => [row.userId, row.id]));
 }
 
 export async function isHoliday(companyId: string, date: string) {

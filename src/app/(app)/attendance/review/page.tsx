@@ -14,6 +14,7 @@ import { ToneBadge } from "@/components/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReviewCardList } from "@/features/attendance/components/review-card-list";
 import { LockControls } from "@/features/attendance/components/review-controls";
 import { getMonthReview, PERIOD_PATTERN, periodLabel, previousPeriod } from "@/features/attendance/review-data";
 import { requirePermission } from "@/lib/auth/dal";
@@ -24,6 +25,12 @@ import { formatRupiah } from "@/lib/format";
 export const metadata: Metadata = {
   title: "Review Bulanan Absensi",
 };
+
+// Tombol unduh: PDF merah, Excel hijau.
+const PDF_BUTTON =
+  "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70 dark:hover:text-red-200";
+const EXCEL_BUTTON =
+  "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70 dark:hover:text-emerald-200";
 
 export default function ReviewPage({ searchParams }: PageProps<"/attendance/review">) {
   return (
@@ -69,6 +76,7 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
+            className={PDF_BUTTON}
             nativeButton={false}
             render={<a href={`/api/attendance/review/export?period=${period}&format=pdf`} />}
           >
@@ -77,6 +85,7 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
           </Button>
           <Button
             variant="outline"
+            className={EXCEL_BUTTON}
             nativeButton={false}
             render={<a href={`/api/attendance/review/export?period=${period}&format=xlsx`} />}
           >
@@ -121,56 +130,59 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
           Belum ada karyawan yang wajib absen.
         </p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <table className="w-full min-w-[56rem] text-sm">
-            <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-              <tr>
-                <th className="p-3 font-medium">Karyawan</th>
-                <th className="p-3 text-right font-medium">Hadir</th>
-                <th className="p-3 text-right font-medium">Terlambat</th>
-                <th className="p-3 text-right font-medium">Pulang cepat</th>
-                <th className="p-3 text-right font-medium">Luar radius</th>
-                <th className="p-3 text-right font-medium">Tdk absen pulang</th>
-                <th className="p-3 text-right font-medium">Tidak hadir</th>
-                <th className="p-3 text-right font-medium">Cuti/izin</th>
-                <th className="p-3 text-right font-medium">Denda</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y">
-              {review.summaries.map((row) => (
-                <tr key={row.userId} className="hover:bg-muted/40">
-                  <td className="p-3">
-                    <Link
-                      href={`/attendance/review/${row.userId}?period=${period}`}
-                      className="font-medium text-brand hover:underline"
-                    >
-                      {row.fullName}
-                    </Link>
-                  </td>
-                  <td className="p-3 text-right tabular-nums">{row.present}</td>
-                  <td className="p-3 text-right tabular-nums">
-                    {row.lateCount > 0 ? `${row.lateCount}× (${row.lateMinutes} mnt)` : "-"}
-                  </td>
-                  <td className="p-3 text-right tabular-nums">{row.earlyCount || "-"}</td>
-                  <td className="p-3 text-right tabular-nums">{row.outsideCount || "-"}</td>
-                  <td className="p-3 text-right tabular-nums">{row.noCheckout || "-"}</td>
-                  <td className="p-3 text-right tabular-nums">{row.absent || "-"}</td>
-                  <td className="p-3 text-right tabular-nums">
-                    {row.paidLeaveDays + row.unpaidLeaveDays > 0
-                      ? `${row.paidLeaveDays}${row.unpaidLeaveDays ? ` + ${row.unpaidLeaveDays} tdk dibayar` : ""}`
-                      : "-"}
-                  </td>
-                  <td className="p-3 text-right tabular-nums">
-                    {row.penaltyTotal > 0 ? formatRupiah(row.penaltyTotal) : "-"}
-                    {row.waivedCount > 0 && (
-                      <span className="block text-xs text-muted-foreground">{row.waivedCount} dibebaskan</span>
-                    )}
-                  </td>
+        <>
+          <ReviewCardList rows={review.summaries} period={period} />
+          <div className="hidden overflow-x-auto rounded-lg border md:block">
+            <table className="w-full min-w-[56rem] text-sm">
+              <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="p-3 font-medium">Karyawan</th>
+                  <th className="p-3 text-right font-medium">Hadir</th>
+                  <th className="p-3 text-right font-medium">Terlambat</th>
+                  <th className="p-3 text-right font-medium">Pulang cepat</th>
+                  <th className="p-3 text-right font-medium">Luar radius</th>
+                  <th className="p-3 text-right font-medium">Tdk absen pulang</th>
+                  <th className="p-3 text-right font-medium">Tidak hadir</th>
+                  <th className="p-3 text-right font-medium">Cuti/izin</th>
+                  <th className="p-3 text-right font-medium">Denda</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody className="divide-y">
+                {review.summaries.map((row) => (
+                  <tr key={row.userId} className="hover:bg-muted/40">
+                    <td className="p-3">
+                      <Link
+                        href={`/attendance/review/${row.userId}?period=${period}`}
+                        className="font-medium text-brand hover:underline"
+                      >
+                        {row.fullName}
+                      </Link>
+                    </td>
+                    <td className="p-3 text-right tabular-nums">{row.present}</td>
+                    <td className="p-3 text-right tabular-nums">
+                      {row.lateCount > 0 ? `${row.lateCount}× (${row.lateMinutes} mnt)` : "-"}
+                    </td>
+                    <td className="p-3 text-right tabular-nums">{row.earlyCount || "-"}</td>
+                    <td className="p-3 text-right tabular-nums">{row.outsideCount || "-"}</td>
+                    <td className="p-3 text-right tabular-nums">{row.noCheckout || "-"}</td>
+                    <td className="p-3 text-right tabular-nums">{row.absent || "-"}</td>
+                    <td className="p-3 text-right tabular-nums">
+                      {row.paidLeaveDays + row.unpaidLeaveDays > 0
+                        ? `${row.paidLeaveDays}${row.unpaidLeaveDays ? ` + ${row.unpaidLeaveDays} tdk dibayar` : ""}`
+                        : "-"}
+                    </td>
+                    <td className="p-3 text-right tabular-nums">
+                      {row.penaltyTotal > 0 ? formatRupiah(row.penaltyTotal) : "-"}
+                      {row.waivedCount > 0 && (
+                        <span className="block text-xs text-muted-foreground">{row.waivedCount} dibebaskan</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
       <p className="text-xs text-muted-foreground">
         Hari ini belum dihitung tidak hadir. Cuti/izin dihitung dalam hari kerja. Klik nama untuk detail, sanggahan,
