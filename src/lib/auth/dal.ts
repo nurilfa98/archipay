@@ -31,7 +31,7 @@ import { redirect } from "next/navigation";
 import type { AddonFlags } from "@/lib/addons";
 import { addonFlagColumns } from "@/lib/addons-db";
 import { db } from "@/lib/db";
-import { companies, roles, subscriptions, userRoles, userSessions, users } from "@/lib/db/schema";
+import { companies, faceProfiles, roles, subscriptions, userRoles, userSessions, users } from "@/lib/db/schema";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { getCompanyAccess, type CompanyAccess } from "@/lib/subscription-access";
 import { readActiveCompanyCookie } from "./active-company";
@@ -54,6 +54,9 @@ export type CurrentUser = {
   // User company tanpa nomor WhatsApp terverifikasi (OTP) wajib ke
   // /verify-phone dulu. Selalu false untuk Superadmin.
   mustVerifyPhone: boolean;
+  // id foto acuan wajah yang sudah DISETUJUI (null bila belum): dipakai avatar
+  // di navbar. Dibuka lewat /api/attendance/faces/<id>/photo (pemilik foto boleh).
+  approvedFaceId: string | null;
   // Company yang sedang dibuka: untuk Owner/Finance/Karyawan = company-nya
   // sendiri, untuk Superadmin = company yang dipilih di menu Company
   // (lib/auth/active-company.ts), null bila belum memilih.
@@ -126,10 +129,14 @@ async function loadCurrentUser(activeCompanyId: string | null): Promise<CurrentU
       // tidak ada query tambahan.
       sessionRowId: userSessions.id,
       sessionRevokedAt: userSessions.revokedAt,
+      // Satu foto acuan disetujui per user (indeks unik), jadi join ini tidak
+      // menggandakan baris.
+      approvedFaceId: faceProfiles.id,
     })
     .from(users)
     .leftJoin(companies, eq(users.companyId, companies.id))
     .leftJoin(userSessions, and(eq(userSessions.id, sessionId), eq(userSessions.userId, users.id)))
+    .leftJoin(faceProfiles, and(eq(faceProfiles.userId, users.id), eq(faceProfiles.status, "APPROVED")))
     .where(eq(users.id, userId))
     .limit(1);
 
@@ -167,6 +174,7 @@ async function loadCurrentUser(activeCompanyId: string | null): Promise<CurrentU
     roles: userRolesList,
     mustChangePassword: user.mustChangePassword,
     mustVerifyPhone: !!user.companyId && (!user.phoneNumber || !user.phoneVerifiedAt),
+    approvedFaceId: user.approvedFaceId ?? null,
     company,
   };
 }

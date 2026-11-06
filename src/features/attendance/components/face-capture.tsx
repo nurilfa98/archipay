@@ -17,7 +17,9 @@
 //    BERAT dijalankan sekali: face embedding (1024 angka), anti-spoof &
 //    liveness. Menjalankan model berat di setiap frame-lah yang dulu membuat
 //    kamera terasa lambat.
-// 5. Foto disimpan TERCERMIN, sama dengan tampilan kamera depan; embedding
+// 5. Foto dipotong PERSEGI (bagian tengah frame, sama dengan yang terlihat di
+//    layar) supaya kartu di halaman persetujuan tidak memanjang ke bawah.
+//    Foto disimpan TERCERMIN, sama dengan tampilan kamera depan; embedding
 //    dihitung dari gambar asli (tidak dicerminkan).
 //    - Daftar foto acuan: foto (JPEG, sisi terpanjang 640 px) + embedding
 //      dikirim ke server dan disimpan sebagai acuan.
@@ -305,7 +307,7 @@ export function SelfieCamera({
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="relative aspect-[3/4] w-full max-w-sm overflow-hidden rounded-2xl border bg-muted">
+      <div className="relative aspect-square w-full max-w-sm overflow-hidden rounded-2xl border bg-muted">
         {/* Tampilan kamera dicerminkan seperti cermin; foto hasilnya juga dicerminkan. */}
         <video
           ref={videoRef}
@@ -437,12 +439,16 @@ export function FaceCapture() {
   );
 }
 
-// Salin frame video (sisi terpanjang PHOTO_MAX_SIDE) ke canvas, tidak dicerminkan.
+// Salin bagian tengah frame video yang PERSEGI (sama dengan yang terlihat di
+// layar, object-cover) ke canvas, maksimal PHOTO_MAX_SIDE, tidak dicerminkan.
 function drawFrame(canvas: HTMLCanvasElement, video: HTMLVideoElement) {
-  const scale = Math.min(1, PHOTO_MAX_SIDE / Math.max(video.videoWidth, video.videoHeight));
-  canvas.width = Math.round(video.videoWidth * scale);
-  canvas.height = Math.round(video.videoHeight * scale);
-  canvas.getContext("2d")!.drawImage(video, 0, 0, canvas.width, canvas.height);
+  const side = Math.min(video.videoWidth, video.videoHeight);
+  const out = Math.min(PHOTO_MAX_SIDE, side);
+  canvas.width = out;
+  canvas.height = out;
+  canvas
+    .getContext("2d")!
+    .drawImage(video, (video.videoWidth - side) / 2, (video.videoHeight - side) / 2, side, side, 0, 0, out, out);
   return canvas;
 }
 
@@ -458,14 +464,17 @@ function mouthRatio(face: FaceResult) {
 
 type Check = { ok: true } | { ok: false; message: string };
 
-// Setiap frame: jumlah wajah, ukuran, dan posisi di tengah bingkai.
+// Setiap frame: jumlah wajah, ukuran, dan posisi di tengah bingkai. Yang terlihat
+// dan difoto adalah persegi di tengah frame, jadi ukuran & posisi dihitung
+// terhadap persegi itu (untuk canvas yang sudah persegi, selisihnya 0).
 function checkPosition(faces: FaceResult[], frameWidth: number, frameHeight: number): Check {
   if (faces.length === 0) return { ok: false, message: "Wajah belum terlihat. Posisikan wajah di dalam bingkai." };
   if (faces.length > 1) return { ok: false, message: "Terlihat lebih dari satu wajah. Pastikan hanya Anda di kamera." };
   const [x, y, width, height] = faces[0].box;
-  if (width < frameWidth * FACE_MIN_WIDTH) return { ok: false, message: "Dekatkan wajah ke kamera." };
-  const centerX = (x + width / 2) / frameWidth;
-  const centerY = (y + height / 2) / frameHeight;
+  const side = Math.min(frameWidth, frameHeight);
+  if (width < side * FACE_MIN_WIDTH) return { ok: false, message: "Dekatkan wajah ke kamera." };
+  const centerX = (x + width / 2 - (frameWidth - side) / 2) / side;
+  const centerY = (y + height / 2 - (frameHeight - side) / 2) / side;
   const centered =
     centerX >= CENTER_MARGIN && centerX <= 1 - CENTER_MARGIN && centerY >= CENTER_MARGIN && centerY <= 1 - CENTER_MARGIN;
   if (!centered) return { ok: false, message: "Posisikan wajah di tengah bingkai." };

@@ -37,6 +37,7 @@ export function ActionDialog({
   icon,
   showLabel,
   size,
+  className,
   variant = "brand",
   disabled,
   title,
@@ -52,6 +53,7 @@ export function ActionDialog({
   icon?: ReactNode;
   showLabel?: boolean;
   size?: ComponentProps<typeof Button>["size"];
+  className?: string; // gaya tombol pemicu, mis. "w-full" agar dua tombol sama lebar
   variant?: ComponentProps<typeof Button>["variant"];
   disabled?: boolean;
   title: string;
@@ -94,6 +96,7 @@ export function ActionDialog({
       <Button
         variant={variant}
         size={size ?? (iconOnly ? "icon" : "default")}
+        className={className}
         aria-label={iconOnly ? label : undefined}
         title={iconOnly ? label : undefined}
         disabled={disabled}

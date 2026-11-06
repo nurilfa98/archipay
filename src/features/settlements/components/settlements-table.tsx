@@ -3,8 +3,10 @@
 // Status di panel "Filter" yang diterapkan server lewat URL.
 //
 // - Kolom Penerima hanya untuk OWNER/FINANCE.
-// - Sisa saldo baru terisi setelah diverifikasi: saldo TERKINI dari ledger
-//   (berkurang saat sisa dikembalikan, dipotong gaji, atau penggantian dibayar).
+// - Sisa saldo: setelah diverifikasi = saldo TERKINI dari ledger (berkurang saat
+//   sisa dikembalikan, dipotong gaji, atau penggantian dibayar). Sebelum itu =
+//   PERKIRAAN (dana uang muka − total nota), sama dengan kartu di halaman detail;
+//   "-" bila belum ada nota sama sekali.
 // - Seluruh baris bisa diklik lewat link di kolom No.
 // - HP (< md): kartu (SettlementCard), 10 dulu lalu +10 saat di-scroll.
 
@@ -45,10 +47,29 @@ export type SettlementRow = {
   submittedAtTime: number | null;
   itemCount: number;
   itemTotal: number;
-  balanceAmount: number | null;
+  advanceAmount: number; // dana uang muka, untuk perkiraan sisa saldo
+  balanceAmount: number | null; // saldo resmi dari ledger, null sebelum diverifikasi
   returnOverdue: boolean;
   status: SettlementStatus;
 };
+
+// Saldo yang ditampilkan: resmi (ledger) setelah diverifikasi; sebelum itu
+// perkiraan = dana − total nota, dan hanya bila sudah ada nota (draf kosong
+// akan menampilkan "seluruh dana dikembalikan", menyesatkan).
+// Positif = belum dikembalikan karyawan, negatif = belum diganti kantor.
+function shownBalance(row: SettlementRow): { amount: number; estimate: boolean } | null {
+  if (row.balanceAmount !== null) return { amount: row.balanceAmount, estimate: false };
+  if (row.itemCount === 0) return null;
+  return { amount: row.advanceAmount - row.itemTotal, estimate: true };
+}
+
+// Keterangan di bawah angka sisa saldo.
+function balanceNote({ amount, estimate }: { amount: number; estimate: boolean }) {
+  if (estimate) {
+    return amount === 0 ? "perkiraan pas" : amount > 0 ? "perkiraan dikembalikan" : "perkiraan diganti kantor";
+  }
+  return amount === 0 ? "lunas" : amount > 0 ? "belum dikembalikan" : "belum diganti kantor";
+}
 
 const column = createDataTableColumns<SettlementRow>();
 
@@ -124,32 +145,23 @@ const totalColumn = column.accessor("itemTotal", {
   ),
 });
 
-// Positif = sisa belum dikembalikan karyawan, negatif = belum diganti kantor.
-const balanceColumn = column.accessor((row) => row.balanceAmount ?? undefined, {
+const balanceColumn = column.accessor((row) => shownBalance(row)?.amount ?? undefined, {
   id: "balance",
   header: "Sisa saldo",
   sortFn: "basic",
   sortUndefined: "last",
   meta: { className: "pr-8 text-right whitespace-nowrap tabular-nums" },
   cell: ({ row }) => {
-    const balance = row.original.balanceAmount;
+    const balance = shownBalance(row.original);
     if (balance === null)
       return <span className="text-muted-foreground">-</span>;
-    if (balance === 0) {
-      return (
-        <>
-          <span className="block font-medium">{formatRupiah(0)}</span>
-          <span className="block text-xs text-muted-foreground">lunas</span>
-        </>
-      );
-    }
     return (
       <>
         <span className="block font-medium">
-          {formatRupiah(Math.abs(balance))}
+          {formatRupiah(Math.abs(balance.amount))}
         </span>
         <span className="block text-xs text-muted-foreground">
-          {balance > 0 ? "belum dikembalikan" : "belum diganti kantor"}
+          {balanceNote(balance)}
         </span>
       </>
     );
@@ -306,7 +318,7 @@ export function SettlementsTable({
 // dibentangkan lewat ::after); tanda alasan terlambat diletakkan di atas link
 // (relative z-10) agar tooltip-nya tetap bisa ditekan.
 function SettlementCard({ row, showRecipient }: { row: SettlementRow; showRecipient: boolean }) {
-  const balance = row.balanceAmount;
+  const balance = shownBalance(row);
   return (
     <div className="relative flex flex-col gap-2 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50">
       <div className="flex items-start justify-between gap-2">
@@ -349,10 +361,8 @@ function SettlementCard({ row, showRecipient }: { row: SettlementRow; showRecipi
             <dd className="text-sm text-muted-foreground">-</dd>
           ) : (
             <>
-              <dd className="text-sm font-medium tabular-nums">{formatRupiah(Math.abs(balance))}</dd>
-              <dd className="text-muted-foreground">
-                {balance === 0 ? "lunas" : balance > 0 ? "belum dikembalikan" : "belum diganti kantor"}
-              </dd>
+              <dd className="text-sm font-medium tabular-nums">{formatRupiah(Math.abs(balance.amount))}</dd>
+              <dd className="text-muted-foreground">{balanceNote(balance)}</dd>
             </>
           )}
         </div>

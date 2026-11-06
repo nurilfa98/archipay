@@ -61,7 +61,11 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
 // Kalau session tidak valid (misal user dinonaktifkan), user diarahkan ke /login.
 async function HeaderUserMenu() {
   const user = await verifyAccount();
-  return <UserMenu user={{ fullName: user.fullName, email: user.email, roles: user.roles }} />;
+  return (
+    <UserMenu
+      user={{ fullName: user.fullName, email: user.email, roles: user.roles, approvedFaceId: user.approvedFaceId }}
+    />
+  );
 }
 
 // Pita "Melihat company ..." khusus Superadmin yang sedang membuka company,

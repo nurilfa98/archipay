@@ -43,6 +43,7 @@ async function FacesContent() {
         email: row.email,
         roles: row.roles,
         consented: row.consented,
+        approvedPhotoId: row.approvedId,
         approvedAtText: row.approvedId ? (row.approvedAt ? formatDateTime(row.approvedAt) : "-") : null,
         pending: row.pending
           ? {

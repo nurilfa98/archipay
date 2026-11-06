@@ -126,6 +126,7 @@ function toRow(settlement: SettlementListItem): SettlementRow {
     submittedAtTime: settlement.submittedAt?.getTime() ?? null,
     itemCount: settlement.itemCount,
     itemTotal: settlement.itemTotal,
+    advanceAmount: settlement.advanceAmount,
     balanceAmount: settlement.balanceAmount,
     returnOverdue: settlement.returnOverdue,
     status: settlement.status,

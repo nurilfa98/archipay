@@ -1,6 +1,10 @@
 // Menu user di pojok kanan navbar: avatar → dropdown berisi nama, email,
 // role, link Profil, link Ganti password, dan tombol Keluar.
 //
+// Avatar memakai inisial nama; begitu foto acuan wajah user DISETUJUI, avatar
+// berganti menjadi foto itu (approvedFaceId). Bila foto gagal dimuat, inisial
+// tetap tampil.
+//
 // Letaknya di features/auth (bukan components/layout) karena berisi logika
 // auth (logout). Layout cukup "memasang" komponen ini ke slot navbar.
 //
@@ -17,7 +21,7 @@
 import { KeyRoundIcon, LogOutIcon, SmartphoneIcon, UserRoundIcon } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -44,7 +48,11 @@ function getInitials(name: string) {
     .join("");
 }
 
-export function UserMenu({ user }: { user: Pick<CurrentUser, "fullName" | "email" | "roles"> }) {
+export function UserMenu({
+  user,
+}: {
+  user: Pick<CurrentUser, "fullName" | "email" | "roles" | "approvedFaceId">;
+}) {
   const { isPending, logout } = useLogout();
   // "Pasang aplikasi": hanya tampil di HP yang belum memasang ArchiPay
   // (lihat features/pwa/hooks/use-install-app.ts).
@@ -56,6 +64,13 @@ export function UserMenu({ user }: { user: Pick<CurrentUser, "fullName" | "email
       {/* render={<Button />}: trigger dirender sebagai Button shadcn */}
       <DropdownMenuTrigger render={<Button variant="ghost" className="h-9 gap-2 px-1.5" />}>
         <Avatar size="sm">
+          {user.approvedFaceId && (
+            <AvatarImage
+              src={`/api/attendance/faces/${user.approvedFaceId}/photo`}
+              alt={`Foto ${user.fullName}`}
+              className="object-[50%_30%]"
+            />
+          )}
           <AvatarFallback>{getInitials(user.fullName)}</AvatarFallback>
         </Avatar>
         {/* Nama hanya tampil di layar ≥ 640px; di HP cukup avatar */}
