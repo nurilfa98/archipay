@@ -254,6 +254,58 @@ export const loginAttempts = pgTable(
   ],
 );
 
+// Catatan error aplikasi (server dan browser) untuk Superadmin: apa yang gagal,
+// di mana, siapa terdampak, dan versi aplikasinya. Satu baris = satu kejadian;
+// kejadian sama dikelompokkan lewat `fingerprint`. Isinya tidak boleh memuat
+// data sensitif (lib/error-log.ts membersihkannya). Dihapus otomatis setelah
+// ERROR_LOG_RETENTION_DAYS hari (cron harian).
+//
+// company_id / user_id sengaja TANPA foreign key: menghapus perusahaan atau
+// pengguna tidak boleh terhambat (atau menghapus) catatan error.
+export const errorLogs = pgTable(
+  "error_logs",
+  {
+    id: id(),
+    createdAt: createdAt(),
+    // Kode error Next.js (sama dengan yang tampil di halaman error dan laporan
+    // WhatsApp "Hubungi admin"). Null untuk error yang tidak punya kode.
+    digest: varchar("digest", { length: 100 }),
+    // Hash nama + pesan (angka/UUID diseragamkan) + baris stack pertama.
+    fingerprint: varchar("fingerprint", { length: 40 }).notNull(),
+    // SERVER_ACTION | PAGE | ROUTE | CRON | CLIENT | EXTERNAL
+    source: varchar("source", { length: 20 }).notNull(),
+    errorName: varchar("error_name", { length: 100 }),
+    message: varchar("message", { length: 1000 }).notNull(),
+    stack: text("stack"),
+    // Nama fungsi/route/cron yang gagal, misal "recordBalancePayment".
+    actionName: varchar("action_name", { length: 150 }),
+    path: varchar("path", { length: 500 }), // tanpa query string
+    method: varchar("method", { length: 10 }),
+    appVersion: varchar("app_version", { length: 40 }), // hash commit deploy
+    companyId: varchar("company_id", { length: 36 }),
+    userId: varchar("user_id", { length: 36 }),
+    role: varchar("role", { length: 100 }),
+    userAgent: varchar("user_agent", { length: 200 }),
+    // Info tambahan yang aman (id data, status HTTP, kode database).
+    context: jsonb("context"),
+    // NEW | RESOLVED | IGNORED, diatur Superadmin per fingerprint.
+    status: varchar("status", { length: 10 }).notNull().default("NEW"),
+    resolvedAt: timestamptz("resolved_at"),
+    resolvedById: varchar("resolved_by_id", { length: 36 }),
+    note: varchar("note", { length: 500 }),
+  },
+  (t) => [
+    check("error_logs_status", sql`${t.status} IN ('NEW', 'RESOLVED', 'IGNORED')`),
+    check(
+      "error_logs_source",
+      sql`${t.source} IN ('SERVER_ACTION', 'PAGE', 'ROUTE', 'CRON', 'CLIENT', 'EXTERNAL')`,
+    ),
+    index("error_logs_created_at_idx").on(t.createdAt),
+    index("error_logs_fingerprint_idx").on(t.fingerprint, t.createdAt),
+    index("error_logs_digest_idx").on(t.digest),
+  ],
+);
+
 // Uang disimpan sebagai bigint dalam RUPIAH (bukan float, bukan sen).
 // Rupiah tidak memakai pecahan sen di transaksi sehari-hari, dan bigint
 // tidak punya masalah pembulatan seperti float (0.1 + 0.2 !== 0.3).
@@ -1023,6 +1075,9 @@ export const faceProfiles = pgTable(
     // tidak bisa dibandingkan.
     modelVersion: varchar("model_version", { length: 40 }).notNull(),
     status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+    // Alasan penolakan: kode pilihan (FACE_REJECT_REASONS) dan teks lengkapnya
+    // ("Label: catatan"). Kode null pada penolakan lama (alasan bebas).
+    rejectCode: varchar("reject_code", { length: 20 }),
     rejectReason: varchar("reject_reason", { length: 300 }),
     reviewedById: userRef("reviewed_by_id"),
     reviewedAt: timestamptz("reviewed_at"),

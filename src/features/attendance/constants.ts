@@ -47,6 +47,69 @@ export const FACE_STATUS_LABELS: Record<FaceStatus, string> = {
   REJECTED: "Ditolak",
 };
 
+// Alasan penolakan foto acuan yang dipilih Owner/Admin HR (dropdown), ditambah
+// catatan opsional (wajib bila "Lainnya"). `hint` = saran perbaikan untuk karyawan.
+export const FACE_REJECT_REASONS = [
+  { code: "NOT_OWNER", label: "Bukan wajah pemilik akun", hint: "Gunakan foto wajah Anda sendiri, tanpa orang lain di dalam bingkai." },
+  { code: "UNCLEAR", label: "Wajah kurang jelas atau buram", hint: "Pegang HP dengan stabil dan hadapkan wajah lurus ke kamera." },
+  { code: "DARK", label: "Terlalu gelap atau silau", hint: "Cari tempat dengan cahaya merata, hindari cahaya kuat dari belakang." },
+  { code: "COVERED", label: "Wajah tertutup", hint: "Lepas masker, kacamata hitam, atau topi yang menutupi wajah." },
+  { code: "OTHER", label: "Lainnya", hint: "Ambil ulang foto dengan wajah terlihat jelas." },
+] as const;
+export type FaceRejectCode = (typeof FACE_REJECT_REASONS)[number]["code"];
+
+export function faceRejectReason(code: string | null) {
+  return FACE_REJECT_REASONS.find((item) => item.code === code) ?? null;
+}
+
+// Teks lengkap yang disimpan & ditampilkan: "Label" atau "Label: catatan".
+export function composeFaceRejectText(code: FaceRejectCode, note: string) {
+  const label = faceRejectReason(code)!.label;
+  return note ? `${label}: ${note}` : label;
+}
+
+// Memecah teks tersimpan menjadi judul dan catatan untuk kartu karyawan.
+// Penolakan lama (tanpa kode) seluruhnya dianggap catatan.
+export function splitFaceRejection(code: string | null, text: string | null) {
+  const reason = faceRejectReason(code);
+  if (!reason) return { title: "Foto ditolak", note: text, hint: null as string | null };
+  const note = text && text.startsWith(`${reason.label}: `) ? text.slice(reason.label.length + 2) : null;
+  return { title: reason.label, note, hint: reason.hint };
+}
+
+// Foto yang ditolak: bila karyawan masih punya foto acuan yang disetujui, kartu
+// penolakan tampil FACE_REJECT_NOTICE_DAYS hari lalu dihapus otomatis (tidak
+// menghalangi absen). Tanpa foto acuan, kartu tetap tampil sampai ia mengambil
+// ulang, tetapi FILE fotonya dihapus setelah FACE_REJECT_PHOTO_DAYS hari.
+export const FACE_REJECT_NOTICE_DAYS = 3;
+export const FACE_REJECT_PHOTO_DAYS = 30;
+
+// Foto acuan yang sudah disetujui hanya boleh diganti sekali dalam
+// FACE_CHANGE_INTERVAL_DAYS hari (dihitung sejak foto itu disetujui), agar
+// karyawan tidak terus-menerus meminta ganti foto. Pengajuan yang sedang
+// berjalan (menunggu / baru ditolak) boleh diambil ulang kapan saja.
+export const FACE_CHANGE_INTERVAL_DAYS = 7;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+type FaceTimes = { status: string; createdAt: Date; reviewedAt: Date | null };
+
+// Kartu "Foto yang diajukan" tampil: foto menunggu persetujuan; ditolak dan
+// belum punya foto acuan (sampai ambil ulang); atau ditolak tetapi masih punya
+// foto acuan, hanya FACE_REJECT_NOTICE_DAYS hari.
+export function showFaceSubmission(approved: FaceTimes | null, latest: FaceTimes | null, now: Date) {
+  if (!latest) return false;
+  if (latest.status === "PENDING" || !approved) return true;
+  return !!latest.reviewedAt && now.getTime() - latest.reviewedAt.getTime() < FACE_REJECT_NOTICE_DAYS * DAY_MS;
+}
+
+// Kapan foto acuan boleh diganti lagi; null bila boleh sekarang.
+export function faceChangeLockedUntil(approved: FaceTimes | null, latest: FaceTimes | null, now: Date) {
+  if (!approved || showFaceSubmission(approved, latest, now)) return null;
+  const until = new Date((approved.reviewedAt ?? approved.createdAt).getTime() + FACE_CHANGE_INTERVAL_DAYS * DAY_MS);
+  return until.getTime() > now.getTime() ? until : null;
+}
+
 // Versi library & model pembuat embedding wajah. Wajib ikut berubah bila versi
 // @vladmandic/human di package.json diganti, karena embedding dari versi/model
 // berbeda tidak bisa dibandingkan.

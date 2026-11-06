@@ -16,7 +16,6 @@ export type SessionRow = {
   id: string;
   deviceLabel: string;
   location: string | null;
-  ipAddress: string | null;
   createdAtLabel: string; // "24 Okt 2026, 15.30 WIB"
   current: boolean;
 };
@@ -40,8 +39,7 @@ export function SessionList({ sessions }: { sessions: SessionRow[] }) {
                     {session.current && <ToneBadge tone="success">Perangkat ini</ToneBadge>}
                   </p>
                   <p className="text-sm text-muted-foreground">
-                    {session.location ?? "Lokasi tidak diketahui"}
-                    {session.ipAddress && ` · IP ${session.ipAddress}`} · Login {session.createdAtLabel}
+                    {session.location ?? "Lokasi tidak diketahui"} · Login {session.createdAtLabel}
                   </p>
                 </div>
               </div>

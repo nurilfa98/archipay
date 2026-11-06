@@ -5,6 +5,8 @@ import { z } from "zod";
 import {
   FACE_EMBEDDING_LENGTH,
   FACE_PHOTO_MAX_BYTES,
+  FACE_REJECT_REASONS,
+  type FaceRejectCode,
   LOCATION_IMPORT_MAX_ROWS,
   RADIUS_MAX,
   RADIUS_MIN,
@@ -220,11 +222,26 @@ const faceEmbedding = z
 
 export const faceSubmissionSchema = z.object({ photo: facePhoto, embedding: faceEmbedding });
 
+// Alasan penolakan teks bebas (cuti/izin).
 export const rejectReasonSchema = z
   .string("Isi alasan penolakan")
   .trim()
   .min(5, "Alasan minimal 5 karakter")
   .max(300, "Alasan maksimal 300 karakter");
+
+// Penolakan foto acuan: pilih alasan, catatan opsional (wajib untuk "Lainnya").
+export const rejectFaceSchema = z
+  .object({
+    code: z.enum(FACE_REJECT_REASONS.map((item) => item.code) as [FaceRejectCode, ...FaceRejectCode[]], {
+      error: "Pilih alasan penolakan",
+    }),
+    note: z.string().trim().max(200, "Catatan maksimal 200 karakter"),
+  })
+  .superRefine((value, ctx) => {
+    if (value.code === "OTHER" && value.note.length < 5) {
+      ctx.addIssue({ code: "custom", path: ["note"], message: "Tuliskan alasannya, minimal 5 karakter" });
+    }
+  });
 
 // ---------------------------------------------------------------------------
 // Absen masuk / pulang (BUSINESS-FLOW §18.5–18.7)

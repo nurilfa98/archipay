@@ -68,7 +68,6 @@ async function ProfileContent() {
               id: session.id,
               deviceLabel: session.deviceLabel,
               location: session.location,
-              ipAddress: session.ipAddress,
               createdAtLabel: formatDateTime(session.createdAt),
               current: session.id === sessionId,
             }))}

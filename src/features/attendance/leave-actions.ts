@@ -46,6 +46,7 @@ import {
   rejectReasonSchema,
   userQuotaSchema,
 } from "./schemas";
+import { logError } from "@/lib/error-log";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
 const NOT_FOUND = { success: false, message: "Pengajuan tidak ditemukan atau sudah diproses." } as const;
@@ -187,7 +188,7 @@ export async function createLeaveRequest(formData: FormData): Promise<ActionResu
     try {
       await putObject(attachmentKey, attachment.bytes, attachment.contentType);
     } catch (error) {
-      console.error("[attendance] unggah lampiran cuti gagal:", error);
+      await logError(error, { source: "EXTERNAL", action: "unggah lampiran cuti" });
       return { success: false, message: "Gagal mengunggah lampiran. Coba lagi beberapa saat." };
     }
   }

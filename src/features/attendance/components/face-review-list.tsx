@@ -25,8 +25,9 @@ import { Input } from "@/components/ui/input";
 import { RoleBadges } from "@/features/users/components/user-badges";
 import type { Role } from "@/lib/auth/roles";
 import { cn } from "@/lib/utils";
-import { ActionDialog, ReasonField } from "@/features/advances/components/action-dialog";
+import { ActionDialog } from "@/features/advances/components/action-dialog";
 import { approveFaceProfile, rejectFaceProfile } from "../face-actions";
+import { FaceRejectFields } from "./face-reject-fields";
 import { PersonAvatar } from "./person-avatar";
 
 export type FaceReviewRow = {
@@ -110,17 +111,13 @@ export function FaceReviewList({
                       className="w-full"
                       variant="destructive"
                       title={`Tolak foto wajah ${row.fullName}?`}
-                      description="Foto dihapus dan karyawan diminta mengambil ulang. Alasan ditampilkan kepadanya."
+                      description="Karyawan diminta mengambil ulang foto. Alasan dan saran perbaikan ditampilkan kepadanya."
                       confirmLabel="Tolak"
                       successMessage={`Foto wajah ${row.fullName} ditolak.`}
                       onConfirm={(formData) => rejectFaceProfile(row.pending!.id, formData)}
                     >
                       {(fieldError) => (
-                        <ReasonField
-                          label="Alasan"
-                          placeholder="Misal: wajah buram, bukan orang yang bersangkutan"
-                          error={fieldError("reason")}
-                        />
+                        <FaceRejectFields codeError={fieldError("code")} noteError={fieldError("note")} />
                       )}
                     </ActionDialog>
                   </div>

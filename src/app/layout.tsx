@@ -13,6 +13,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/toast";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { ClientErrorListener } from "@/features/error-logs/components/client-error-listener";
 import { InstallAppListener } from "@/features/pwa/components/install-app-listener";
 import { PRODUCT_DESCRIPTION } from "@/lib/brand";
 import "./globals.css";
@@ -70,6 +71,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           {/* Menangkap event "pasang aplikasi" dari browser sedini mungkin;
               tombolnya ada di halaman login dan menu user. */}
           <InstallAppListener />
+          {/* Mencatat error browser yang lolos ke log error (Superadmin). */}
+          <ClientErrorListener />
         </ThemeProvider>
       </body>
     </html>

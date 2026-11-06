@@ -1,0 +1,1 @@
+ALTER TABLE "face_profiles" ADD COLUMN "reject_code" varchar(20);

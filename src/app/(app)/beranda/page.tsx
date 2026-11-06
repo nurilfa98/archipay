@@ -27,7 +27,6 @@ import { AdvanceSummaryCards } from "@/features/advances/components/advance-summ
 import { RecentAdvancesTable } from "@/features/advances/components/recent-advances-table";
 import { getAdvanceSummary, listAdvances } from "@/features/advances/queries";
 import { ActionNeeded } from "@/features/dashboard/components/action-needed";
-import { DashboardHero } from "@/features/dashboard/components/dashboard-hero";
 import { LinkRow, SectionCard } from "@/features/dashboard/components/dashboard-ui";
 import { MyAttendanceCard, MyLeaveCard, MyPayslipCard } from "@/features/dashboard/components/my-cards";
 import { AttendanceOverviewCard, PayrollWorkCard } from "@/features/dashboard/components/staff-cards";
@@ -68,11 +67,6 @@ async function DashboardContent() {
   // Karyawan biasa memulai dari urusannya sendiri (absen); Finance & Admin HR
   // memulai dari pekerjaan yang menunggu mereka.
   const ownFirst = !viewsAllAdvances && !viewsAllAttendance;
-  const subtitle = viewsAllAdvances
-    ? "Pantau uang muka, pertanggungjawaban, dan penggajian."
-    : viewsAllAttendance
-      ? "Pantau absensi, foto wajah, dan cuti/izin karyawan."
-      : "Pekerjaan dan urusan Anda hari ini.";
 
   const mine =
     checksIn || hasPayslip ? (
@@ -113,9 +107,6 @@ async function DashboardContent() {
 
   return (
     <div className="flex flex-col gap-4 sm:gap-6">
-      <Suspense fallback={<Skeleton className="h-28 w-full rounded-2xl" />}>
-        <DashboardHero user={user} subtitle={subtitle} />
-      </Suspense>
       {ownFirst && mine}
       {viewsAdvances && (
         <Block>
@@ -239,7 +230,6 @@ function OwnerDashboardSkeleton() {
 function DashboardSkeleton() {
   return (
     <div className="flex flex-col gap-4">
-      <Skeleton className="h-28 w-full rounded-2xl" />
       <div className="grid gap-4 md:grid-cols-2">
         <Skeleton className="h-44 rounded-2xl" />
         <Skeleton className="h-44 rounded-2xl" />

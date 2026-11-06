@@ -6,14 +6,18 @@
 
 import {
   CalendarClockIcon,
+  CalendarDaysIcon,
   ChevronRightIcon,
   ClipboardCheckIcon,
   ClipboardListIcon,
+  ClockIcon,
+  LockIcon,
   PlaneIcon,
   LogInIcon,
   LogOutIcon,
   MapPinIcon,
   ScanFaceIcon,
+  TimerIcon,
 } from "lucide-react";
 import type { Metadata } from "next";
 import { io } from "next/cache";
@@ -26,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { localTime } from "@/features/attendance/clock";
+import { FaceSubmissionCard } from "@/features/attendance/components/face-submission-card";
 import { RecordList } from "@/features/attendance/components/record-list";
 import { countPendingLeaves } from "@/features/attendance/leave-queries";
 import {
@@ -37,10 +42,11 @@ import {
   hasConsent,
   listMyRecords,
 } from "@/features/attendance/queries";
+import { faceChangeLockedUntil, showFaceSubmission } from "@/features/attendance/constants";
 import { formatMinutes, formatWorkDays } from "@/features/attendance/schedule";
 import { requireAttendanceAddon } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
-import { formatDateTime, zonedDateString } from "@/lib/dates";
+import { formatDateTime, formatShortDate, zonedDateString } from "@/lib/dates";
 import { formatRupiah } from "@/lib/format";
 
 export const metadata: Metadata = {
@@ -84,6 +90,12 @@ async function AttendanceContent() {
   // Sama dengan modeOf() di check-actions.ts.
   const sameDay = latest && latest.workDate === localTime(now, latest.timezone).date;
   const mode = !sameDay ? "in" : latest.checkOutAt ? "done" : "out";
+  // Kartu "Foto yang diajukan": foto menunggu, atau penolakan. Bila karyawan
+  // masih punya foto acuan, penolakan hanya tampil FACE_REJECT_NOTICE_DAYS hari.
+  const submission = faces?.latest ?? null;
+  const showSubmission = !!faces && showFaceSubmission(faces.approved, faces.latest, now);
+  // Ganti foto acuan dibatasi sekali seminggu (FACE_CHANGE_INTERVAL_DAYS).
+  const lockedUntil = faces ? faceChangeLockedUntil(faces.approved, faces.latest, now) : null;
 
   return (
     <>
@@ -114,16 +126,39 @@ async function AttendanceContent() {
         <Card>
           <CardHeader>
             <CardTitle>Foto acuan wajah Anda</CardTitle>
-            <CardDescription>
-              Jam kerja {formatMinutes(settings.workStartMinute)} – {formatMinutes(settings.workEndMinute)},{" "}
-              {formatWorkDays(settings.workDays).toLowerCase()}. Toleransi terlambat {settings.lateToleranceMinutes}{" "}
-              menit.
-            </CardDescription>
+            <CardDescription>Dipakai untuk mencocokkan wajah Anda saat absen.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <MyFaceStatus faces={faces} consented={consented} />
+            <MyFaceStatus
+              faces={faces}
+              consented={consented}
+              submissionShown={showSubmission}
+              lockedUntil={lockedUntil}
+            />
+            <dl className="grid grid-cols-2 gap-2">
+              <WorkRule
+                icon={<ClockIcon />}
+                label="Jam kerja"
+                value={`${formatMinutes(settings.workStartMinute)} – ${formatMinutes(settings.workEndMinute)}`}
+              />
+              <WorkRule
+                icon={<TimerIcon />}
+                label="Toleransi terlambat"
+                value={`${settings.lateToleranceMinutes} menit`}
+              />
+              <WorkRule
+                className="col-span-2"
+                icon={<CalendarDaysIcon />}
+                label="Hari kerja"
+                value={formatWorkDays(settings.workDays)}
+              />
+            </dl>
           </CardContent>
         </Card>
+      )}
+
+      {checksIn && faces && showSubmission && submission && (
+        <FaceSubmissionCard submission={submission} hasApproved={!!faces.approved} />
       )}
 
       {checksIn && faces?.approved && (
@@ -199,27 +234,29 @@ async function AttendanceContent() {
 function MyFaceStatus({
   faces,
   consented,
+  submissionShown,
+  lockedUntil,
 }: {
   faces: Awaited<ReturnType<typeof getMyFaceProfiles>>;
   consented: boolean;
+  // Kartu "Foto yang diajukan" sedang tampil di bawahnya: statusnya, alasan
+  // penolakan, dan tombol ambil ulang ada di sana.
+  submissionShown: boolean;
+  // Foto acuan baru boleh diganti lagi mulai waktu ini (batas sekali seminggu).
+  lockedUntil: Date | null;
 }) {
   const { approved, latest } = faces;
-  const enrollButton = (label: string) => (
-    <Button nativeButton={false} render={<Link href="/attendance/enroll" />}>
-      <ScanFaceIcon />
-      {label}
-    </Button>
-  );
+  const photoClass = "size-[111px] shrink-0 rounded-xl";
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-      {approved && (
+    <div className="flex items-center gap-4">
+      {approved ? (
         // Klik foto → pratinjau mengambang (components/file-preview.tsx).
         <FilePreview
           src={`/api/attendance/faces/${approved.id}/photo`}
           isPdf={false}
           title="Foto acuan wajah Anda"
-          className="group block size-24 shrink-0 cursor-zoom-in overflow-hidden rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className={`group block ${photoClass} cursor-zoom-in overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-ring`}
         >
           {/* eslint-disable-next-line @next/next/no-img-element -- file privat lewat route berizin */}
           <img
@@ -228,40 +265,69 @@ function MyFaceStatus({
             className="size-full bg-muted object-cover object-[50%_30%] transition-transform duration-200 group-hover:scale-105"
           />
         </FilePreview>
-      )}
-      <div className="flex flex-1 flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          {approved ? (
-            <ToneBadge tone="success">Siap absen</ToneBadge>
-          ) : latest?.status === "PENDING" ? (
-            <ToneBadge tone="warning">Menunggu persetujuan</ToneBadge>
-          ) : latest?.status === "REJECTED" ? (
-            <ToneBadge tone="danger">Ditolak</ToneBadge>
-          ) : (
-            <ToneBadge tone="pending">Belum terdaftar</ToneBadge>
-          )}
-          {latest?.status === "PENDING" && approved && (
-            <span className="text-sm text-muted-foreground">Foto pengganti sedang diperiksa.</span>
-          )}
+      ) : (
+        <div className={`flex ${photoClass} items-center justify-center border border-dashed bg-muted/50`}>
+          <ScanFaceIcon className="size-9 text-muted-foreground" />
         </div>
-        {latest?.status === "PENDING" && (
-          <p className="text-sm text-muted-foreground">
-            Dikirim {formatDateTime(latest.createdAt)}. Owner atau Admin HR akan memeriksanya.
+      )}
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-2">
+        {approved ? (
+          <ToneBadge tone="success">Siap absen</ToneBadge>
+        ) : latest?.status === "PENDING" ? (
+          <ToneBadge tone="warning">Menunggu persetujuan</ToneBadge>
+        ) : latest?.status === "REJECTED" ? (
+          <ToneBadge tone="danger">Ditolak</ToneBadge>
+        ) : (
+          <ToneBadge tone="pending">Belum terdaftar</ToneBadge>
+        )}
+        <p className="text-sm text-muted-foreground">
+          {approved
+            ? `Disetujui ${formatShortDate(approved.reviewedAt ?? approved.createdAt)}`
+            : latest?.status === "PENDING"
+              ? "Sedang diperiksa Owner atau Admin HR."
+              : latest?.status === "REJECTED"
+                ? "Foto ditolak. Ambil ulang foto Anda."
+                : "Daftarkan foto wajah agar bisa absen."}
+        </p>
+        {!submissionShown && !approved && !latest && (
+          <Button size="sm" nativeButton={false} render={<Link href="/attendance/enroll" />}>
+            <ScanFaceIcon />
+            {consented ? "Ambil foto wajah" : "Daftar foto wajah"}
+          </Button>
+        )}
+        {!submissionShown && approved && !lockedUntil && (
+          <Button size="sm" variant="outline" nativeButton={false} render={<Link href="/attendance/enroll" />}>
+            Ganti foto wajah
+          </Button>
+        )}
+        {!submissionShown && approved && lockedUntil && (
+          <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+            <LockIcon className="mt-0.5 size-3.5 shrink-0" />
+            Foto bisa diganti sekali seminggu. Ganti lagi mulai {formatDateTime(lockedUntil)}.
           </p>
         )}
-        {latest?.status === "REJECTED" && latest.rejectReason && (
-          <p className="text-sm text-destructive">Alasan: {latest.rejectReason}</p>
-        )}
-        <div>
-          {!approved && !latest && enrollButton(consented ? "Ambil foto wajah" : "Daftar foto wajah")}
-          {latest?.status === "REJECTED" && enrollButton("Ambil ulang foto")}
-          {latest?.status === "PENDING" && enrollButton("Ambil ulang foto")}
-          {approved && !latest && (
-            <Button variant="outline" nativeButton={false} render={<Link href="/attendance/enroll" />}>
-              Ganti foto wajah
-            </Button>
-          )}
-        </div>
+      </div>
+    </div>
+  );
+}
+
+function WorkRule({
+  icon,
+  label,
+  value,
+  className,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+  className?: string;
+}) {
+  return (
+    <div className={`flex items-center gap-2.5 rounded-lg bg-muted/60 px-3 py-2 ${className ?? ""}`}>
+      <span className="text-muted-foreground [&>svg]:size-4">{icon}</span>
+      <div className="flex min-w-0 flex-col">
+        <dt className="text-xs text-muted-foreground">{label}</dt>
+        <dd className="text-sm font-medium">{value}</dd>
       </div>
     </div>
   );

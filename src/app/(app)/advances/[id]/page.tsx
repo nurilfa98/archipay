@@ -156,8 +156,7 @@ async function AdvanceDetailContent({ id }: { id: string }) {
           <CardHeader>
             <CardTitle>Pernyataan karyawan</CardTitle>
             <CardDescription>
-              Disetujui {advance.recipientName} pada {formatDateTime(advance.acknowledgedAt)}
-              {advance.acknowledgmentIp && ` dari IP ${advance.acknowledgmentIp}`}.
+              Disetujui {advance.recipientName} pada {formatDateTime(advance.acknowledgedAt)}.
             </CardDescription>
           </CardHeader>
           <CardContent>

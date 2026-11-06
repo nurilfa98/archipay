@@ -19,9 +19,11 @@ import { attendanceConsents, faceProfiles, users } from "@/lib/db/schema";
 import { getClientIp } from "@/lib/request";
 import { deleteObject, putObject } from "@/lib/storage";
 import type { ActionResult } from "@/types/action-result";
-import { consentStatement, FACE_MODEL_VERSION } from "./constants";
-import { hasConsent } from "./queries";
-import { faceSubmissionSchema, idSchema, rejectReasonSchema } from "./schemas";
+import { formatDateTime } from "@/lib/dates";
+import { composeFaceRejectText, consentStatement, FACE_MODEL_VERSION, faceChangeLockedUntil } from "./constants";
+import { getMyFaceProfiles, hasConsent } from "./queries";
+import { faceSubmissionSchema, idSchema, rejectFaceSchema } from "./schemas";
+import { logError } from "@/lib/error-log";
 
 const FORBIDDEN = {
   success: false,
@@ -81,6 +83,16 @@ export async function submitFaceProfile(formData: FormData): Promise<ActionResul
     };
   }
 
+  // Batas ganti foto acuan: sekali per FACE_CHANGE_INTERVAL_DAYS hari.
+  const faces = await getMyFaceProfiles(actor.company.id, actor.id);
+  const lockedUntil = faceChangeLockedUntil(faces.approved, faces.latest, new Date());
+  if (lockedUntil) {
+    return {
+      success: false,
+      message: `Foto acuan hanya bisa diganti sekali seminggu. Coba lagi mulai ${formatDateTime(lockedUntil)}.`,
+    };
+  }
+
   const parsed = faceSubmissionSchema.safeParse({
     photo: formData.get("photo"),
     embedding: formData.get("embedding") ?? "",
@@ -100,7 +112,7 @@ export async function submitFaceProfile(formData: FormData): Promise<ActionResul
   try {
     await putObject(photoKey, new Uint8Array(await parsed.data.photo.arrayBuffer()), "image/jpeg");
   } catch (error) {
-    console.error("[attendance] unggah foto acuan gagal:", error);
+    await logError(error, { source: "EXTERNAL", action: "unggah foto acuan wajah" });
     return { success: false, message: "Gagal mengunggah foto wajah. Coba lagi beberapa saat." };
   }
 
@@ -229,16 +241,18 @@ export async function rejectFaceProfile(profileId: string, formData: FormData): 
   if (!can(actor, "attendance:approve-face")) return FORBIDDEN;
   const id = idSchema.safeParse(profileId);
   if (!id.success) return NOT_FOUND;
-  const reason = rejectReasonSchema.safeParse(formData.get("reason"));
+  const reason = rejectFaceSchema.safeParse({
+    code: formData.get("code"),
+    note: String(formData.get("note") ?? ""),
+  });
   if (!reason.success) {
     return {
       success: false,
       message: "Periksa kembali isian Anda.",
-      fieldErrors: {
-        reason: [z.flattenError(reason.error).formErrors[0] ?? "Alasan tidak valid"],
-      },
+      fieldErrors: z.flattenError(reason.error).fieldErrors,
     };
   }
+  const rejectText = composeFaceRejectText(reason.data.code, reason.data.note);
 
   const ip = await getClientIp();
   const result = await db.transaction(async (tx) => {
@@ -268,16 +282,19 @@ export async function rejectFaceProfile(profileId: string, formData: FormData): 
     }
 
     // Hanya penolakan terakhir yang disimpan (untuk menampilkan alasannya).
-    await tx
+    const previous = await tx
       .delete(faceProfiles)
-      .where(and(eq(faceProfiles.userId, profile.userId), eq(faceProfiles.status, "REJECTED")));
-    // File foto yang ditolak tidak disimpan lagi (data minimal, UU PDP).
+      .where(and(eq(faceProfiles.userId, profile.userId), eq(faceProfiles.status, "REJECTED")))
+      .returning({ photoKey: faceProfiles.photoKey });
+    // File foto yang ditolak TETAP disimpan agar karyawan bisa melihat foto yang
+    // ditolak di kartunya. Dihapus saat ia mengambil ulang, atau otomatis oleh
+    // cron (FACE_REJECT_NOTICE_DAYS / FACE_REJECT_PHOTO_DAYS, features/attendance/face-retention.ts).
     await tx
       .update(faceProfiles)
       .set({
         status: "REJECTED",
-        rejectReason: reason.data,
-        photoKey: null,
+        rejectCode: reason.data.code,
+        rejectReason: rejectText,
         reviewedById: actor.id,
         reviewedAt: new Date(),
       })
@@ -291,7 +308,7 @@ export async function rejectFaceProfile(profileId: string, formData: FormData): 
         entityId: id.data,
         newValues: {
           employeeName: profile.fullName,
-          rejectReason: reason.data,
+          rejectReason: rejectText,
         },
         ipAddress: ip,
       },
@@ -299,7 +316,7 @@ export async function rejectFaceProfile(profileId: string, formData: FormData): 
     );
     return {
       success: true as const,
-      keys: profile.photoKey ? [profile.photoKey] : [],
+      keys: previous.map((row) => row.photoKey).filter((key): key is string => key !== null),
     };
   });
   if (!result.success) return result;
@@ -314,6 +331,8 @@ function deleteFilesLater(keys: string[]) {
   after(async () => {
     const results = await Promise.allSettled(keys.map((key) => deleteObject(key)));
     const failed = results.filter((item) => item.status === "rejected").length;
-    if (failed > 0) console.error(`[attendance] ${failed} file foto wajah gagal dihapus`);
+    if (failed > 0) {
+      await logError(new Error(`${failed} file foto wajah gagal dihapus`), { source: "EXTERNAL", action: "hapus foto wajah" });
+    }
   });
 }

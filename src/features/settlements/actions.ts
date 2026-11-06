@@ -71,6 +71,7 @@ import {
   type VerificationDecision,
 } from "./schemas";
 import { getSettlementActions, settlementOutcome } from "./service";
+import { logError } from "@/lib/error-log";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses untuk tindakan ini." } as const;
 const NOT_FOUND = { success: false, message: "Pertanggungjawaban tidak ditemukan." } as const;
@@ -160,7 +161,7 @@ export async function addSettlementItem(settlementId: string, formData: FormData
     try {
       await putObject(fileKey, file.bytes, file.contentType);
     } catch (error) {
-      console.error("[settlements] upload gagal:", error);
+      await logError(error, { source: "EXTERNAL", action: "unggah nota" });
       return { success: false, message: "Gagal mengunggah file nota. Coba lagi beberapa saat." };
     }
   }
@@ -256,7 +257,7 @@ export async function removeSettlementItem(settlementId: string, itemId: string)
 
   // File dihapus setelah baris terhapus; gagal hapus file tidak mengganggu user.
   const fileKey = removed.fileKey;
-  if (fileKey) after(() => deleteObject(fileKey).catch((error) => console.error("[settlements] hapus file:", error)));
+  if (fileKey) after(() => deleteObject(fileKey).catch((error) => logError(error, { source: "EXTERNAL", action: "hapus file nota" })));
   revalidateSettlements();
   return done();
 }

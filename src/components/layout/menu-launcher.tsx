@@ -41,13 +41,13 @@ export function MenuLauncher({ roles, addons }: { roles: Role[]; addons: AddonFl
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-3">
       <form role="search" onSubmit={handleSubmit} className="relative">
         <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input
           type="search"
           aria-label="Cari menu"
-          placeholder="Cari menu, misalnya: pengguna, potong gaji"
+          placeholder="Cari menu, misalnya: beranda"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           className="h-11 pl-9 text-base md:text-sm"
@@ -59,20 +59,17 @@ export function MenuLauncher({ roles, addons }: { roles: Role[]; addons: AddonFl
           Menu &quot;{query}&quot; tidak ditemukan.
         </p>
       ) : (
-        <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <ul className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
           {visible.map((item) => (
             <li key={item.href}>
               <Link
                 href={item.href}
-                className="group flex h-full flex-col items-center gap-3 rounded-xl border bg-card p-4 text-center outline-none transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:ring-2 focus-visible:ring-ring sm:p-5"
+                className="group flex h-full flex-col items-center gap-2 rounded-xl border bg-card px-2 py-3 text-center outline-none transition-colors hover:border-brand/40 hover:bg-brand/5 focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <span className="flex size-12 items-center justify-center rounded-xl bg-brand/10 text-brand transition-colors group-hover:bg-brand group-hover:text-brand-foreground">
-                  <item.icon className="size-6" />
+                <span className="flex size-11 items-center justify-center rounded-xl bg-brand/10 text-brand transition-colors group-hover:bg-brand group-hover:text-brand-foreground">
+                  <item.icon className="size-5" />
                 </span>
-                <span className="flex flex-col gap-1">
-                  <span className="text-sm font-semibold">{item.title}</span>
-                  <span className="text-xs text-muted-foreground">{item.description}</span>
-                </span>
+                <span className="text-xs leading-tight font-semibold break-words">{item.title}</span>
               </Link>
             </li>
           ))}
@@ -84,11 +81,11 @@ export function MenuLauncher({ roles, addons }: { roles: Role[]; addons: AddonFl
 
 export function MenuLauncherSkeleton() {
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-3">
       <div className="h-11 animate-pulse rounded-lg bg-muted" />
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-6">
         {Array.from({ length: 6 }, (_, index) => (
-          <div key={index} className="h-36 animate-pulse rounded-xl bg-muted" />
+          <div key={index} className="h-[88px] animate-pulse rounded-xl bg-muted" />
         ))}
       </div>
     </div>

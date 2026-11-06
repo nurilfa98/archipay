@@ -82,12 +82,6 @@ const COLUMNS = column.columns([
       </>
     ),
   }),
-  column.accessor("ipAddress", {
-    header: "Alamat IP",
-    enableSorting: false,
-    meta: { className: "hidden whitespace-nowrap text-muted-foreground lg:table-cell" },
-    cell: ({ getValue }) => getValue() ?? "-",
-  }),
   column.display({
     id: "detail",
     header: "Aksi",

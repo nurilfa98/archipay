@@ -41,6 +41,7 @@ import { CameraIcon, LoaderCircleIcon, RotateCcwIcon, SendIcon } from "lucide-re
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
+import { reportClientError } from "@/features/error-logs/report";
 import { notify } from "@/lib/notify";
 import { cn } from "@/lib/utils";
 import { FACE_EMBEDDING_LENGTH } from "../constants";
@@ -215,6 +216,7 @@ export function SelfieCamera({
           : "Kamera atau pendeteksi wajah gagal dibuka. Periksa koneksi internet lalu coba lagi.",
       );
       console.error("[attendance] kamera/human gagal", error);
+      reportClientError(error, { action: "face-capture:start" });
     }
   }
 
@@ -310,11 +312,18 @@ export function SelfieCamera({
   }
 
   return (
-    <div className="flex flex-col items-center gap-4">
+    // w-full: tanpa ini kolom ini menyusut mengikuti isi terlebar (tombol / teks)
+    // karena berada di dalam kolom `items-center`, sehingga bingkai kamera ikut
+    // mengecil dan ukurannya berubah-ubah. Dengan w-full bingkai selalu selebar
+    // kartu (maksimal max-w-sm).
+    <div className="flex w-full flex-col items-center gap-4">
       {/* Grid satu sel: penyangga persegi (aspect-square) dan semua isi menumpuk di sel yang
           sama, sehingga bingkai tetap persegi tetapi MELEBAR bila teksnya lebih tinggi
           (tidak terpotong di layar sempit). */}
-      <div ref={frameRef} className="relative grid w-full max-w-sm overflow-hidden rounded-2xl border bg-muted">
+      <div
+        ref={frameRef}
+        className="relative grid w-full max-w-sm grid-cols-1 overflow-hidden rounded-2xl border bg-muted"
+      >
         <div className="col-start-1 row-start-1 aspect-square" aria-hidden />
         {/* Tampilan kamera dicerminkan seperti cermin; foto hasilnya juga dicerminkan. */}
         <video

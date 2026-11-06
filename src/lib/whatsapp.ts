@@ -16,6 +16,7 @@
 
 import "server-only";
 import { env } from "@/lib/env";
+import { logError } from "@/lib/error-log";
 
 export type WhatsAppMessage = {
   to: string; // nomor format 62..., lihat lib/phone.ts
@@ -27,7 +28,7 @@ export type WhatsAppMessage = {
 export async function sendWhatsApp(message: WhatsAppMessage): Promise<boolean> {
   if (!env.FONNTE_TOKEN) {
     if (env.NODE_ENV === "production") {
-      console.error("[whatsapp] FONNTE_TOKEN belum diisi, pesan tidak terkirim");
+      await logError(new Error("FONNTE_TOKEN belum diisi, pesan tidak terkirim"), { source: "EXTERNAL", action: "whatsapp" });
       return false;
     }
     console.info(`[whatsapp:dev] Kepada: ${message.to}\n\n${message.text}`);
@@ -57,11 +58,15 @@ export async function sendWhatsApp(message: WhatsAppMessage): Promise<boolean> {
     } | null;
     const ok = response.ok && (result?.status ?? result?.Status) === true;
     if (!ok) {
-      console.error(`[whatsapp] Fonnte menolak (${response.status}): ${result?.reason ?? "tanpa alasan"}`);
+      await logError(new Error(`Fonnte menolak (${response.status}): ${result?.reason ?? "tanpa alasan"}`), {
+        source: "EXTERNAL",
+        action: "whatsapp",
+        context: { status: response.status },
+      });
     }
     return ok;
   } catch (error) {
-    console.error("[whatsapp] gagal menghubungi Fonnte:", error);
+    await logError(error, { source: "EXTERNAL", action: "whatsapp" });
     return false;
   }
 }

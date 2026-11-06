@@ -25,6 +25,7 @@ import { getPlatformSettings } from "@/lib/platform-settings";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import type { ActionResult } from "@/types/action-result";
 import { clearErrorReport, errorReportBlockedUntil, markErrorReportSent } from "./rate-limit";
+import { logError } from "@/lib/error-log";
 
 export type ErrorReportStatus = { canReport: boolean; alreadyReported: boolean };
 
@@ -90,7 +91,7 @@ export async function reportError(input: ErrorReportInput): Promise<ActionResult
     if (!sent) throw new Error("WhatsApp gagal dikirim");
     return { success: true, data: undefined };
   } catch (error) {
-    console.error("[error-report] laporan gagal dikirim:", error);
+    await logError(error, { source: "SERVER_ACTION", action: "reportError" });
     // Boleh dicoba lagi karena pesannya memang belum terkirim.
     clearErrorReport(userId);
     return { success: false, message: "Laporan gagal dikirim. Coba lagi beberapa saat lagi." };

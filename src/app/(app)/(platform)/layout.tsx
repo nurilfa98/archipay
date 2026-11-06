@@ -8,6 +8,7 @@
 // Referensi: node_modules/next/dist/docs/01-app/01-getting-started/02-project-structure.md (Route groups)
 
 import { Suspense } from "react";
+import { countNewErrorGroups } from "@/features/error-logs/queries";
 import { PlatformNav } from "@/features/subscriptions/components/platform-nav";
 import { countClaimedSubscriptions } from "@/features/subscriptions/queries";
 import { verifyAccount } from "@/lib/auth/dal";
@@ -27,5 +28,6 @@ export default function PlatformLayout({ children }: LayoutProps<"/">) {
 async function PlatformTabs() {
   const user = await verifyAccount();
   if (!can(user, "company:manage")) return null;
-  return <PlatformNav claimed={await countClaimedSubscriptions()} />;
+  const [claimed, newErrors] = await Promise.all([countClaimedSubscriptions(), countNewErrorGroups().catch(() => 0)]);
+  return <PlatformNav claimed={claimed} newErrors={newErrors} />;
 }

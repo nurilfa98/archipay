@@ -45,6 +45,7 @@ import { assignableRolesFor, canEditBankAccount, canEditEmail, canManageUser, ca
 import { credentialsEmail } from "./emails";
 import { getOwnProfile, getUserDetail, type UserDetail } from "./queries";
 import { createUserSchema, profileSchema, updateUserSchema, userIdSchema } from "./schemas";
+import { logError } from "@/lib/error-log";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
 const NOT_FOUND = { success: false, message: "Pengguna tidak ditemukan." } as const;
@@ -373,7 +374,9 @@ export async function setUserActive(userId: string, active: boolean): Promise<Ac
     after(async () => {
       const results = await Promise.allSettled(faceKeys.map((key) => deleteObject(key)));
       const failed = results.filter((result) => result.status === "rejected").length;
-      if (failed > 0) console.error(`[users] ${failed} file foto wajah gagal dihapus`);
+      if (failed > 0) {
+        await logError(new Error(`${failed} file foto wajah gagal dihapus`), { source: "EXTERNAL", action: "hapus foto wajah pengguna" });
+      }
     });
   }
 

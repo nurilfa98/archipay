@@ -150,6 +150,7 @@ export const SUB_PAGES: { title: string; href: string; parent?: string }[] = [
 export const PLATFORM_PAGES: { title: string; href: string }[] = [
   { title: "Perusahaan", href: "/companies" },
   { title: "Tagihan", href: "/billing" },
+  { title: "Log error", href: "/error-logs" },
   { title: "Pengaturan platform", href: "/platform-settings" },
 ];
 

@@ -32,6 +32,7 @@ import {
 } from "@/lib/db/schema";
 import { getPlatformSettings } from "@/lib/platform-settings";
 import { deleteObject } from "@/lib/storage";
+import { logError } from "@/lib/error-log";
 
 const MAX_PER_RUN = 1000;
 const BATCH_SIZE = 20;
@@ -77,7 +78,9 @@ export async function purgeExpiredReceipts(now = new Date()) {
     }
   }
 
-  if (failed > 0) console.error(`[receipt-retention] ${failed} file nota gagal dihapus, dicoba lagi besok`);
+  if (failed > 0) {
+    await logError(new Error(`${failed} file nota gagal dihapus, dicoba lagi besok`), { source: "CRON", action: "hapus nota lewat masa simpan" });
+  }
   return { deleted, failed, retentionMonths: receiptRetentionMonths };
 }
 
@@ -148,6 +151,11 @@ export async function purgeExpiredProofs(now = new Date()) {
     }
   }
 
-  if (failed > 0) console.error(`[receipt-retention] ${failed} file bukti pengembalian gagal dihapus, dicoba lagi besok`);
+  if (failed > 0) {
+    await logError(new Error(`${failed} file bukti pengembalian gagal dihapus, dicoba lagi besok`), {
+      source: "CRON",
+      action: "hapus bukti lewat masa simpan",
+    });
+  }
   return { deleted, failed };
 }

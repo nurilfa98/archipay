@@ -72,6 +72,7 @@ import { DEFAULT_LEAVE_TYPES } from "@/features/attendance/constants";
 import { DEFAULT_EXPENSE_CATEGORIES } from "./constants";
 import { getCompany } from "./queries";
 import { companyIdSchema, companySchema, createCompanySchema } from "./schemas";
+import { logError } from "@/lib/error-log";
 
 const FORBIDDEN = { success: false, message: "Anda tidak memiliki akses." } as const;
 const NOT_FOUND = { success: false, message: "Perusahaan tidak ditemukan." } as const;
@@ -337,7 +338,13 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
       const results = await Promise.allSettled(fileKeys.slice(start, start + 20).map((key) => deleteObject(key)));
       failed += results.filter((result) => result.status === "rejected").length;
     }
-    if (failed > 0) console.error(`[companies] hapus company ${company.id}: ${failed} file gagal dihapus`);
+    if (failed > 0) {
+      await logError(new Error(`${failed} file perusahaan gagal dihapus`), {
+        source: "EXTERNAL",
+        action: "hapus file perusahaan",
+        context: { companyId: company.id },
+      });
+    }
   });
 
   // Superadmin sedang membuka company ini: keluarkan dari company tersebut.

@@ -75,6 +75,7 @@ import {
   rejectPaymentSchema,
 } from "./schemas";
 import { getSeatUsage } from "./seats";
+import { logError } from "@/lib/error-log";
 
 const NO_ADDONS: AddonFlags = { attendance: false, payroll: false };
 
@@ -164,7 +165,7 @@ export async function claimSubscriptionPaid(
   try {
     await putObject(proofKey, bytes, type.contentType);
   } catch (error) {
-    console.error("[subscriptions] unggah bukti bayar gagal:", error);
+    await logError(error, { source: "EXTERNAL", action: "unggah bukti bayar langganan" });
     return { success: false, message: "Gagal mengunggah bukti bayar. Coba lagi beberapa saat." };
   }
 
@@ -595,7 +596,7 @@ export async function uploadQris(_prevState: ActionResult | undefined, formData:
   try {
     await putObject(key, bytes, type.contentType);
   } catch (error) {
-    console.error("[subscriptions] unggah QRIS gagal:", error);
+    await logError(error, { source: "EXTERNAL", action: "unggah QRIS" });
     return { success: false, message: "Gagal mengunggah gambar QRIS. Coba lagi beberapa saat." };
   }
   const previous = await setQrisKey(key);

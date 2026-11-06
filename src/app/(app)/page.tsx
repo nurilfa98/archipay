@@ -3,15 +3,17 @@
 // Superadmin yang belum membuka company diarahkan ke daftar company; Owner
 // company yang terkunci (langganan habis) diarahkan ke Langganan.
 //
-// Judul statis di luar <Suspense>; daftar menu butuh role user (cookie), jadi
-// berada di dalamnya.
+// Kartu sapaan ("Selamat pagi, Nuril" + hari, tanggal, jam digital) dan daftar
+// menu butuh data user (cookie), jadi berada di dalam <Suspense>.
 
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { MenuLauncher, MenuLauncherSkeleton } from "@/components/layout/menu-launcher";
+import { WelcomeCard, WelcomeCardSkeleton } from "@/components/layout/welcome-card";
 import { verifyAccount } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
+import { env } from "@/lib/env";
 
 export const metadata: Metadata = {
   title: "Menu",
@@ -19,15 +21,11 @@ export const metadata: Metadata = {
 
 export default function MenuPage() {
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 py-4 sm:py-10">
-      <div className="flex flex-col gap-1 text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">
-          <Suspense fallback="Halo, ...">
-            <Greeting />
-          </Suspense>
-        </h1>
-        <p className="text-sm text-muted-foreground">Pilih menu untuk mulai bekerja.</p>
-      </div>
+    // -mt-3: <main> sudah punya pt-6; dikurangi agar kartu sapaan lebih dekat ke navbar.
+    <div className="mx-auto -mt-3 flex w-full max-w-3xl flex-col gap-3 pb-4 sm:pb-8">
+      <Suspense fallback={<WelcomeCardSkeleton />}>
+        <Welcome />
+      </Suspense>
       <Suspense fallback={<MenuLauncherSkeleton />}>
         <Menu />
       </Suspense>
@@ -35,9 +33,10 @@ export default function MenuPage() {
   );
 }
 
-async function Greeting() {
+// Jam memakai zona waktu perusahaan (APP_TIMEZONE), bukan zona waktu perangkat.
+async function Welcome() {
   const user = await verifyAccount();
-  return `Halo, ${user.fullName.split(" ")[0]}`;
+  return <WelcomeCard name={user.fullName.split(" ")[0]} timeZone={env.APP_TIMEZONE} />;
 }
 
 async function Menu() {

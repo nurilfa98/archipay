@@ -11,6 +11,7 @@ import { getOwnerContacts } from "@/features/advances/queries";
 import { periodLabel } from "@/features/attendance/review-data";
 import { env } from "@/lib/env";
 import { sendWhatsApp } from "@/lib/whatsapp";
+import { logError } from "@/lib/error-log";
 
 export async function notifyPayrollReviewRequested(
   companyId: string,
@@ -31,5 +32,7 @@ export async function notifyPayrollReviewRequested(
     ),
   );
   const failed = results.filter((result) => result.status === "rejected" || !result.value).length;
-  if (failed > 0) console.error(`[payroll] ${failed} kabar penggajian ke Owner gagal dikirim`);
+  if (failed > 0) {
+    await logError(new Error(`${failed} kabar penggajian ke Owner gagal dikirim`), { source: "EXTERNAL", action: "kabar penggajian ke Owner" });
+  }
 }

@@ -12,6 +12,7 @@
 
 import "server-only";
 import { env } from "@/lib/env";
+import { logError } from "@/lib/error-log";
 
 export type EmailMessage = {
   to: string;
@@ -26,7 +27,7 @@ export type EmailMessage = {
 export async function sendEmail(message: EmailMessage): Promise<boolean> {
   if (!env.RESEND_API_KEY || !env.EMAIL_FROM) {
     if (env.NODE_ENV === "production") {
-      console.error("[email] RESEND_API_KEY / EMAIL_FROM belum diisi, email tidak terkirim");
+      await logError(new Error("RESEND_API_KEY / EMAIL_FROM belum diisi, email tidak terkirim"), { source: "EXTERNAL", action: "email" });
       return false;
     }
     // Hanya di development: isi email (termasuk password sementara) tampil di
@@ -54,12 +55,16 @@ export async function sendEmail(message: EmailMessage): Promise<boolean> {
     });
 
     if (!response.ok) {
-      console.error(`[email] Resend menolak (${response.status}): ${await response.text()}`);
+      await logError(new Error(`Resend menolak (${response.status}): ${(await response.text()).slice(0, 300)}`), {
+        source: "EXTERNAL",
+        action: "email",
+        context: { status: response.status },
+      });
       return false;
     }
     return true;
   } catch (error) {
-    console.error("[email] gagal menghubungi Resend:", error);
+    await logError(error, { source: "EXTERNAL", action: "email" });
     return false;
   }
 }

@@ -134,6 +134,20 @@
       "when": 1793940396388,
       "tag": "0018_reimbursement_ack",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793965050470,
+      "tag": "0019_error_logs",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793968785420,
+      "tag": "0020_face_reject_code",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,8 @@
 // - penggantian yang belum dijawab karyawan > 3 hari dianggap diterima (features/settlements/reimbursement-ack.ts)
 // - hapus file nota & bukti pengembalian yang lewat masa simpan (features/settlements/receipt-retention.ts)
 // - kabar delegasi cuti/izin ke Admin HR (features/attendance/leave-reminders.ts)
+// - hapus foto acuan wajah yang ditolak (features/attendance/face-retention.ts)
+// - hapus catatan error (error_logs) yang lewat masa simpan (features/error-logs/queries.ts)
 // - hapus riwayat perangkat login yang sudah kedaluwarsa > 90 hari (features/auth/sessions.ts)
 //
 // Keamanan: wajib header `Authorization: Bearer <CRON_SECRET>`. Vercel Cron
@@ -26,14 +28,17 @@
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { notifyDelegatedLeaves } from "@/features/attendance/leave-reminders";
+import { purgeRejectedFaces } from "@/features/attendance/face-retention";
 import { notifyPendingFaces } from "@/features/attendance/reminders";
 import { sendDailyDigests } from "@/features/digest/run";
 import { purgeOldSessions } from "@/features/auth/sessions";
 import { runReminders } from "@/features/reminders/run";
 import { autoConfirmReimbursements } from "@/features/settlements/reimbursement-ack";
+import { purgeOldErrorLogs } from "@/features/error-logs/queries";
 import { purgeExpiredProofs, purgeExpiredReceipts } from "@/features/settlements/receipt-retention";
 import { sendSubscriptionReminders } from "@/features/subscriptions/reminders";
 import { env } from "@/lib/env";
+import { logError } from "@/lib/error-log";
 
 export async function GET(request: Request) {
   if (!env.CRON_SECRET) {
@@ -46,38 +51,46 @@ export async function GET(request: Request) {
   const sent = await runReminders();
   const subscriptionReminders = await sendSubscriptionReminders();
   // Gagal ringkasan email tidak boleh menggagalkan tugas cron lainnya.
-  const digests = await sendDailyDigests().catch((error: unknown) => {
-    console.error("[cron] ringkasan email harian:", error);
+  const digests = await sendDailyDigests().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "ringkasan email harian" });
     return null;
   });
   // Gagal kabar foto wajah tidak boleh menggagalkan tugas cron lainnya.
-  const pendingFaces = await notifyPendingFaces().catch((error: unknown) => {
-    console.error("[cron] kabar foto wajah menunggu persetujuan:", error);
+  const pendingFaces = await notifyPendingFaces().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "kabar foto wajah menunggu persetujuan" });
     return null;
   });
   // Gagal hapus nota tidak boleh menggagalkan pengingat yang sudah terkirim.
-  const receipts = await purgeExpiredReceipts().catch((error: unknown) => {
-    console.error("[cron] hapus nota lewat masa simpan:", error);
+  const receipts = await purgeExpiredReceipts().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "hapus nota lewat masa simpan" });
     return null;
   });
-  const reimbursements = await autoConfirmReimbursements().catch((error: unknown) => {
-    console.error("[cron] konfirmasi otomatis penggantian:", error);
+  const reimbursements = await autoConfirmReimbursements().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "konfirmasi otomatis penggantian" });
     return null;
   });
-  const proofs = await purgeExpiredProofs().catch((error: unknown) => {
-    console.error("[cron] hapus bukti pengembalian lewat masa simpan:", error);
+  const proofs = await purgeExpiredProofs().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "hapus bukti pengembalian lewat masa simpan" });
     return null;
   });
-  const delegatedLeaves = await notifyDelegatedLeaves().catch((error: unknown) => {
-    console.error("[cron] kabar delegasi cuti/izin:", error);
+  const delegatedLeaves = await notifyDelegatedLeaves().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "kabar delegasi cuti/izin" });
     return null;
   });
-  const sessions = await purgeOldSessions().catch((error: unknown) => {
-    console.error("[cron] hapus riwayat perangkat login:", error);
+  const rejectedFaces = await purgeRejectedFaces().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "hapus foto wajah ditolak" });
+    return null;
+  });
+  const errorLogs = await purgeOldErrorLogs().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "hapus catatan error lama" });
+    return null;
+  });
+  const sessions = await purgeOldSessions().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "hapus riwayat perangkat login" });
     return null;
   });
   return NextResponse.json(
-    { ok: true, sent, digests, subscriptionReminders, pendingFaces, delegatedLeaves, receipts, proofs, reimbursements, sessions },
+    { ok: true, sent, digests, subscriptionReminders, pendingFaces, delegatedLeaves, receipts, proofs, reimbursements, rejectedFaces, errorLogs, sessions },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

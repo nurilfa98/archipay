@@ -2,15 +2,19 @@
 // acuan wajah (BUSINESS-FLOW §18.4). Untuk pengguna yang wajib absen.
 
 import type { Metadata } from "next";
+import { io } from "next/cache";
+import Link from "next/link";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConsentForm } from "@/features/attendance/components/consent-form";
 import { FaceCapture } from "@/features/attendance/components/face-capture";
-import { consentStatement } from "@/features/attendance/constants";
-import { hasConsent } from "@/features/attendance/queries";
+import { consentStatement, faceChangeLockedUntil } from "@/features/attendance/constants";
+import { getMyFaceProfiles, hasConsent } from "@/features/attendance/queries";
 import { requirePermission } from "@/lib/auth/dal";
+import { formatDateTime } from "@/lib/dates";
 
 export const metadata: Metadata = {
   title: "Daftar Foto Wajah",
@@ -42,6 +46,29 @@ async function EnrollContent() {
         </CardHeader>
         <CardContent>
           <ConsentForm statement={consentStatement(user.fullName, user.company.name)} />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Batas ganti foto acuan: sekali seminggu (dicek ulang di submitFaceProfile).
+  const faces = await getMyFaceProfiles(user.company.id, user.id);
+  await io();
+  const lockedUntil = faceChangeLockedUntil(faces.approved, faces.latest, new Date());
+  if (lockedUntil) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Foto acuan belum bisa diganti</CardTitle>
+          <CardDescription>
+            Foto acuan hanya bisa diganti sekali seminggu. Anda bisa menggantinya lagi mulai{" "}
+            {formatDateTime(lockedUntil)}.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="outline" nativeButton={false} render={<Link href="/attendance" />}>
+            Kembali ke Absensi
+          </Button>
         </CardContent>
       </Card>
     );

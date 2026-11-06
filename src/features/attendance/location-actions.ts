@@ -22,6 +22,7 @@ import {
   placeQuerySchema,
   type LocationInput,
 } from "./schemas";
+import { logError } from "@/lib/error-log";
 
 const FORBIDDEN = {
   success: false,
@@ -383,7 +384,7 @@ export async function searchPlaces(query: string): Promise<ActionResult<PlaceRes
     placeCache.set(key, results);
     return { success: true, data: results };
   } catch (error) {
-    console.error("[attendance] cari alamat gagal", error);
+    await logError(error, { source: "EXTERNAL", action: "cari alamat lokasi" });
     return {
       success: false,
       message: "Pencarian alamat sedang tidak tersedia. Geser pin di peta secara manual.",

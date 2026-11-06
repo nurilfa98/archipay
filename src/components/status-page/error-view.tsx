@@ -13,6 +13,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ErrorReportButton } from "@/features/error-reports/components/error-report-button";
+import { reportClientError } from "@/features/error-logs/report";
 import { ErrorIllustration } from "./status-illustrations";
 import { StatusPage } from "./status-page";
 
@@ -25,8 +26,11 @@ export function ErrorView({
   retry: () => void;
   standalone?: boolean;
 }) {
+  // Dicatat ke log error (tabel error_logs). Error server yang sudah tercatat
+  // (kode error sama) hanya dilengkapi identitas pengguna yang mengalaminya.
   useEffect(() => {
     console.error(error);
+    reportClientError(error, { action: "error-boundary" });
   }, [error]);
 
   const digest =

@@ -17,6 +17,7 @@ import { formatDateOnly, zonedDateString } from "@/lib/dates";
 import { getPresignedUrl, putObject, readLocalObject } from "@/lib/storage";
 import { BACKDATE_MAX_DAYS, MAX_RECEIPT_BYTES } from "./constants";
 import { detectReceiptType } from "./receipt-file";
+import { logError } from "@/lib/error-log";
 
 export type ProofFile = { bytes: Uint8Array<ArrayBuffer>; contentType: string; extension: string };
 
@@ -45,7 +46,7 @@ export async function storeProof(
     await putObject(key, file.bytes, file.contentType);
     return { ok: true, key, contentType: file.contentType };
   } catch (error) {
-    console.error("[settlements] unggah bukti gagal:", error);
+    await logError(error, { source: "EXTERNAL", action: "unggah bukti pengembalian" });
     return { ok: false, message: "Gagal mengunggah bukti. Coba lagi beberapa saat." };
   }
 }

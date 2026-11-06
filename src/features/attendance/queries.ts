@@ -170,7 +170,9 @@ export async function hasConsent(userId: string) {
 export type FaceProfileSummary = {
   id: string;
   status: FaceStatus;
+  rejectCode: string | null;
   rejectReason: string | null;
+  hasPhoto: boolean; // file foto masih ada (bisa dipratinjau)
   createdAt: Date;
   reviewedAt: Date | null;
 };
@@ -189,7 +191,9 @@ export async function getMyFaceProfiles(
     .select({
       id: faceProfiles.id,
       status: faceProfiles.status,
+      rejectCode: faceProfiles.rejectCode,
       rejectReason: faceProfiles.rejectReason,
+      hasPhoto: sql<boolean>`${faceProfiles.photoKey} is not null`,
       createdAt: faceProfiles.createdAt,
       reviewedAt: faceProfiles.reviewedAt,
     })

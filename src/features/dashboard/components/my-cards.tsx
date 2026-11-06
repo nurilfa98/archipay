@@ -4,13 +4,14 @@
 // <Suspense> oleh halaman.
 
 import {
+  ArrowRightIcon,
   CalendarCheckIcon,
   ClockIcon,
   DownloadIcon,
+  FilePenLineIcon,
   LogInIcon,
   LogOutIcon,
   PlaneIcon,
-  PlusIcon,
   ReceiptTextIcon,
   ScanFaceIcon,
   type LucideIcon,
@@ -212,13 +213,15 @@ export async function MyLeaveCard({ user }: { user: CompanyUser }) {
         </ul>
       )}
       <Button
-        variant="outline"
-        className="w-full sm:w-auto"
+        variant="brand"
+        size="lg"
+        className="group/cta w-full sm:w-auto"
         nativeButton={false}
         render={<Link href="/attendance/leave/new" />}
       >
-        <PlusIcon />
+        <FilePenLineIcon />
         Ajukan cuti / izin
+        <ArrowRightIcon className="transition-transform group-hover/cta:translate-x-0.5" />
       </Button>
     </SectionCard>
   );

@@ -847,12 +847,19 @@ punya role lain.
 
 1. Saat pertama membuka Absensi, user mencentang **pernyataan persetujuan** pengolahan data wajah & lokasi (UU PDP 27/2022). Teks persis, waktu, dan IP disimpan, sama seperti persetujuan di konfirmasi uang muka (bagian 5).
 2. User mengambil **selfie acuan** dari kamera (bukan galeri) dengan cek liveness (senyum). HP menghitung *face embedding*; foto disimpan di R2 dan embedding di database. Status: **Menunggu persetujuan**.
-3. Owner atau Admin HR mencocokkan foto dengan orangnya lalu **Setujui** / **Tolak** (alasan wajib). Sebelum disetujui, user belum bisa absen.
+3. Owner atau Admin HR mencocokkan foto dengan orangnya lalu **Setujui** / **Tolak** (alasan dipilih dari dropdown, lihat butir 7). Sebelum disetujui, user belum bisa absen.
 4. Mengganti foto acuan memakai alur yang sama; foto lama dipakai sampai foto baru disetujui, lalu filenya dihapus.
+   **Batas ganti foto:** foto acuan yang sudah disetujui hanya bisa diganti **sekali seminggu** (7 hari sejak foto itu disetujui), dicek di halaman daftar foto dan di server. Selama ada pengajuan berjalan (menunggu / baru ditolak) karyawan tetap boleh mengambil ulang. Kartu Absensi menampilkan kapan foto bisa diganti lagi.
 5. Foto acuan & embedding **dihapus saat user dinonaktifkan**; bila diaktifkan lagi, user mendaftar ulang.
-6. Tidak ada yang bisa menyetujui foto wajahnya sendiri. Foto yang ditolak langsung dihapus filenya; hanya alasan penolakan terakhir yang disimpan.
-7. **Kabar ke Owner & Admin HR:** cron harian (bagian 9) mengirim WhatsApp ke semua Owner dan Admin HR aktif bila ada foto baru yang menunggu persetujuan (Admin HR tidak dikabari foto miliknya sendiri). Hemat kuota: semua foto baru dalam satu company digabung jadi **satu pesan per penerima**, dan setiap foto hanya dikabarkan **sekali** (`face_profiles.owner_notified_at`); foto yang belum diproses tidak dikirim ulang, jumlahnya tetap tampil di menu Absensi. Foto yang diganti karyawan dihitung sebagai foto baru.
-8. Liveness saat pendaftaran & absen: tepat satu wajah, cukup dekat, di tengah bingkai (garis hijau setengah), lalu **tersenyum** (garis hijau penuh); foto diambil otomatis dari frame netral sesaat sebelum tersenyum, lalu harus lolos model anti-spoof & liveness (skor ≥ 0,5). Setiap frame hanya memakai model ringan (deteksi, mesh, ekspresi); embedding, anti-spoof & liveness dihitung sekali saat foto diambil. Senyum menggantikan kedip (2026-11-05) karena kedip sering terlewat di HP. Foto dipotong **persegi** (bagian tengah frame, sama dengan yang terlihat di layar) lalu disimpan JPEG maks. 640 × 640 px, tercermin seperti tampilan kamera depan; kartu persetujuan menampilkannya persegi (foto lama yang portrait dipotong tengah-atas).
+6. Tidak ada yang bisa menyetujui foto wajahnya sendiri.
+7. **Menolak foto:** Owner/Admin HR memilih alasan dari dropdown (Bukan wajah pemilik akun, Wajah kurang jelas atau buram, Terlalu gelap atau silau, Wajah tertutup, Lainnya) dan boleh menambah catatan (wajib untuk "Lainnya"). Setiap alasan punya saran perbaikan untuk karyawan.
+8. **Kartu "Foto yang diajukan"** di menu Absensi karyawan, di bawah kartu "Foto acuan wajah Anda": foto terbaru yang dikirim (bisa dipratinjau), statusnya, dan bila ditolak, alasan + catatan + saran + tombol "Ambil foto ulang". Hanya alasan penolakan terakhir yang disimpan.
+9. **Berapa lama foto dan alasan penolakan disimpan:**
+   - Karyawan mengambil ulang foto → penolakan dan file lama langsung dihapus.
+   - Karyawan masih punya foto acuan yang disetujui → kartu penolakan tampil **3 hari**, lalu baris dan filenya dihapus otomatis (cron harian). Tidak menghalangi absen.
+   - Karyawan belum punya foto acuan → kartu penolakan tetap tampil sampai ia mengambil ulang, tetapi **file fotonya dihapus setelah 30 hari** (alasan tetap tampil, tanpa foto).
+10. **Kabar ke Owner & Admin HR:** cron harian (bagian 9) mengirim WhatsApp ke semua Owner dan Admin HR aktif bila ada foto baru yang menunggu persetujuan (Admin HR tidak dikabari foto miliknya sendiri). Hemat kuota: semua foto baru dalam satu company digabung jadi **satu pesan per penerima**, dan setiap foto hanya dikabarkan **sekali** (`face_profiles.owner_notified_at`); foto yang belum diproses tidak dikirim ulang, jumlahnya tetap tampil di menu Absensi. Foto yang diganti karyawan dihitung sebagai foto baru.
+11. Liveness saat pendaftaran & absen: tepat satu wajah, cukup dekat, di tengah bingkai (garis hijau setengah), lalu **tersenyum** (garis hijau penuh); foto diambil otomatis dari frame netral sesaat sebelum tersenyum, lalu harus lolos model anti-spoof & liveness (skor ≥ 0,5). Setiap frame hanya memakai model ringan (deteksi, mesh, ekspresi); embedding, anti-spoof & liveness dihitung sekali saat foto diambil. Senyum menggantikan kedip (2026-11-05) karena kedip sering terlewat di HP. Foto dipotong **persegi** (bagian tengah frame, sama dengan yang terlihat di layar) lalu disimpan JPEG maks. 640 × 640 px, tercermin seperti tampilan kamera depan; kartu persetujuan menampilkannya persegi (foto lama yang portrait dipotong tengah-atas).
 
 ### 18.5 Absen masuk
 
@@ -1187,7 +1194,52 @@ mencatat manual).
 
 ---
 
-## 21. Catatan terbuka
+## 21. Log error (Superadmin)
+
+Tujuannya: saat ada laporan "error", Superadmin bisa langsung melihat **apa** yang gagal, **di mana**, **siapa** yang terdampak, dan **versi** aplikasinya, tanpa menebak dari log server.
+
+### 21.1 Yang dicatat
+
+Tabel `error_logs`, satu baris = satu kejadian. Kejadian yang sama dikelompokkan lewat `fingerprint` (hash nama error + pesan dengan angka/UUID diseragamkan + baris stack pertama + nama aksi).
+
+| Sumber | Dari mana |
+|---|---|
+| Halaman, route, Server Action | `src/instrumentation.ts` (`onRequestError`): error yang tidak tertangani, lengkap dengan kode error (digest) |
+| Aksi server / cron / layanan luar | `logError()` di blok catch (R2, WhatsApp, email, tugas cron), menggantikan `console.error` |
+| Browser | halaman error (`ErrorView`), error yang lolos dari React (`ClientErrorListener`), dan kamera wajah gagal |
+
+Setiap baris berisi: kode error (digest), sumber, nama dan pesan error, stack trace, nama aksi/route, halaman (tanpa query string), versi aplikasi (hash commit), perusahaan, pengguna, role, perangkat (user agent), dan info tambahan yang aman. **Alamat IP tidak dicatat.**
+
+### 21.2 Yang tidak pernah dicatat
+
+Isi form, password, token, nomor rekening, embedding wajah, dan nomor telepon/email dalam `context`. Pesan dan stack dibersihkan dari pola `password=`, `token=`, `Authorization`, dan URL database sebelum disimpan.
+
+### 21.3 Aturan pencatatan
+
+- Pencatatan **tidak pernah melempar error**. Bila database bermasalah, hanya `console.error` (log server tetap berisi).
+- Kejadian yang sama dibatasi 5 per menit per instance server, agar satu masalah tidak membanjiri tabel. Laporan dari browser dibatasi 15 per 10 menit per pengguna.
+- Error server yang sudah tercatat lalu muncul di layar pengguna (kode error sama) tidak dicatat dua kali: barisnya dilengkapi identitas pengguna yang mengalaminya.
+- Sinyal internal Next.js (redirect, 404) bukan error dan dilewati.
+
+### 21.4 Halaman Superadmin
+
+`/error-logs` (tab "Log error" di area platform, dengan angka masalah yang masih Baru). Daftar dikelompokkan per masalah: jumlah kejadian, perusahaan terdampak, kejadian terakhir, dan versi. Bisa disaring per status (Baru, Selesai, Diabaikan, Semua) dan sumber, serta dicari lewat kode error, pesan, atau nama aksi. Kode error dari halaman error atau laporan WhatsApp "Hubungi admin" langsung bisa dicari di sini.
+
+Detail satu masalah memuat stack trace terbaru (bisa disalin) dan 20 kejadian terakhir. Superadmin bisa menandai **Selesai**, **Abaikan**, atau **Buka lagi** (dengan catatan), berlaku untuk seluruh kelompok. Kejadian baru setelah ditandai Selesai kembali berstatus **Baru**; kejadian baru dari masalah yang diabaikan tetap dicatat tetapi berstatus Diabaikan.
+
+Hanya Superadmin yang bisa membuka halaman ini: isinya stack trace dan nama fungsi internal. Tindakan Superadmin di sini tidak masuk Audit Log.
+
+### 21.5 Masa simpan
+
+Catatan dihapus otomatis setelah **60 hari** oleh cron harian (`/api/cron/reminders`).
+
+### 21.6 Alamat IP
+
+Alamat IP tidak lagi ditampilkan ke pengguna (daftar perangkat di Profil, kartu "Pernyataan karyawan" di uang muka) maupun sebagai kolom di tabel Audit Log. IP tetap tersimpan untuk keamanan dan hanya tampil di panel detail Audit Log (Owner). Email pemberitahuan login dari perangkat baru tetap menyebut IP.
+
+---
+
+## 22. Catatan terbuka
 
 Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 
