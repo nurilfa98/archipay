@@ -27,9 +27,10 @@
 // Multi-tenant: satu cron untuk semua company; company nonaktif dilewati.
 
 import "server-only";
-import { and, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, eq, inArray, lt, not, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { AWAITING_RECEIPT_STATUSES } from "@/features/advances/constants";
+import { hasPendingReturnClaim } from "@/features/settlements/queries";
 import { db } from "@/lib/db";
 import { advanceLedgerEntries, advanceRequests, companies, reminderLogs, settlements, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
@@ -146,7 +147,17 @@ async function listCandidates(kind: ReminderKind): Promise<ReminderCandidate[]> 
     .innerJoin(companies, eq(advanceRequests.companyId, companies.id))
     .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
     .leftJoin(settlements, eq(settlements.advanceId, advanceRequests.id))
-    .where(and(status, timing, eq(recipient.isActive, true), eq(companies.isActive, true)))
+    .where(
+      and(
+        status,
+        timing,
+        eq(recipient.isActive, true),
+        eq(companies.isActive, true),
+        // Karyawan sudah melapor "saya sudah mengembalikan" dan belum diputuskan:
+        // jangan ditagih (BUSINESS-FLOW §8.1.1). Pengingat kembali bila laporan ditolak.
+        isSettlement ? undefined : not(hasPendingReturnClaim),
+      ),
+    )
     .limit(500);
   return rows;
 }

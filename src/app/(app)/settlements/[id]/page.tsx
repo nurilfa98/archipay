@@ -5,6 +5,9 @@
 //   nota, selesaikan, atau kembalikan untuk diperbaiki.
 // - OWNER/FINANCE, setelah diverifikasi: catat pengembalian sisa dana atau
 //   pembayaran penggantian (boleh dicicil) sampai saldo 0.
+// - Karyawan penerima, sisa dana belum kembali: "Saya sudah mengembalikan"
+//   (laporan + tanggal + bukti opsional); Owner/Finance mengonfirmasi atau
+//   menolak laporan itu (BUSINESS-FLOW §8.1.1).
 // - Selain itu: hanya baca, plus riwayat saldo (ledger) setelah diverifikasi.
 //
 // Hanya penerima dan pemegang advance:view-all yang boleh membuka; selain itu
@@ -14,12 +17,13 @@
 // - node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/dynamic-routes.md
 // - node_modules/next/dist/docs/01-app/03-api-reference/04-functions/not-found.md
 
-import { CircleAlertIcon, CircleCheckIcon, InfoIcon } from "lucide-react";
+import { CircleAlertIcon, CircleCheckIcon, ClockIcon, FileTextIcon, ImageIcon, InfoIcon } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
+import { FilePreview } from "@/components/file-preview";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -34,6 +38,8 @@ import {
 } from "@/components/ui/table";
 import { NO_PROJECT } from "@/features/projects/constants";
 import { BackToList } from "@/features/projects/components/back-to-list";
+import { ReimbursementAckButtons } from "@/features/settlements/components/reimbursement-ack-buttons";
+import { ClaimDecisionButtons, ReturnClaimButton } from "@/features/settlements/components/return-claim-forms";
 import { SettlementBalanceAction } from "@/features/settlements/components/settlement-balance-action";
 import { SettlementItemForm } from "@/features/settlements/components/settlement-item-form";
 import {
@@ -44,13 +50,16 @@ import { LateReasonIndicator } from "@/features/settlements/components/late-reas
 import { SettlementStatusBadge } from "@/features/settlements/components/settlement-status-badge";
 import { SettlementSubmitButton } from "@/features/settlements/components/settlement-submit-button";
 import { SettlementVerifyForm } from "@/features/settlements/components/settlement-verify-form";
-import { LEDGER_ENTRY_LABELS, LEDGER_METHOD_LABELS } from "@/features/settlements/constants";
+import { balanceDateRange } from "@/features/settlements/balance-evidence";
+import { LEDGER_ENTRY_LABELS, LEDGER_METHOD_LABELS, REIMBURSE_ACK_DAYS } from "@/features/settlements/constants";
 import {
+  getLatestReturnClaim,
   getSettlementDetail,
   listExpenseCategories,
   listLedgerEntries,
   listSettlementItems,
   type LedgerEntry,
+  type ReturnClaim,
   type SettlementDetail,
   type SettlementItem,
 } from "@/features/settlements/queries";
@@ -87,11 +96,21 @@ async function SettlementDetailContent({ id }: { id: string }) {
   const items = await listSettlementItems(settlement.id);
   const actions = getSettlementActions({ ...settlement, itemCount: items.length }, viewer);
   const verified = !!settlement.verifiedAt;
-  const [categories, settings, ledger] = await Promise.all([
+  const [categories, settings, ledger, claim] = await Promise.all([
     actions.edit ? listExpenseCategories(viewer.company.id) : [],
     actions.edit ? getCompanySettings(viewer.company.id) : null,
     verified ? listLedgerEntries(settlement.advanceId) : [],
+    // Laporan pengembalian terbaru dari karyawan (menunggu / terakhir ditolak).
+    verified ? getLatestReturnClaim(settlement.id) : null,
   ]);
+  // Batas tanggal diterima/dikembalikan: sejak dana dicairkan (maks. 30 hari ke
+  // belakang) sampai hari ini; server memeriksa ulang (balance-evidence.ts).
+  const { today, minDate } = balanceDateRange(settlement.disbursedAt);
+  const claimPending = claim?.status === "PENDING";
+  // Penggantian yang dibayar kantor dan menunggu jawaban karyawan ini, serta
+  // sanggahan terakhir "belum saya terima" (BUSINESS-FLOW §8.1.2).
+  const pendingAcks = isRecipient ? ledger.filter((entry) => entry.ackStatus === "PENDING") : [];
+  const lastDispute = [...ledger].reverse().find((entry) => entry.ackStatus === "DISPUTED") ?? null;
 
   const rows = items.map(toItemRow);
   const itemTotal = items.reduce((sum, item) => sum + item.amount, 0);
@@ -118,9 +137,129 @@ async function SettlementDetailContent({ id }: { id: string }) {
         action={<SettlementStatusBadge status={settlement.status} />}
       />
 
-      <StatusAlert settlement={settlement} isRecipient={isRecipient} currentBalance={currentBalance} />
+      <StatusAlert settlement={settlement} isRecipient={isRecipient} currentBalance={currentBalance} claim={claim} />
 
-      {(actions.recordReturn || actions.recordReimbursement) && (
+      {lastDispute && settlement.advanceStatus === "REIMBURSE_PENDING" && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>
+            {settlement.recipientName} menyatakan belum menerima penggantian {formatRupiah(lastDispute.amount)}
+          </AlertTitle>
+          <AlertDescription>
+            Dicatat {lastDispute.ackAt && formatDateTime(lastDispute.ackAt)}
+            {lastDispute.ackNote && ` · "${lastDispute.ackNote}"`}. Pencatatan pembayaran dibatalkan dan kekurangan kembali
+            tercatat belum dibayar.{" "}
+            {actions.recordReimbursement ? "Periksa dulu sebelum membayar ulang." : "Owner/Finance sudah diberi tahu."}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {pendingAcks.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Konfirmasi penerimaan penggantian</CardTitle>
+            <CardDescription>
+              Kantor mencatat sudah membayar kekurangan Anda. Konfirmasi apakah uangnya benar-benar sudah Anda terima.
+              Tanpa jawaban dalam {REIMBURSE_ACK_DAYS} hari, dianggap sudah diterima.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {pendingAcks.map((entry) => (
+              <div key={entry.id} className="flex flex-col gap-3 rounded-lg border p-3">
+                <dl className="grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <Item label="Nominal">
+                    <span className="font-semibold tabular-nums">{formatRupiah(entry.amount)}</span>
+                  </Item>
+                  <Item label="Cara">{entry.method ? (LEDGER_METHOD_LABELS[entry.method] ?? entry.method) : "-"}</Item>
+                  <Item label="Tanggal dibayar">{entry.receivedOn ? formatDateOnly(entry.receivedOn) : "-"}</Item>
+                  <Item label="Bukti transfer">
+                    <LedgerProof entry={entry} emptyText="Tidak ada" />
+                  </Item>
+                </dl>
+                <p className="text-xs text-muted-foreground">
+                  Otomatis dianggap diterima{" "}
+                  {formatDate(new Date(entry.createdAt.getTime() + REIMBURSE_ACK_DAYS * 24 * 60 * 60 * 1000))} bila tidak
+                  dijawab.
+                </p>
+                <ReimbursementAckButtons entryId={entry.id} amount={entry.amount} summary={title} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {isRecipient && settlement.advanceStatus === "RETURN_PENDING" && !claimPending && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Sudah mengembalikan sisa dana?</CardTitle>
+            <CardDescription>
+              Lapor di sini setelah Anda menyerahkan uang tunai atau mentransfernya, lengkap dengan tanggalnya.
+              Laporan Anda tercatat walau Owner/Finance belum sempat mencatat, dan selama menunggu konfirmasi Anda
+              tidak ditagih maupun dipotong gaji.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {claim?.status === "REJECTED" && (
+              <Alert variant="destructive">
+                <CircleAlertIcon />
+                <AlertTitle>
+                  Laporan {formatRupiah(claim.amount)} ({formatDateOnly(claim.returnedOn)}) ditolak
+                  {claim.decidedByName && ` oleh ${claim.decidedByName}`}
+                  {claim.decidedAt && ` · ${formatDateTime(claim.decidedAt)}`}
+                </AlertTitle>
+                <AlertDescription>&ldquo;{claim.rejectReason}&rdquo; Sisa dana masih tercatat belum dikembalikan.</AlertDescription>
+              </Alert>
+            )}
+            <div>
+              <ReturnClaimButton
+                settlementId={settlement.id}
+                outstanding={currentBalance}
+                summary={`${title} · ${settlement.recipientName}`}
+                today={today}
+                minDate={minDate}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {claim && claimPending && actions.recordReturn && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Laporan pengembalian dari {claim.reporterName}</CardTitle>
+            <CardDescription>
+              Dilaporkan {formatDateTime(claim.createdAt)}. Cek mutasi rekening atau kas Anda, lalu konfirmasi bila
+              uangnya benar-benar sudah masuk, atau tolak bila belum. Selama belum diputuskan, karyawan tidak ditagih
+              dan penggajian yang memuatnya ditahan.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+              <Item label="Nominal dilaporkan">
+                <span className="text-base font-semibold tabular-nums">{formatRupiah(claim.amount)}</span>
+              </Item>
+              <Item label="Cara">{LEDGER_METHOD_LABELS[claim.method] ?? claim.method}</Item>
+              <Item label="Tanggal pengembalian">{formatDateOnly(claim.returnedOn)}</Item>
+              <Item label="Bukti">
+                <ProofLink src={`/api/return-claims/${claim.id}/proof`} claim={claim} />
+              </Item>
+              {claim.note && <Item label="Catatan karyawan">{claim.note}</Item>}
+            </dl>
+            <ClaimDecisionButtons
+              claimId={claim.id}
+              amount={claim.amount}
+              returnedOn={claim.returnedOn}
+              returnedOnLabel={formatDateOnly(claim.returnedOn)}
+              methodLabel={LEDGER_METHOD_LABELS[claim.method] ?? claim.method}
+              summary={`${title} · ${settlement.recipientName}`}
+              today={today}
+              minDate={minDate}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {(actions.recordReturn || actions.recordReimbursement) && !claimPending && (
         <Card>
           <CardHeader>
             <CardTitle>Penyelesaian saldo</CardTitle>
@@ -137,6 +276,8 @@ async function SettlementDetailContent({ id }: { id: string }) {
               kind={actions.recordReturn ? "return" : "reimburse"}
               outstanding={Math.abs(currentBalance)}
               summary={`${title} · ${settlement.recipientName}`}
+              today={today}
+              minDate={minDate}
             />
           </CardContent>
         </Card>
@@ -251,10 +392,12 @@ function StatusAlert({
   settlement,
   isRecipient,
   currentBalance: balance,
+  claim,
 }: {
   settlement: SettlementDetail;
   isRecipient: boolean;
   currentBalance: number;
+  claim: ReturnClaim | null;
 }) {
   const returnOverdue = settlement.returnOverdue;
   switch (settlement.status) {
@@ -278,6 +421,21 @@ function StatusAlert({
         </Alert>
       ) : null;
     case "RETURN_PENDING":
+      // Karyawan sudah melapor: kabar status ke dia; Owner/Finance melihat kartu laporannya.
+      if (claim?.status === "PENDING") {
+        return isRecipient ? (
+          <Alert>
+            <ClockIcon />
+            <AlertTitle>
+              Laporan pengembalian {formatRupiah(claim.amount)} menunggu konfirmasi Owner/Finance
+            </AlertTitle>
+            <AlertDescription>
+              Dilaporkan {formatDateTime(claim.createdAt)}, tanggal pengembalian {formatDateOnly(claim.returnedOn)}.
+              Selama menunggu, Anda tidak ditagih dan tidak dipotong gaji.
+            </AlertDescription>
+          </Alert>
+        ) : null;
+      }
       return (
         <Alert variant={returnOverdue ? "destructive" : "default"}>
           <CircleAlertIcon />
@@ -409,7 +567,7 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="whitespace-nowrap">Waktu</TableHead>
+            <TableHead className="whitespace-nowrap">Dicatat</TableHead>
             <TableHead>Keterangan</TableHead>
             <TableHead className="pr-8 text-right">Nominal</TableHead>
           </TableRow>
@@ -421,6 +579,7 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
               <TableCell className="min-w-48 align-top whitespace-normal">
                 <span className="block font-medium">{LEDGER_ENTRY_LABELS[entry.type] ?? entry.type}</span>
                 <span className="block text-xs text-muted-foreground">{ledgerDetail(entry)}</span>
+                <LedgerProof entry={entry} />
               </TableCell>
               <TableCell
                 className={cn(
@@ -466,7 +625,8 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
               </span>
             </div>
             <p className="text-xs break-words text-muted-foreground">{ledgerDetail(entry)}</p>
-            <p className="text-xs text-muted-foreground">{formatDateTime(entry.createdAt)}</p>
+            <LedgerProof entry={entry} />
+            <p className="text-xs text-muted-foreground">Dicatat {formatDateTime(entry.createdAt)}</p>
           </li>
         ))}
         <li className="flex items-center justify-between gap-2 rounded-lg border bg-muted/50 p-3 font-semibold">
@@ -481,17 +641,59 @@ function LedgerTable({ entries }: { entries: LedgerEntry[] }) {
   );
 }
 
-// "Transfer · ref. 123 · oleh Budi": rincian satu transaksi saldo.
+// "Transfer · diterima 3 Nov 2026 · ref. 123 · oleh Budi": rincian satu transaksi
+// saldo. Tiga tanggal: dilaporkan karyawan, diterima (uang masuk), dicatat (kolom Dicatat).
 function ledgerDetail(entry: LedgerEntry) {
   return [
     entry.method && LEDGER_METHOD_LABELS[entry.method],
     entry.payrollPeriod && `periode ${entry.payrollPeriod}`,
+    entry.receivedOn && `${entry.type === "REIMBURSEMENT" ? "dibayar" : "diterima"} ${formatDateOnly(entry.receivedOn)}`,
+    entry.reportedAt && `dilaporkan ${formatDateTime(entry.reportedAt)}`,
+    ackText(entry),
     entry.reference && `ref. ${entry.reference}`,
     entry.note,
     `oleh ${entry.createdByName}`,
   ]
     .filter(Boolean)
     .join(" · ");
+}
+
+// Tautan bukti yang membuka pratinjau mengambang (components/file-preview.tsx).
+function ProofLink({ src, claim }: { src: string; claim: Pick<ReturnClaim, "hasProof" | "proofIsPdf" | "proofDeleted"> }) {
+  if (!claim.hasProof) return <span className="text-muted-foreground">Tidak ada</span>;
+  if (claim.proofDeleted) return <span className="text-muted-foreground">Dihapus (lewat masa simpan)</span>;
+  const Icon = claim.proofIsPdf ? FileTextIcon : ImageIcon;
+  return (
+    <FilePreview src={src} isPdf={claim.proofIsPdf} title="Pratinjau bukti">
+      <Icon className="size-4" />
+      Lihat bukti
+    </FilePreview>
+  );
+}
+
+// Status konfirmasi karyawan atas penggantian (BUSINESS-FLOW §8.1.2).
+function ackText(entry: LedgerEntry) {
+  switch (entry.ackStatus) {
+    case "PENDING":
+      return `menunggu konfirmasi karyawan (otomatis dianggap diterima ${formatDate(new Date(entry.createdAt.getTime() + REIMBURSE_ACK_DAYS * 24 * 60 * 60 * 1000))})`;
+    case "CONFIRMED":
+      return `dikonfirmasi karyawan${entry.ackAt ? ` ${formatDateTime(entry.ackAt)}` : ""}`;
+    case "AUTO":
+      return `dianggap diterima (${REIMBURSE_ACK_DAYS} hari tanpa jawaban)`;
+    case "DISPUTED":
+      return `karyawan belum menerima${entry.ackNote ? ` ("${entry.ackNote}")` : ""}`;
+    default:
+      return null;
+  }
+}
+
+function LedgerProof({ entry, emptyText }: { entry: LedgerEntry; emptyText?: string }) {
+  if (!entry.hasProof) return emptyText ? <span className="text-muted-foreground">{emptyText}</span> : null;
+  return (
+    <span className="mt-1 block">
+      <ProofLink src={`/api/ledger-proofs/${entry.id}`} claim={entry} />
+    </span>
+  );
 }
 
 function Item({ label, children }: { label: string; children: ReactNode }) {

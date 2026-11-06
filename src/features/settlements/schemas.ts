@@ -75,10 +75,54 @@ export const verificationSchema = z.array(
 
 export type VerificationDecision = z.infer<typeof verificationSchema>[number];
 
+// Tanggal "2026-11-03" dari <input type="date">; kosong = hari ini (diisi server).
+const optionalDate = z
+  .string()
+  .trim()
+  .refine((value) => value === "" || (/^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`))), "Tanggal tidak valid")
+  .transform((value) => value || null);
+
+const requiredDate = (message: string) =>
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, message)
+    .refine((value) => !Number.isNaN(Date.parse(`${value}T00:00:00Z`)), "Tanggal tidak valid");
+
+const optionalNote = z
+  .string()
+  .trim()
+  .max(300, "Catatan maksimal 300 karakter")
+  .transform((value) => value || null);
+
+// Karyawan melapor sudah mengembalikan sisa dana (BUSINESS-FLOW §8.1.1).
+export const reportReturnSchema = z.object({
+  amount,
+  method: z.enum(SETTLE_METHODS, "Pilih cara pengembalian"),
+  returnedOn: requiredDate("Isi tanggal pengembalian"),
+  note: optionalNote,
+});
+
+// Owner/Finance mengonfirmasi laporan: nominal & tanggal diterima boleh dikoreksi.
+export const confirmClaimSchema = z.object({
+  amount,
+  receivedOn: requiredDate("Isi tanggal diterima"),
+  note: optionalNote,
+});
+
+export const rejectClaimSchema = z.object({
+  reason: z
+    .string()
+    .trim()
+    .min(5, "Alasan minimal 5 karakter")
+    .max(500, "Alasan maksimal 500 karakter"),
+});
+
 // Pengembalian sisa dana / pembayaran penggantian (OWNER/FINANCE).
 export const balancePaymentSchema = z.object({
   amount,
   method: z.enum(SETTLE_METHODS, "Pilih cara pembayaran"),
+  // Tanggal uang diterima/dibayarkan; kosong = hari ini.
+  receivedOn: optionalDate,
   reference: z
     .string()
     .trim()

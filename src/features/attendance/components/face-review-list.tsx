@@ -4,8 +4,8 @@
 //
 // Tanggal diformat di server (zona waktu perusahaan) lalu dikirim sebagai teks.
 //
-// Bagian "Status pengguna wajib absen": ringkasan kemajuan, filter status,
-// pencarian nama/email, dan daftar dengan yang perlu ditindaklanjuti di atas.
+// Bagian "Status pengguna wajib absen": filter status (chip), pencarian
+// nama/email, dan daftar dengan yang perlu ditindaklanjuti di atas.
 
 "use client";
 
@@ -282,8 +282,6 @@ function FaceStatusSection({ rows }: { rows: FaceReviewRow[] }) {
   const items = rows.map((row) => ({ row, key: statusKey(row) }));
   const count = (target: Filter) =>
     target === "ALL" ? items.length : items.filter((item) => STATUS[item.key].group === target).length;
-  const ready = count("READY");
-  const percent = items.length === 0 ? 0 : Math.round((ready / items.length) * 100);
 
   const needle = query.trim().toLowerCase();
   const visible = items
@@ -298,27 +296,9 @@ function FaceStatusSection({ rows }: { rows: FaceReviewRow[] }) {
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="all-faces">
-      <div className="flex flex-col gap-3 rounded-xl border bg-card p-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 id="all-faces" className="font-medium">
-            Status pengguna wajib absen
-          </h2>
-          <p className="text-sm text-muted-foreground tabular-nums">
-            <strong className="text-foreground">{ready}</strong> dari {items.length} siap absen
-            {items.length > 0 && ` (${percent}%)`}
-          </p>
-        </div>
-        <div
-          className="h-2 overflow-hidden rounded-full bg-muted"
-          role="progressbar"
-          aria-label="Pengguna yang siap absen"
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-        >
-          <div className="h-full rounded-full bg-emerald-500 transition-[width] duration-500" style={{ width: `${percent}%` }} />
-        </div>
-      </div>
+      <h2 id="all-faces" className="font-medium">
+        Status pengguna wajib absen ({items.length})
+      </h2>
 
       {items.length === 0 ? (
         <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">

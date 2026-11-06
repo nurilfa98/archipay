@@ -15,6 +15,8 @@ const LABELS: Record<SettlementTodo["kind"], string> = {
   return: "Kembalikan sisa dana",
   verify: "Verifikasi nota",
   "record-return": "Catat pengembalian sisa dana",
+  "confirm-claim": "Konfirmasi laporan pengembalian",
+  "ack-reimburse": "Konfirmasi penerimaan penggantian",
   reimburse: "Bayar penggantian kekurangan",
 };
 
@@ -65,11 +67,20 @@ function Warning({ todo }: { todo: SettlementTodo }) {
 
 // Untuk pengembalian/penggantian yang ditampilkan adalah sisa saldo, bukan dana awal.
 function todoAmount(todo: SettlementTodo) {
-  return todo.kind === "return" || todo.kind === "record-return" || todo.kind === "reimburse"
+  if (todo.kind === "ack-reimburse") return todo.ackAmount;
+  return todo.kind === "return" ||
+    todo.kind === "record-return" ||
+    todo.kind === "confirm-claim" ||
+    todo.kind === "reimburse"
     ? Math.abs(todo.balance)
     : todo.amount;
 }
 
 function isVerifierTask(todo: SettlementTodo) {
-  return todo.kind === "verify" || todo.kind === "record-return" || todo.kind === "reimburse";
+  return (
+    todo.kind === "verify" ||
+    todo.kind === "record-return" ||
+    todo.kind === "confirm-claim" ||
+    todo.kind === "reimburse"
+  );
 }

@@ -56,6 +56,7 @@ export const LINE_SOURCES = [
   "PRORATE",
   "ABSENCE",
   "ADVANCE",
+  "REIMBURSE",
   "PENALTY",
   "MANUAL",
 ] as const;
@@ -63,7 +64,7 @@ export type LineSource = (typeof LINE_SOURCES)[number];
 
 // Baris yang nominalnya boleh diubah Owner di draf. Gaji pokok/tunjangan/
 // potongan tetap diubah lewat data gaji; denda hanya bisa dihapus (ditunda).
-export const EDITABLE_SOURCES: readonly LineSource[] = ["PRORATE", "ABSENCE", "ADVANCE", "MANUAL"];
+export const EDITABLE_SOURCES: readonly LineSource[] = ["PRORATE", "ABSENCE", "ADVANCE", "REIMBURSE", "MANUAL"];
 // Baris yang boleh dihapus dari draf.
 export const REMOVABLE_SOURCES: readonly LineSource[] = [
   "ALLOWANCE",
@@ -72,6 +73,7 @@ export const REMOVABLE_SOURCES: readonly LineSource[] = [
   "PRORATE",
   "ABSENCE",
   "ADVANCE",
+  "REIMBURSE",
   "PENALTY",
   "MANUAL",
 ];

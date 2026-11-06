@@ -77,6 +77,50 @@ export function digestEmail(input: {
       })),
     });
   }
+  if (data.pendingReturnClaims.length) {
+    sections.push({
+      title: "Laporan pengembalian menunggu konfirmasi",
+      note: "Karyawan sudah melapor mengembalikan sisa dana. Cek mutasi/kas lalu konfirmasi atau tolak.",
+      rows: data.pendingReturnClaims.map((claim) => ({
+        cells: [
+          claim.number,
+          claim.recipientName,
+          `${formatRupiah(claim.amount)} (${claim.method === "CASH" ? "tunai" : "transfer"}), dilaporkan ${shortDate.format(claim.createdAt)}`,
+        ],
+        href: url(`/settlements/${claim.settlementId}`),
+        warn: "belum diputuskan",
+      })),
+    });
+  }
+  if (data.unpaidReimbursements.length) {
+    sections.push({
+      title: "Penggantian kekurangan belum dibayar",
+      note: "Karyawan sudah menalangi; kantor wajib menggantinya.",
+      rows: data.unpaidReimbursements.map((item) => ({
+        cells: [
+          item.number,
+          item.recipientName,
+          `kekurangan ${formatRupiah(item.amount)}, terverifikasi ${shortDate.format(item.at)}`,
+        ],
+        href: url(`/settlements/${item.settlementId}`),
+        warn: "belum dibayar",
+      })),
+    });
+  }
+  if (data.unconfirmedReimbursements.length) {
+    sections.push({
+      title: "Penggantian belum dikonfirmasi karyawan",
+      note: "Sudah dibayar, tapi karyawan belum menjawab sudah/belum menerima. Otomatis dianggap diterima setelah 3 hari.",
+      rows: data.unconfirmedReimbursements.map((item) => ({
+        cells: [
+          item.number,
+          item.recipientName,
+          `${formatRupiah(item.amount)} dibayar ${shortDate.format(item.at)}`,
+        ],
+        href: url(`/settlements/${item.settlementId}`),
+      })),
+    });
+  }
   if (data.approvedNotDisbursed.length) {
     sections.push({
       title: "Sudah disetujui, belum dicairkan",

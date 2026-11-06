@@ -129,6 +129,7 @@ function toRow(settlement: SettlementListItem): SettlementRow {
     advanceAmount: settlement.advanceAmount,
     balanceAmount: settlement.balanceAmount,
     returnOverdue: settlement.returnOverdue,
+    pendingClaim: settlement.pendingClaim,
     status: settlement.status,
   };
 }

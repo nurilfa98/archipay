@@ -2,29 +2,35 @@
 // "Catat penggantian" (kantor membayar kekurangan) untuk OWNER/FINANCE.
 //
 // Nominal awal = seluruh sisa, tetapi boleh diubah untuk cicilan. Server
-// menolak nominal yang melebihi sisa saldo di ledger.
+// menolak nominal yang melebihi sisa saldo di ledger. Tanggal diterima/dibayarkan
+// (bawaan hari ini, boleh mundur 30 hari) dan foto bukti opsional ikut dicatat
+// (BUSINESS-FLOW §8.1.1).
 
 "use client";
 
 import { useState } from "react";
-import { Field, FieldError, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ActionDialog } from "@/features/advances/components/action-dialog";
 import { recordReimbursement, recordReturn } from "@/features/settlements/actions";
-import { LEDGER_METHOD_LABELS, SETTLE_METHODS, type SettleMethod } from "@/features/settlements/constants";
+import type { SettleMethod } from "@/features/settlements/constants";
 import { formatRupiah } from "@/lib/format";
+import { DateField, MethodField, ProofField } from "./balance-fields";
 
 export function SettlementBalanceAction({
   settlementId,
   kind,
   outstanding,
   summary,
+  today,
+  minDate,
 }: {
   settlementId: string;
   kind: "return" | "reimburse";
   outstanding: number; // sisa saldo saat ini (positif)
   summary: string; // "PJ-2026-10-0001 · Budi"
+  today: string; // "2026-11-06" (zona waktu perusahaan)
+  minDate: string; // tanggal paling awal yang boleh dipilih
 }) {
   const [method, setMethod] = useState<SettleMethod>("CASH");
   const isReturn = kind === "return";
@@ -45,25 +51,36 @@ export function SettlementBalanceAction({
       {(fieldError) => (
         <>
           <AmountField defaultValue={outstanding} error={fieldError("amount")} />
-          <FieldSet>
-            <FieldLegend variant="label">{isReturn ? "Dikembalikan secara" : "Dibayar secara"}</FieldLegend>
-            <RadioGroup
-              name="method"
-              value={method}
-              onValueChange={(value) => setMethod(value as SettleMethod)}
-              className="flex gap-6"
-            >
-              {SETTLE_METHODS.map((option) => (
-                <Field key={option} orientation="horizontal" className="w-auto">
-                  <RadioGroupItem value={option} id={`settle-method-${option}`} />
-                  <FieldLabel htmlFor={`settle-method-${option}`} className="font-normal">
-                    {LEDGER_METHOD_LABELS[option]}
-                  </FieldLabel>
-                </Field>
-              ))}
-            </RadioGroup>
-            <FieldError>{fieldError("method")}</FieldError>
-          </FieldSet>
+          <MethodField
+            legend={isReturn ? "Dikembalikan secara" : "Dibayar secara"}
+            value={method}
+            onChange={setMethod}
+            error={fieldError("method")}
+          />
+          <DateField
+            name="receivedOn"
+            label={isReturn ? "Tanggal diterima" : "Tanggal dibayar"}
+            description={
+              isReturn
+                ? "Tanggal uang benar-benar Anda terima (mutasi rekening untuk transfer). Bawaan hari ini."
+                : "Tanggal kekurangan benar-benar dibayarkan ke karyawan. Bawaan hari ini."
+            }
+            defaultValue={today}
+            min={minDate}
+            max={today}
+            error={fieldError("receivedOn")}
+          />
+          <ProofField
+            error={fieldError("proof")}
+            required={!isReturn && method === "TRANSFER"}
+            description={
+              !isReturn
+                ? method === "TRANSFER"
+                  ? "Screenshot bukti transfer ke karyawan, maksimal 4 MB."
+                  : "Tunai: karyawan akan diminta menekan Sudah saya terima. Foto kuitansi bila ada, maksimal 4 MB."
+                : undefined
+            }
+          />
           {method === "TRANSFER" && (
             <Field data-invalid={!!fieldError("reference")}>
               <FieldLabel htmlFor="reference">Nomor referensi transfer (opsional)</FieldLabel>

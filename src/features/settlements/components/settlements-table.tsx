@@ -50,8 +50,18 @@ export type SettlementRow = {
   advanceAmount: number; // dana uang muka, untuk perkiraan sisa saldo
   balanceAmount: number | null; // saldo resmi dari ledger, null sebelum diverifikasi
   returnOverdue: boolean;
+  pendingClaim: boolean; // karyawan sudah melapor mengembalikan, menunggu konfirmasi
   status: SettlementStatus;
 };
+
+// Karyawan sudah melapor "saya sudah mengembalikan" dan menunggu Owner/Finance.
+function PendingClaimNote() {
+  return (
+    <span className="mt-1 block text-xs font-medium text-amber-700 dark:text-amber-300">
+      laporan pengembalian menunggu
+    </span>
+  );
+}
 
 // Saldo yang ditampilkan: resmi (ledger) setelah diverifikasi; sebelum itu
 // perkiraan = dana − total nota, dan hanya bila sudah ada nota (draf kosong
@@ -175,6 +185,7 @@ const statusColumn = column.accessor("status", {
   cell: ({ row }) => (
     <>
       <SettlementStatusBadge status={row.original.status} />
+      {row.original.pendingClaim && <PendingClaimNote />}
       {row.original.returnOverdue && (
         <span className="mt-1 block text-xs font-medium text-amber-700 dark:text-amber-300">
           lewat batas pengembalian
@@ -338,7 +349,10 @@ function SettlementCard({ row, showRecipient }: { row: SettlementRow; showRecipi
             </span>
           )}
         </span>
-        <SettlementStatusBadge status={row.status} />
+        <div className="flex flex-col items-end gap-0.5">
+          <SettlementStatusBadge status={row.status} />
+          {row.pendingClaim && <PendingClaimNote />}
+        </div>
       </div>
       <p className="line-clamp-2 text-sm">{row.purpose}</p>
       <p className="text-xs text-muted-foreground">

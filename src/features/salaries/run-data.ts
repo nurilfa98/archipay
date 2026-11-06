@@ -79,12 +79,15 @@ export async function buildPayslipDrafts(
     : [[], [], []];
   const tracked = new Map(reviewPeople.map((person) => [person.id, person.startDate]));
 
-  const [advanceCandidates, postedAdvances, penaltyCandidates, postedPenalties] = await Promise.all([
-    listPayrollCandidates(companyId),
-    listPostedAdvances(companyId, period),
-    listPenaltyCandidates(companyId),
-    listPostedPenalties(companyId, period),
-  ]);
+  const [advanceCandidates, postedAdvances, penaltyCandidates, postedPenalties, reimbursementCandidates, postedReimbursements] =
+    await Promise.all([
+      listPayrollCandidates(companyId),
+      listPostedAdvances(companyId, period),
+      listPenaltyCandidates(companyId),
+      listPostedPenalties(companyId, period),
+      listReimbursementCandidates(companyId),
+      listPostedReimbursements(companyId, period),
+    ]);
 
   const absenceDeductionActive = settings.absenceDeduction && options.attendanceActive;
   const drafts: PayslipDraft[] = [];
@@ -141,6 +144,29 @@ export async function buildPayslipDrafts(
         postedAt: null,
       });
     }
+    // Penggantian kekurangan (kantor nombok) dibayar lewat slip: pendapatan,
+    // dicatat ke ledger saat penggajian diselesaikan (tanpa konfirmasi karyawan,
+    // slip sendiri buktinya). Hapus baris di draf bila dibayar dengan cara lain.
+    for (const item of postedReimbursements.filter((row) => row.recipientId === person.id)) {
+      lines.push({
+        type: "EARNING",
+        source: "REIMBURSE",
+        label: `Penggantian uang muka ${item.advanceNumber} (${item.settlementNumber ?? "-"})`,
+        amount: item.amount,
+        refId: item.settlementId,
+        postedAt: item.postedAt,
+      });
+    }
+    for (const item of reimbursementCandidates.filter((row) => row.recipientId === person.id)) {
+      lines.push({
+        type: "EARNING",
+        source: "REIMBURSE",
+        label: `Penggantian uang muka ${item.advanceNumber} (${item.settlementNumber ?? "-"})`,
+        amount: item.outstanding,
+        refId: item.settlementId,
+        postedAt: null,
+      });
+    }
     for (const penalty of postedPenalties.filter((row) => row.userId === person.id)) {
       lines.push({
         type: "DEDUCTION",
@@ -193,6 +219,50 @@ async function listPostedAdvances(companyId: string, period: string) {
       and(
         eq(advanceLedgerEntries.companyId, companyId),
         eq(advanceLedgerEntries.type, "PAYROLL_DEDUCTION"),
+        eq(advanceLedgerEntries.payrollPeriod, period),
+      ),
+    )
+    .groupBy(advanceRequests.recipientId, advanceRequests.number, settlements.id, settlements.number);
+}
+
+// Penggantian kekurangan yang belum dibayar (uang muka REIMBURSE_PENDING): sisa
+// kewajiban kantor ke karyawan, positif.
+async function listReimbursementCandidates(companyId: string) {
+  return db
+    .select({
+      recipientId: advanceRequests.recipientId,
+      advanceNumber: advanceRequests.number,
+      settlementId: settlements.id,
+      settlementNumber: settlements.number,
+      outstanding:
+        sql`-coalesce((select sum(${advanceLedgerEntries.amount}) from ${advanceLedgerEntries} where ${advanceLedgerEntries.advanceId} = ${advanceRequests.id}), 0)`.mapWith(
+          Number,
+        ),
+    })
+    .from(settlements)
+    .innerJoin(advanceRequests, eq(settlements.advanceId, advanceRequests.id))
+    .where(and(eq(settlements.companyId, companyId), eq(advanceRequests.status, "REIMBURSE_PENDING")));
+}
+
+// Penggantian yang sudah dicatat lewat slip gaji periode ini, per laporan.
+async function listPostedReimbursements(companyId: string, period: string) {
+  return db
+    .select({
+      recipientId: advanceRequests.recipientId,
+      advanceNumber: advanceRequests.number,
+      settlementId: settlements.id,
+      settlementNumber: settlements.number,
+      amount: sql`sum(${advanceLedgerEntries.amount})`.mapWith(Number),
+      postedAt: sql<Date>`max(${advanceLedgerEntries.createdAt})`.mapWith((value) => new Date(value)),
+    })
+    .from(advanceLedgerEntries)
+    .innerJoin(advanceRequests, eq(advanceLedgerEntries.advanceId, advanceRequests.id))
+    .innerJoin(settlements, eq(settlements.advanceId, advanceRequests.id))
+    .where(
+      and(
+        eq(advanceLedgerEntries.companyId, companyId),
+        eq(advanceLedgerEntries.type, "REIMBURSEMENT"),
+        eq(advanceLedgerEntries.method, "PAYROLL"),
         eq(advanceLedgerEntries.payrollPeriod, period),
       ),
     )

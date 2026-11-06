@@ -38,9 +38,17 @@ export async function postBalanceEntry(input: {
   payrollPeriod?: string | null;
   note: string | null;
   audit: AuditAction;
+  // Tanggal uang diterima/dibayarkan ("2026-11-03") & bukti opsional
+  // (features/settlements/balance-evidence.ts). Kosong untuk potong gaji.
+  receivedOn?: string | null;
+  proof?: { key: string; contentType: string } | null;
+  // Penggantian yang dibayar Owner/Finance menunggu konfirmasi karyawan
+  // (BUSINESS-FLOW §8.1.2); null untuk jenis lain & penggantian lewat slip gaji.
+  ackStatus?: "PENDING" | null;
   // Dijalankan di transaksi yang sama setelah tercatat (mis. menandai baris
-  // slip gaji tercatat, features/salaries/run-actions.ts).
-  onPosted?: (tx: Transaction) => Promise<void>;
+  // slip gaji tercatat, features/salaries/run-actions.ts, atau mengubah laporan
+  // pengembalian menjadi dikonfirmasi). Melempar error = seluruh pencatatan batal.
+  onPosted?: (tx: Transaction, entry: { id: string }) => Promise<void>;
 }): Promise<BalanceEntryResult> {
   const expectedStatus = input.type === "REIMBURSEMENT" ? "REIMBURSE_PENDING" : "RETURN_PENDING";
   const ip = await getClientIp();
@@ -62,17 +70,24 @@ export async function postBalanceEntry(input: {
     if (input.amount > outstanding) return { ok: false, reason: "EXCEEDS", outstanding } as const;
 
     const signed = input.type === "REIMBURSEMENT" ? input.amount : -input.amount;
-    await tx.insert(advanceLedgerEntries).values({
-      companyId: input.actor.company.id,
-      advanceId: input.advanceId,
-      type: input.type,
-      amount: signed,
-      method: input.method,
-      reference: input.reference,
-      payrollPeriod: input.payrollPeriod ?? null,
-      note: input.note,
-      createdById: input.actor.id,
-    });
+    const [entry] = await tx
+      .insert(advanceLedgerEntries)
+      .values({
+        companyId: input.actor.company.id,
+        advanceId: input.advanceId,
+        type: input.type,
+        amount: signed,
+        method: input.method,
+        reference: input.reference,
+        payrollPeriod: input.payrollPeriod ?? null,
+        note: input.note,
+        receivedOn: input.receivedOn ?? null,
+        proofKey: input.proof?.key ?? null,
+        proofContentType: input.proof?.contentType ?? null,
+        ackStatus: input.ackStatus ?? null,
+        createdById: input.actor.id,
+      })
+      .returning({ id: advanceLedgerEntries.id });
 
     const remaining = outstanding - input.amount;
     if (remaining === 0) {
@@ -92,6 +107,7 @@ export async function postBalanceEntry(input: {
           method: input.method,
           reference: input.reference,
           payrollPeriod: input.payrollPeriod ?? null,
+          receivedOn: input.receivedOn ?? null,
           remaining,
           status: remaining === 0 ? "CLOSED" : expectedStatus,
         },
@@ -99,7 +115,7 @@ export async function postBalanceEntry(input: {
       },
       tx,
     );
-    await input.onPosted?.(tx);
+    await input.onPosted?.(tx, entry);
     return { ok: true, amount: input.amount, remaining, closed: remaining === 0 } as const;
   });
 }

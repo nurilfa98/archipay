@@ -67,6 +67,7 @@ export const LEDGER_ENTRY_TYPES = [
   "RETURN", // − sisa dana dikembalikan karyawan
   "PAYROLL_DEDUCTION", // − sisa dana dipotong dari gaji
   "REIMBURSEMENT", // + kantor mengganti kekurangan
+  "REIMBURSEMENT_REVERSAL", // − penggantian dibatalkan: karyawan menyatakan belum menerima
 ] as const;
 export type LedgerEntryType = (typeof LEDGER_ENTRY_TYPES)[number];
 
@@ -76,6 +77,7 @@ export const LEDGER_ENTRY_LABELS: Record<LedgerEntryType, string> = {
   RETURN: "Sisa dana dikembalikan",
   PAYROLL_DEDUCTION: "Potong gaji",
   REIMBURSEMENT: "Penggantian dibayar",
+  REIMBURSEMENT_REVERSAL: "Penggantian dibatalkan",
 };
 
 // Cara pengembalian / penggantian. PAYROLL hanya untuk potong gaji.
@@ -86,6 +88,28 @@ export const LEDGER_METHOD_LABELS: Record<string, string> = {
   TRANSFER: "Transfer",
   PAYROLL: "Potong gaji",
 };
+
+// Laporan pengembalian dari karyawan (BUSINESS-FLOW §8.1.1).
+export const RETURN_CLAIM_STATUS = ["PENDING", "CONFIRMED", "REJECTED"] as const;
+export type ReturnClaimStatus = (typeof RETURN_CLAIM_STATUS)[number];
+
+export const RETURN_CLAIM_STATUS_LABELS: Record<ReturnClaimStatus, string> = {
+  PENDING: "Menunggu konfirmasi",
+  CONFIRMED: "Dikonfirmasi",
+  REJECTED: "Ditolak",
+};
+
+// Konfirmasi karyawan atas penggantian yang dibayar (BUSINESS-FLOW §8.1.2).
+export const ACK_STATUS = ["PENDING", "CONFIRMED", "DISPUTED", "AUTO"] as const;
+export type AckStatus = (typeof ACK_STATUS)[number];
+// Tanpa jawaban sekian hari, penggantian dianggap sudah diterima.
+export const REIMBURSE_ACK_DAYS = 3;
+
+// Tanggal diterima / dikembalikan boleh mundur paling jauh sekian hari dari
+// saat dicatat (tidak boleh ke depan, tidak boleh sebelum dana dicairkan).
+export const BACKDATE_MAX_DAYS = 30;
+// Laporan yang belum diputuskan lebih dari sekian hari masuk ringkasan email.
+export const CLAIM_ESCALATE_DAYS = 2;
 
 // Batas file nota. Foto dikompres di HP lebih dulu (biasanya < 500 KB);
 // batas ini terutama untuk PDF nota digital.

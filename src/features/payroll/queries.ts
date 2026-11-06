@@ -9,9 +9,10 @@
 // bagian penggajian, lalu menandai "sudah dipotong" setelah gaji dibayar.
 
 import "server-only";
-import { and, asc, desc, eq, like, lt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, like, lt, not, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { io } from "next/cache";
+import { hasPendingReturnClaim } from "@/features/settlements/queries";
 import { db } from "@/lib/db";
 import { advanceLedgerEntries, advanceRequests, settlements, users } from "@/lib/db/schema";
 import { env } from "@/lib/env";
@@ -56,6 +57,9 @@ export async function listPayrollCandidates(companyId: string): Promise<PayrollC
         eq(settlements.companyId, companyId),
         eq(advanceRequests.status, "RETURN_PENDING"),
         lt(settlements.returnDueAt, sql`now()`),
+        // Ada laporan pengembalian karyawan yang belum diputuskan: jangan dipotong
+        // dulu (BUSINESS-FLOW §8.1.1).
+        not(hasPendingReturnClaim),
       ),
     )
     .orderBy(asc(recipient.fullName), asc(settlements.returnDueAt));

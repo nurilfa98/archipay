@@ -626,13 +626,83 @@ export const advanceLedgerEntries = pgTable(
     // Periode gaji untuk PAYROLL_DEDUCTION, "2026-11".
     payrollPeriod: varchar("payroll_period", { length: 7 }),
     note: varchar("note", { length: 300 }),
+    // Tanggal uang benar-benar diterima/dibayarkan (BUSINESS-FLOW §8.1.1);
+    // created_at = kapan dicatat di sistem. Null pada baris lama & baris otomatis.
+    receivedOn: date("received_on"),
+    // Foto/PDF bukti (opsional) di R2; dihapus otomatis oleh cron setelah masa
+    // simpan (features/settlements/receipt-retention.ts), lalu proof_deleted_at diisi.
+    proofKey: varchar("proof_key", { length: 255 }),
+    proofContentType: varchar("proof_content_type", { length: 50 }),
+    proofDeletedAt: timestamptz("proof_deleted_at"),
+    // Konfirmasi karyawan atas penggantian (REIMBURSEMENT) yang dibayar
+    // Owner/Finance (BUSINESS-FLOW §8.1.2): PENDING (menunggu), CONFIRMED
+    // ("sudah saya terima"), DISPUTED ("belum saya terima" → dibalik oleh baris
+    // REIMBURSEMENT_REVERSAL), AUTO (3 hari tanpa jawaban → dianggap diterima).
+    // Null = bukan penggantian, atau dibayar lewat slip gaji (slip = buktinya).
+    ackStatus: varchar("ack_status", { length: 20 }),
+    ackAt: timestamptz("ack_at"),
+    ackNote: varchar("ack_note", { length: 300 }),
+    // Baris pembalik menunjuk baris penggantian yang dibatalkan (satu kali saja).
+    reversalOf: varchar("reversal_of", { length: 36 }),
     createdById: userRef("created_by_id").notNull(),
     createdAt: createdAt(),
   },
   (t) => [
     check("advance_ledger_entries_amount_nonzero", sql`${t.amount} <> 0`),
+    check(
+      "advance_ledger_entries_ack_status",
+      sql`${t.ackStatus} IS NULL OR ${t.ackStatus} IN ('PENDING', 'CONFIRMED', 'DISPUTED', 'AUTO')`,
+    ),
+    uniqueIndex("advance_ledger_entries_one_reversal").on(t.reversalOf).where(sql`${t.reversalOf} IS NOT NULL`),
+    index("advance_ledger_entries_ack_pending_idx").on(t.createdAt).where(sql`${t.ackStatus} = 'PENDING'`),
     index("advance_ledger_entries_advance_idx").on(t.advanceId, t.createdAt),
     index("advance_ledger_entries_payroll_idx").on(t.companyId, t.payrollPeriod),
+  ],
+);
+
+// Laporan pengembalian sisa dana dari karyawan (BUSINESS-FLOW §8.1.1). Karyawan
+// melapor "saya sudah mengembalikan" beserta tanggalnya; Owner/Finance
+// mengecek uangnya (mutasi/kas) lalu mengonfirmasi (→ baris RETURN di ledger)
+// atau menolak. Selama PENDING, uang muka itu tidak dianggap terlambat:
+// pengingat berhenti, tidak masuk Potong Gaji, dan penggajian diblokir.
+//
+// created_at = dilaporkan; decided_at = dikonfirmasi/ditolak; returned_on =
+// tanggal menurut karyawan; received_on = tanggal diterima menurut pemeriksa.
+export const returnClaims = pgTable(
+  "return_claims",
+  {
+    id: id(),
+    companyId: companyRef(),
+    settlementId: varchar("settlement_id", { length: 36 })
+      .notNull()
+      .references(() => settlements.id),
+    advanceId: varchar("advance_id", { length: 36 })
+      .notNull()
+      .references(() => advanceRequests.id),
+    reporterId: userRef("reporter_id").notNull(),
+    amount: rupiah("amount").notNull(),
+    method: varchar("method", { length: 20 }).notNull(),
+    returnedOn: date("returned_on").notNull(),
+    note: varchar("note", { length: 300 }),
+    proofKey: varchar("proof_key", { length: 255 }),
+    proofContentType: varchar("proof_content_type", { length: 50 }),
+    proofDeletedAt: timestamptz("proof_deleted_at"),
+    status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+    createdAt: createdAt(),
+    decidedAt: timestamptz("decided_at"),
+    decidedById: userRef("decided_by_id"),
+    rejectReason: varchar("reject_reason", { length: 500 }),
+    receivedOn: date("received_on"),
+    ledgerEntryId: varchar("ledger_entry_id", { length: 36 }).references(() => advanceLedgerEntries.id),
+  },
+  (t) => [
+    check("return_claims_status_check", sql`${t.status} IN ('PENDING', 'CONFIRMED', 'REJECTED')`),
+    check("return_claims_method_check", sql`${t.method} IN ('CASH', 'TRANSFER')`),
+    check("return_claims_amount_check", sql`${t.amount} > 0`),
+    // Satu laporan menunggu per pertanggungjawaban.
+    uniqueIndex("return_claims_one_pending").on(t.settlementId).where(sql`${t.status} = 'PENDING'`),
+    index("return_claims_company_status_idx").on(t.companyId, t.status, t.createdAt),
+    index("return_claims_settlement_idx").on(t.settlementId, t.createdAt),
   ],
 );
 

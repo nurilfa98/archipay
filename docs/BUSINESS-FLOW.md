@@ -284,7 +284,47 @@ dari gaji → saldo 0 → `CLOSED`.
 
 - Dicatat Owner/Finance (bukan penerima) **setelah uang benar-benar diterima/diserahkan**, dengan metode Tunai/Transfer.
 - Boleh dicicil. Nominal tidak boleh melebihi sisa saldo.
-- Saat saldo menjadi 0, status otomatis `CLOSED`. Karyawan menerima WhatsApp setiap kali ada pencatatan.
+- Saat saldo menjadi 0, status otomatis `CLOSED`. Karyawan menerima WhatsApp setiap kali ada pencatatan (pengembalian tunai tidak dikabari, hemat kuota).
+- Setiap pencatatan menyimpan **tanggal diterima / dibayar** (bawaan hari ini; tidak boleh ke depan, tidak boleh sebelum dana dicairkan, maksimal **30 hari ke belakang**) terpisah dari **waktu dicatat**, dan **foto/PDF bukti opsional** (screenshot transfer atau kuitansi, maks. 4 MB, dikompres di HP). Keduanya tampil di Riwayat saldo; bukti dibuka lewat pratinjau mengambang.
+- Nomor referensi transfer tetap opsional dan hanya berupa catatan (tidak dicek ganda: nomor yang panjang rawan salah ketik dan tetap harus dicocokkan dengan mutasi bank).
+- Bila karyawan sudah **melapor** pengembalian (8.1.1) dan belum diputuskan, pencatatan langsung ditolak: konfirmasi atau tolak laporannya dulu agar satu pengembalian tidak tercatat dua kali.
+
+### 8.1.1 Laporan pengembalian dari karyawan (2026-11-06)
+
+Pengembalian terjadi di luar sistem (tunai atau transfer). Supaya karyawan tidak ditagih atau dipotong gajinya hanya karena Owner/Finance lupa mencatat, karyawan bisa **melapor lebih dulu**:
+
+1. Di pertanggungjawaban yang sisanya belum kembali, karyawan menekan **Saya sudah mengembalikan**: nominal, cara (tunai/transfer), **tanggal pengembalian**, foto bukti opsional, catatan. Satu laporan menunggu per pertanggungjawaban.
+2. Owner/Finance (bukan penerima) mengecek **mutasi rekening** (transfer) atau **kas yang diterima** (tunai) pada tanggal itu, lalu:
+   - **Konfirmasi diterima**: nominal dan **tanggal diterima** terisi dari laporan dan boleh dikoreksi (mis. transfer baru masuk keesokan hari). Jadi baris `RETURN` di ledger; saldo berkurang.
+   - **Tolak** dengan alasan: karyawan dikabari WhatsApp, sisa tetap tercatat belum kembali, dan ia boleh melapor ulang.
+3. Jalur lama tetap ada: Owner/Finance boleh langsung **Catat pengembalian** bila karyawan tidak melapor sendiri.
+
+**Tiga tanggal** (tampil di Riwayat saldo dan Audit Log): *dilaporkan* (otomatis, saat karyawan menekan tombol), *diterima* (tanggal uang benar-benar sampai, diisi karyawan lalu dicek/dikoreksi pemeriksa), *dicatat* (otomatis, saat dikonfirmasi). Jadi karyawan tidak dianggap terlambat karena ia terlambat melapor atau Owner/Finance terlambat mencatat.
+
+**Selama laporan menunggu keputusan** (perlindungan karyawan):
+- uang muka tidak ditandai **lewat batas pengembalian**;
+- pengingat WhatsApp pengembalian (H-1 dan lewat batas) berhenti (aktif lagi bila laporan ditolak);
+- sisanya tidak masuk daftar **Potong Gaji**;
+- **penggajian tidak bisa diselesaikan** bila ada laporan lewat-batas dari karyawan di penggajian itu (kotak peringatan menyebut namanya); konfirmasi atau tolak dulu, lalu Hitung ulang;
+- laporan muncul di **Perlu tindakan** Owner/Finance ("Konfirmasi laporan pengembalian") dan diberi penanda di daftar pertanggungjawaban; laporan yang belum diputuskan lebih dari **2 hari** masuk **ringkasan email** Owner dan Finance.
+
+Bukti (di laporan maupun di pencatatan langsung) disimpan di R2 privat dan dihapus otomatis cron harian setelah masa simpan nota (Pengaturan platform), sejak uang mukanya Selesai; barisnya tetap ada dan ditandai "dihapus (lewat masa simpan)". Tunai tetap tidak bisa dibuktikan sepenuhnya: yang didapat adalah jejak dua sisi dengan cap waktu.
+
+### 8.1.2 Penggantian kekurangan (kantor nombok) dan konfirmasi karyawan (2026-11-06)
+
+Arah uangnya terbalik dari 8.1.1: kantor membayar karyawan, jadi yang berisiko adalah **karyawan** (dicatat "sudah dibayar" padahal belum menerima) dan kekurangan yang **tidak kunjung dibayar**.
+
+1. Owner/Finance (bukan penerima) menekan **Catat penggantian**: nominal, cara, **tanggal dibayar**, catatan.
+   - **Transfer: bukti transfer (screenshot) WAJIB** dilampirkan.
+   - **Tunai:** bukti tidak ada; karyawan sendiri yang mengonfirmasi (langkah 2).
+2. Pembayaran **langsung tercatat** di buku saldo (saldo berkurang, bisa CLOSED) dengan status **Menunggu konfirmasi karyawan**. Karyawan dikabari WhatsApp dan melihat tugas "Konfirmasi penerimaan penggantian" (juga di Perlu tindakan). Pilihannya:
+   - **Sudah saya terima**: status Dikonfirmasi.
+   - **Belum saya terima** (catatan opsional): pencatatan dibatalkan lewat **baris pembalik** `Penggantian dibatalkan` di buku saldo (buku saldo tidak pernah diubah/dihapus), uang muka kembali berstatus menunggu penggantian, dan **Owner serta pencatat pembayaran langsung dikabari WhatsApp** (urgent). Halaman menampilkan peringatan merah sampai dibayar ulang.
+3. **Tanpa jawaban 3 hari**, cron harian menandainya **Dianggap diterima** (otomatis, tercatat di Audit Log tanpa pelaku). Setelah itu sanggahan tidak lewat aplikasi lagi.
+4. **Penggajian tidak diblokir**: penggantian yang belum dikonfirmasi hanya muncul sebagai catatan informasi di halaman penggajian. Alasannya, diamnya karyawan tidak memotong apa pun dari gajinya (berbeda dengan 8.1.1).
+5. **Ringkasan email** Owner dan Finance memuat, setelah lebih dari **2 hari**: penggantian yang **belum dibayar** dan penggantian yang **belum dikonfirmasi karyawan**.
+
+**Dibayar lewat penggajian** (bila add-on Penggajian aktif): kekurangan yang belum dibayar otomatis muncul di draf slip karyawan sebagai baris **pendapatan** "Penggantian uang muka …" (nominal boleh dikurangi untuk dicicil, atau dihapus bila dibayar dengan cara lain). Saat penggajian diselesaikan, baris itu dicatat ke buku saldo dengan cara **Potong gaji/penggajian** dan tanggal bayar penggajian; slip adalah buktinya, jadi **tanpa konfirmasi karyawan**. Buka kunci tidak membatalkan yang sudah tercatat (sama dengan potongan).
 
 ### 8.2 Potong gaji (menu Potong Gaji)
 
@@ -1078,6 +1118,7 @@ Periode = **bulan kalender** ("2026-11"). Satu penggajian per bulan per company.
    | Masuk/berhenti di tengah bulan | potongan | hari kerja di luar masa kerja × tarif harian |
    | Tidak hadir & cuti/izin tidak dibayar | potongan | (hari tidak hadir + hari cuti/izin yang jenisnya *tidak dibayar*) × tarif harian, hanya bila potong otomatis nyala, add-on Absensi aktif, dan karyawan tidak dikecualikan |
    | Sisa uang muka | potongan | setiap sisa uang muka yang lewat batas pengembalian (daftar Potong Gaji), nominal = sisa; plus yang sudah dicatat Finance di Potong Gaji untuk periode gaji bulan ini |
+| Penggantian uang muka | pendapatan | kekurangan (uang muka menunggu penggantian) yang belum dibayar dengan cara lain, nominal = sisa kewajiban kantor; dicatat ke buku saldo saat diselesaikan, tanpa konfirmasi karyawan (§8.1.2) |
    | Denda keterlambatan | potongan | denda yang masih berlaku dari periode absensi yang sudah dikunci & belum dipotong, per bulan absen; plus yang sudah dicatat dipotong untuk periode gaji bulan ini |
 
    Sakit, cuti tahunan, dan izin yang jenisnya *dibayar* **tidak dipotong**

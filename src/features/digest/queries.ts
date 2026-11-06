@@ -3,8 +3,9 @@
 // di features/digest/run.ts.
 
 import "server-only";
-import { and, asc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
+import { CLAIM_ESCALATE_DAYS } from "@/features/settlements/constants";
 import { db } from "@/lib/db";
 import {
   advanceLedgerEntries,
@@ -14,6 +15,7 @@ import {
   leaveTypes,
   projects,
   reminderLogs,
+  returnClaims,
   settlementItems,
   settlements,
   users,
@@ -49,8 +51,31 @@ export type DigestOverdue = {
   balance: number;
 };
 
+export type DigestReturnClaim = {
+  settlementId: string;
+  number: string;
+  recipientName: string;
+  amount: number;
+  method: string;
+  createdAt: Date;
+};
+
+export type DigestReimbursement = {
+  settlementId: string;
+  number: string;
+  recipientName: string;
+  amount: number;
+  at: Date; // dibayar (belum dikonfirmasi) / diverifikasi (belum dibayar)
+};
+
 export type DigestData = {
+  // Penggantian kekurangan yang belum dibayar, dan yang sudah dibayar tetapi
+  // belum dijawab karyawan, lebih dari CLAIM_ESCALATE_DAYS hari (BUSINESS-FLOW §8.1.2).
+  unpaidReimbursements: DigestReimbursement[];
+  unconfirmedReimbursements: DigestReimbursement[];
   pendingApprovals: DigestAdvance[];
+  // Laporan pengembalian karyawan yang belum diputuskan > CLAIM_ESCALATE_DAYS hari.
+  pendingReturnClaims: DigestReturnClaim[];
   pendingFaces: { fullName: string; createdAt: Date }[];
   pendingLeaves: { number: string; fullName: string; typeName: string; startDate: string; endDate: string }[];
   awaitingVerification: DigestSettlement[];
@@ -83,8 +108,19 @@ export async function getDigestData(
       .where(and(eq(advanceRequests.companyId, companyId), eq(advanceRequests.status, status)))
       .orderBy(asc(advanceRequests.createdAt));
 
-  const [pendingApprovals, approvedNotDisbursed, pendingFaces, awaiting, overdue, acknowledged, pendingLeaves] =
-    await Promise.all([
+  const claimCutoff = new Date(Date.now() - CLAIM_ESCALATE_DAYS * 24 * 60 * 60 * 1000);
+  const [
+    pendingApprovals,
+    approvedNotDisbursed,
+    pendingFaces,
+    awaiting,
+    overdue,
+    acknowledged,
+    pendingLeaves,
+    pendingReturnClaims,
+    unpaidReimbursements,
+    unconfirmedReimbursements,
+  ] = await Promise.all([
       byStatus("PENDING_APPROVAL"),
       byStatus("APPROVED"),
       attendance
@@ -163,6 +199,68 @@ export async function getDigestData(
             .where(and(eq(leaveRequests.companyId, companyId), eq(leaveRequests.status, "PENDING")))
             .orderBy(asc(leaveRequests.createdAt))
         : [],
+      db
+        .select({
+          settlementId: returnClaims.settlementId,
+          number: settlements.number,
+          recipientName: recipient.fullName,
+          amount: returnClaims.amount,
+          method: returnClaims.method,
+          createdAt: returnClaims.createdAt,
+        })
+        .from(returnClaims)
+        .innerJoin(settlements, eq(returnClaims.settlementId, settlements.id))
+        .innerJoin(recipient, eq(returnClaims.reporterId, recipient.id))
+        .where(
+          and(
+            eq(returnClaims.companyId, companyId),
+            eq(returnClaims.status, "PENDING"),
+            lt(returnClaims.createdAt, claimCutoff),
+          ),
+        )
+        .orderBy(asc(returnClaims.createdAt)),
+      db
+        .select({
+          settlementId: settlements.id,
+          number: settlements.number,
+          recipientName: recipient.fullName,
+          amount:
+            sql`-coalesce((select sum(${advanceLedgerEntries.amount}) from ${advanceLedgerEntries} where ${advanceLedgerEntries.advanceId} = ${advanceRequests.id}), 0)`.mapWith(
+              Number,
+            ),
+          at: settlements.verifiedAt,
+        })
+        .from(settlements)
+        .innerJoin(advanceRequests, eq(settlements.advanceId, advanceRequests.id))
+        .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
+        .where(
+          and(
+            eq(settlements.companyId, companyId),
+            eq(advanceRequests.status, "REIMBURSE_PENDING"),
+            lt(settlements.verifiedAt, claimCutoff),
+          ),
+        )
+        .orderBy(asc(settlements.verifiedAt)),
+      db
+        .select({
+          settlementId: settlements.id,
+          number: settlements.number,
+          recipientName: recipient.fullName,
+          amount: advanceLedgerEntries.amount,
+          at: advanceLedgerEntries.createdAt,
+        })
+        .from(advanceLedgerEntries)
+        .innerJoin(advanceRequests, eq(advanceLedgerEntries.advanceId, advanceRequests.id))
+        .innerJoin(settlements, eq(settlements.advanceId, advanceRequests.id))
+        .innerJoin(recipient, eq(advanceRequests.recipientId, recipient.id))
+        .where(
+          and(
+            eq(advanceLedgerEntries.companyId, companyId),
+            eq(advanceLedgerEntries.ackStatus, "PENDING"),
+            lt(advanceLedgerEntries.createdAt, claimCutoff),
+          ),
+        )
+        .orderBy(asc(advanceLedgerEntries.createdAt)),
     ]);
 
   return {
@@ -170,6 +268,13 @@ export async function getDigestData(
     approvedNotDisbursed: approvedNotDisbursed.map(withNumber),
     pendingFaces,
     pendingLeaves,
+    pendingReturnClaims: pendingReturnClaims.map((row) => ({ ...row, number: row.number ?? "-" })),
+    unpaidReimbursements: unpaidReimbursements.map((row) => ({
+      ...row,
+      number: row.number ?? "-",
+      at: row.at ?? claimCutoff,
+    })),
+    unconfirmedReimbursements: unconfirmedReimbursements.map((row) => ({ ...row, number: row.number ?? "-" })),
     awaitingVerification: awaiting.map((row) => ({
       id: row.id,
       number: row.number ?? "-",

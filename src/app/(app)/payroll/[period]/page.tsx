@@ -10,6 +10,7 @@ import {
   CircleAlertIcon,
   DownloadIcon,
   FileSpreadsheetIcon,
+  InfoIcon,
   LockIcon,
   SendIcon,
   TriangleAlertIcon,
@@ -46,6 +47,7 @@ import {
 } from "@/features/salaries/constants";
 import { exceedsDeductionLimit } from "@/features/salaries/payslip-math";
 import { getPayrollSettings, getRun, type Payslip, type PayslipLine } from "@/features/salaries/queries";
+import { listPendingAcks, listPendingReturnClaims } from "@/features/settlements/queries";
 import { periodSchema } from "@/features/salaries/schemas";
 import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
@@ -97,6 +99,19 @@ async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">
   const pendingPenalties = allLines.filter((line) => line.source === "PENALTY" && !line.postedAt);
   const needsAttendanceLock = settings.absenceDeduction && user.company.attendance && !attendanceLocked;
   const negative = run.payslips.filter((slip) => slip.netPay < 0);
+  // Laporan pengembalian karyawan (lewat batas) yang belum diputuskan menahan
+  // penyelesaian penggajian (BUSINESS-FLOW §8.1.1).
+  const waitingClaims = draft
+    ? await listPendingReturnClaims(companyId, {
+        overdueOnly: true,
+        userIds: run.payslips.map((slip) => slip.userId),
+      })
+    : [];
+  // Penggantian yang sudah dibayar tetapi belum dijawab karyawan: hanya info,
+  // TIDAK menahan penggajian (BUSINESS-FLOW §8.1.2).
+  const unconfirmedAcks = draft
+    ? await listPendingAcks(companyId, { userIds: run.payslips.map((slip) => slip.userId) })
+    : [];
   const exportUrl = (format: string) => `/api/payroll/${run.period}/export?format=${format}`;
 
   return (
@@ -142,6 +157,42 @@ async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">
           </AlertDescription>
         </Alert>
       )}
+      {draft && waitingClaims.length > 0 && (
+        <Alert variant="destructive">
+          <CircleAlertIcon />
+          <AlertTitle>Ada laporan pengembalian yang belum diputuskan</AlertTitle>
+          <AlertDescription>
+            {waitingClaims.map((claim, index) => (
+              <span key={claim.id}>
+                {index > 0 && ", "}
+                <Link href={`/settlements/${claim.settlementId}`} className="underline">
+                  {claim.recipientName}
+                </Link>{" "}
+                ({formatRupiah(claim.amount)})
+              </span>
+            ))}
+            . Konfirmasi atau tolak dulu, lalu tekan Hitung ulang. Penggajian tidak bisa diselesaikan sebelum itu.
+          </AlertDescription>
+        </Alert>
+      )}
+      {draft && unconfirmedAcks.length > 0 && (
+        <Alert>
+          <InfoIcon />
+          <AlertTitle>Penggantian belum dikonfirmasi karyawan</AlertTitle>
+          <AlertDescription>
+            {unconfirmedAcks.map((ack, index) => (
+              <span key={ack.entryId}>
+                {index > 0 && ", "}
+                <Link href={`/settlements/${ack.settlementId}`} className="underline">
+                  {ack.recipientName}
+                </Link>{" "}
+                ({formatRupiah(ack.amount)})
+              </span>
+            ))}
+            . Tidak menahan penggajian; otomatis dianggap diterima setelah 3 hari tanpa jawaban.
+          </AlertDescription>
+        </Alert>
+      )}
       {draft && negative.length > 0 && (
         <Alert variant="destructive">
           <CircleAlertIcon />
@@ -173,7 +224,13 @@ async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">
                     people={run.payslips.length}
                     pendingAdvances={pendingAdvances.length}
                     pendingPenalties={pendingPenalties.length}
-                    disabled={!run.payDate || needsAttendanceLock || negative.length > 0 || run.payslips.length === 0}
+                    disabled={
+                      !run.payDate ||
+                      needsAttendanceLock ||
+                      negative.length > 0 ||
+                      waitingClaims.length > 0 ||
+                      run.payslips.length === 0
+                    }
                   />
                 ) : (
                   <RequestReviewButton

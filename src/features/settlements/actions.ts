@@ -37,6 +37,7 @@ import {
   advanceLedgerEntries,
   advanceRequests,
   expenseCategories,
+  returnClaims,
   settlementItems,
   settlements,
 } from "@/lib/db/schema";
@@ -51,6 +52,7 @@ import {
   MAX_RECEIPT_BYTES,
   SETTLEMENT_NUMBER_PREFIX,
 } from "./constants";
+import { checkBalanceDate, readProofUpload, storeProof } from "./balance-evidence";
 import { postBalanceEntry } from "./ledger";
 import {
   notifyBalanceRecorded,
@@ -549,11 +551,46 @@ async function recordBalancePayment(
   const parsed = balancePaymentSchema.safeParse({
     amount: formData.get("amount") ?? "",
     method: formData.get("method") ?? "",
+    receivedOn: formData.get("receivedOn") ?? "",
     reference: formData.get("reference") ?? "",
     note: formData.get("note") ?? "",
   });
   if (!parsed.success) return invalid(parsed.error);
   const input = parsed.data;
+
+  // Karyawan sudah melapor pengembalian: putuskan laporannya dulu (konfirmasi
+  // atau tolak), supaya satu pengembalian tidak tercatat dua kali.
+  if (type === "RETURN") {
+    const [pending] = await db
+      .select({ id: returnClaims.id })
+      .from(returnClaims)
+      .where(and(eq(returnClaims.settlementId, settlement.id), eq(returnClaims.status, "PENDING")))
+      .limit(1);
+    if (pending) {
+      return {
+        success: false,
+        message: `${settlement.recipientName} sudah melapor pengembalian. Konfirmasi atau tolak laporannya dulu.`,
+      };
+    }
+  }
+
+  // Tanggal uang diterima/dibayarkan (kosong = hari ini) & bukti opsional.
+  const receivedOn = input.receivedOn ?? zonedDateString(new Date());
+  const dateError = checkBalanceDate(receivedOn, zonedDateString(settlement.disbursedAt!));
+  if (dateError) return fieldError("receivedOn", dateError);
+  const upload = await readProofUpload(formData.get("proof"));
+  if (!upload.ok) return fieldError("proof", upload.message);
+  // Penggantian lewat TRANSFER wajib melampirkan bukti transfer (karyawan yang
+  // berisiko, BUSINESS-FLOW §8.1.2); tunai dikonfirmasi karyawan sendiri.
+  if (type === "REIMBURSEMENT" && input.method === "TRANSFER" && !upload.file) {
+    return fieldError("proof", "Lampirkan bukti transfer");
+  }
+  let proof: { key: string; contentType: string } | null = null;
+  if (upload.file) {
+    const stored = await storeProof(actor.company.id, "ledger-proofs", crypto.randomUUID(), upload.file);
+    if (!stored.ok) return { success: false, message: stored.message };
+    proof = stored;
+  }
 
   const result = await postBalanceEntry({
     actor,
@@ -565,8 +602,13 @@ async function recordBalancePayment(
     reference: input.method === "TRANSFER" ? input.reference : null,
     note: input.note,
     audit: type === "RETURN" ? "SETTLEMENT_RETURN_RECORDED" : "SETTLEMENT_REIMBURSEMENT_RECORDED",
+    receivedOn,
+    proof,
+    // Penggantian menunggu "sudah saya terima" dari karyawan (maks. 3 hari).
+    ackStatus: type === "REIMBURSEMENT" ? "PENDING" : null,
   });
   if (!result.ok) {
+    if (proof) await deleteObject(proof.key).catch(() => undefined);
     return result.reason === "EXCEEDS"
       ? fieldError("amount", `Nominal melebihi sisa saldo ${formatRupiah(result.outstanding)}`)
       : STALE;

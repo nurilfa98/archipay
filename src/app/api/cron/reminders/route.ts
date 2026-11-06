@@ -7,7 +7,8 @@
 //   (features/subscriptions/reminders.ts)
 // - kabar foto acuan wajah baru yang menunggu persetujuan ke Owner lewat
 //   WhatsApp, sekali per foto (features/attendance/reminders.ts)
-// - hapus file nota yang lewat masa simpan (features/settlements/receipt-retention.ts)
+// - penggantian yang belum dijawab karyawan > 3 hari dianggap diterima (features/settlements/reimbursement-ack.ts)
+// - hapus file nota & bukti pengembalian yang lewat masa simpan (features/settlements/receipt-retention.ts)
 // - kabar delegasi cuti/izin ke Admin HR (features/attendance/leave-reminders.ts)
 // - hapus riwayat perangkat login yang sudah kedaluwarsa > 90 hari (features/auth/sessions.ts)
 //
@@ -29,7 +30,8 @@ import { notifyPendingFaces } from "@/features/attendance/reminders";
 import { sendDailyDigests } from "@/features/digest/run";
 import { purgeOldSessions } from "@/features/auth/sessions";
 import { runReminders } from "@/features/reminders/run";
-import { purgeExpiredReceipts } from "@/features/settlements/receipt-retention";
+import { autoConfirmReimbursements } from "@/features/settlements/reimbursement-ack";
+import { purgeExpiredProofs, purgeExpiredReceipts } from "@/features/settlements/receipt-retention";
 import { sendSubscriptionReminders } from "@/features/subscriptions/reminders";
 import { env } from "@/lib/env";
 
@@ -58,6 +60,14 @@ export async function GET(request: Request) {
     console.error("[cron] hapus nota lewat masa simpan:", error);
     return null;
   });
+  const reimbursements = await autoConfirmReimbursements().catch((error: unknown) => {
+    console.error("[cron] konfirmasi otomatis penggantian:", error);
+    return null;
+  });
+  const proofs = await purgeExpiredProofs().catch((error: unknown) => {
+    console.error("[cron] hapus bukti pengembalian lewat masa simpan:", error);
+    return null;
+  });
   const delegatedLeaves = await notifyDelegatedLeaves().catch((error: unknown) => {
     console.error("[cron] kabar delegasi cuti/izin:", error);
     return null;
@@ -67,7 +77,7 @@ export async function GET(request: Request) {
     return null;
   });
   return NextResponse.json(
-    { ok: true, sent, digests, subscriptionReminders, pendingFaces, delegatedLeaves, receipts, sessions },
+    { ok: true, sent, digests, subscriptionReminders, pendingFaces, delegatedLeaves, receipts, proofs, reimbursements, sessions },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

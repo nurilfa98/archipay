@@ -24,7 +24,7 @@ import { after } from "next/server";
 import { z } from "zod";
 import { isPeriodLocked } from "@/features/attendance/period-lock";
 import { postBalanceEntry } from "@/features/settlements/ledger";
-import { getSettlementDetail } from "@/features/settlements/queries";
+import { getSettlementDetail, listPendingReturnClaims } from "@/features/settlements/queries";
 import { logAudit } from "@/lib/audit";
 import { verifySession, type CompanyUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
@@ -547,11 +547,26 @@ export async function finalizePayrollRun(period: string): Promise<ActionResult> 
   if (negative) {
     return { success: false, message: `Gaji bersih ${negative.fullName} minus. Kurangi potongannya dulu.` };
   }
+  // Karyawan yang sudah melapor mengembalikan sisa dana (lewat batas) tapi belum
+  // diputuskan Owner/Finance: sisa uang mukanya tidak ikut dipotong, jadi
+  // penggajian ditahan sampai laporannya dikonfirmasi atau ditolak.
+  const waiting = await listPendingReturnClaims(companyId, {
+    overdueOnly: true,
+    userIds: slips.map((slip) => slip.userId),
+  });
+  if (waiting.length > 0) {
+    return {
+      success: false,
+      message: `Ada laporan pengembalian yang belum diputuskan: ${[...new Set(waiting.map((claim) => claim.recipientName))].join(", ")}. Konfirmasi atau tolak dulu di menu Pertanggungjawaban, lalu Hitung ulang.`,
+    };
+  }
 
-  // 1. Catat sisa uang muka ke ledger, satu baris per transaksi.
+  // 1. Catat sisa uang muka (potongan) dan penggantian kekurangan (pendapatan)
+  //    ke ledger, satu baris per transaksi.
   const pending = await db
     .select({
       id: payslipLines.id,
+      source: payslipLines.source,
       label: payslipLines.label,
       amount: payslipLines.amount,
       refId: payslipLines.refId,
@@ -560,29 +575,49 @@ export async function finalizePayrollRun(period: string): Promise<ActionResult> 
     })
     .from(payslipLines)
     .innerJoin(payslips, eq(payslipLines.payslipId, payslips.id))
-    .where(and(eq(payslips.runId, run.id), eq(payslipLines.source, "ADVANCE"), isNull(payslipLines.postedAt)));
+    .where(
+      and(
+        eq(payslips.runId, run.id),
+        inArray(payslipLines.source, ["ADVANCE", "REIMBURSE"]),
+        isNull(payslipLines.postedAt),
+      ),
+    );
 
   for (const line of pending) {
     if (line.amount <= 0 || !line.refId) continue;
+    // REIMBURSE = penggantian kekurangan dibayar lewat slip (BUSINESS-FLOW §8.1.2).
+    const reimburse = line.source === "REIMBURSE";
     const failure = `${line.fullName}: ${line.label} tidak bisa dicatat`;
     const settlement = await getSettlementDetail(companyId, line.refId);
-    if (!settlement || settlement.advanceStatus !== "RETURN_PENDING" || settlement.recipientId !== line.userId) {
+    if (
+      !settlement ||
+      settlement.advanceStatus !== (reimburse ? "REIMBURSE_PENDING" : "RETURN_PENDING") ||
+      settlement.recipientId !== line.userId
+    ) {
       return { success: false, message: `${failure} (sudah lunas atau berubah). Tekan Hitung ulang.` };
     }
     if (settlement.recipientId === actor.id) {
-      return { success: false, message: `${failure}: tidak bisa mencatat potongan untuk diri sendiri.` };
+      return {
+        success: false,
+        message: `${failure}: tidak bisa mencatat ${reimburse ? "penggantian" : "potongan"} untuk diri sendiri.`,
+      };
     }
     const result = await postBalanceEntry({
       actor,
       advanceId: settlement.advanceId,
       settlementId: settlement.id,
-      type: "PAYROLL_DEDUCTION",
+      type: reimburse ? "REIMBURSEMENT" : "PAYROLL_DEDUCTION",
       amount: line.amount,
       method: "PAYROLL",
       reference: null,
       payrollPeriod: parsedPeriod.data,
-      note: `Potong gaji periode ${parsedPeriod.data} (Penggajian)`,
-      audit: "PAYROLL_DEDUCTION_RECORDED",
+      note: reimburse
+        ? `Penggantian lewat penggajian periode ${parsedPeriod.data}`
+        : `Potong gaji periode ${parsedPeriod.data} (Penggajian)`,
+      audit: reimburse ? "PAYROLL_REIMBURSEMENT_RECORDED" : "PAYROLL_DEDUCTION_RECORDED",
+      // Dibayar lewat gaji: tanggalnya = tanggal bayar penggajian; slip = buktinya
+      // (tanpa konfirmasi karyawan).
+      receivedOn: reimburse ? run.payDate : null,
       onPosted: async (tx) => {
         await tx.update(payslipLines).set({ postedAt: new Date() }).where(eq(payslipLines.id, line.id));
       },

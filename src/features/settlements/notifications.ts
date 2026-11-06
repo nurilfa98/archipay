@@ -5,6 +5,7 @@
 
 import "server-only";
 import { formatDate } from "@/lib/dates";
+import { REIMBURSE_ACK_DAYS } from "./constants";
 import { env } from "@/lib/env";
 import { formatRupiah } from "@/lib/format";
 import { sendWhatsApp } from "@/lib/whatsapp";
@@ -73,12 +74,50 @@ export function notifyBalanceRecorded(
       : entry.type === "REIMBURSEMENT"
         ? `Sisa penggantian yang belum dibayar: ${formatRupiah(entry.remaining)}.`
         : `Sisa yang masih harus dikembalikan: *${formatRupiah(entry.remaining)}*.`;
+  // Penggantian yang dibayar Owner/Finance: karyawan diminta mengonfirmasi (§8.1.2).
+  const ask =
+    entry.type === "REIMBURSEMENT"
+      ? `\nMohon konfirmasi di aplikasi apakah uangnya *sudah Anda terima*. Tanpa jawaban dalam ${REIMBURSE_ACK_DAYS} hari, dianggap sudah diterima.\n`
+      : "";
   return send(
     [recipient],
     () =>
       `Halo ${recipient.fullName},\n\n` +
       `${what} (pertanggungjawaban *${settlement.number}*, uang muka ${settlement.advanceNumber}).\n` +
-      `${rest}\n\n${link(settlement.id)}`,
+      `${rest}\n${ask}\n${link(settlement.id)}`,
+  );
+}
+
+// Karyawan menyatakan BELUM menerima penggantian → Owner & pencatatnya (urgent).
+export function notifyReimbursementDisputed(
+  settlement: SettlementSummary,
+  people: Person[],
+  claim: { employeeName: string; amount: number; note: string | null },
+) {
+  return send(
+    people,
+    (person) =>
+      `Halo ${person.fullName},\n\n` +
+      `${claim.employeeName} menyatakan *belum menerima* penggantian *${formatRupiah(claim.amount)}* ` +
+      `untuk *${settlement.number}* (uang muka ${settlement.advanceNumber}).` +
+      (claim.note ? `\nCatatan: ${claim.note}` : "") +
+      `\n\nPencatatan dibatalkan dan kekurangan kembali tercatat belum dibayar. Periksa lalu bayar ulang:\n${link(settlement.id)}`,
+  );
+}
+
+// Laporan pengembalian ditolak → karyawan (urgent: ia harus bertindak lagi).
+export function notifyReturnClaimRejected(
+  settlement: SettlementSummary,
+  recipient: Person,
+  claim: { amount: number; reason: string },
+) {
+  return send(
+    [recipient],
+    () =>
+      `Halo ${recipient.fullName},\n\n` +
+      `Laporan pengembalian *${formatRupiah(claim.amount)}* untuk *${settlement.number}* ` +
+      `(uang muka ${settlement.advanceNumber}) *belum bisa dikonfirmasi*.\nAlasan: ${claim.reason}\n\n` +
+      `Sisa dana masih tercatat belum dikembalikan. Periksa lalu lapor ulang bila perlu:\n${link(settlement.id)}`,
   );
 }
 
