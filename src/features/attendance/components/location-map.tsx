@@ -7,6 +7,10 @@
 // - `fitKey` berubah → peta diatur agar semua titik terlihat (setelah impor).
 //   Saat pertama dibuka, peta juga menampilkan semua titik yang sudah ada.
 //
+// - `me` (opsional): posisi pengguna saat ini (titik biru + lingkaran akurasi
+//   GPS), dipakai halaman absen. Peta menyesuaikan agar `me` dan semua titik
+//   terlihat.
+//
 // Leaflet membaca `window` saat dimuat, jadi library-nya di-import di dalam
 // useEffect (hanya di browser), bukan di bagian atas file. Objek peta
 // disimpan di ref; props terbaru dibaca lewat ref agar peta tidak dibuat ulang.
@@ -30,10 +34,13 @@ type Handlers = {
   onPointSelect?: (index: number) => void;
 };
 
+export type MapMe = LatLng & { accuracy: number };
+
 type MapState = {
   L: typeof Leaflet;
   map: Leaflet.Map;
   layer: Leaflet.LayerGroup;
+  meLayer: Leaflet.LayerGroup;
 };
 
 // Tengah Indonesia, bila belum ada titik sama sekali.
@@ -44,6 +51,8 @@ export function LocationMap({
   selectedIndex,
   focus,
   fitKey,
+  me,
+  ariaLabel,
   onMapClick,
   onPointMove,
   onPointSelect,
@@ -53,6 +62,8 @@ export function LocationMap({
   selectedIndex?: number | null;
   focus?: (LatLng & { zoom?: number; key: number }) | null;
   fitKey?: number;
+  me?: MapMe | null;
+  ariaLabel?: string;
   className?: string;
 } & Handlers) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -61,12 +72,14 @@ export function LocationMap({
   const latest = useRef({
     points,
     selectedIndex,
+    me,
     handlers: { onMapClick, onPointMove, onPointSelect } as Handlers,
   });
   useEffect(() => {
     latest.current = {
       points,
       selectedIndex,
+      me,
       handlers: { onMapClick, onPointMove, onPointSelect },
     };
   });
@@ -88,10 +101,12 @@ export function LocationMap({
           lng: event.latlng.lng,
         }),
       );
-      const state = { L, map, layer: L.layerGroup().addTo(map) };
+      const state = { L, map, layer: L.layerGroup().addTo(map), meLayer: L.layerGroup().addTo(map) };
       stateRef.current = state;
       drawPoints(state, latest.current.points, latest.current.selectedIndex, latest);
-      fitPoints(state, latest.current.points);
+      drawMe(state, latest.current.me);
+      if (latest.current.me) fitWithMe(state, latest.current.points, latest.current.me);
+      else fitPoints(state, latest.current.points);
     });
     return () => {
       cancelled = true;
@@ -104,6 +119,14 @@ export function LocationMap({
   useEffect(() => {
     if (stateRef.current) drawPoints(stateRef.current, points, selectedIndex, latest);
   }, [points, selectedIndex]);
+
+  // Posisi pengguna berubah (halaman absen): gambar ulang lalu tampilkan bersama titik lokasi.
+  useEffect(() => {
+    const state = stateRef.current;
+    if (!state) return;
+    drawMe(state, me);
+    if (me) fitWithMe(state, latest.current.points, me);
+  }, [me]);
 
   // Atur peta agar semua titik terlihat (misal setelah impor file).
   useEffect(() => {
@@ -120,7 +143,7 @@ export function LocationMap({
       ref={containerRef}
       className={cn("z-0 h-80 w-full overflow-hidden rounded-lg border bg-muted sm:h-96", className)}
       role="application"
-      aria-label="Peta lokasi. Klik peta untuk memilih titik, geser pin untuk memindahkannya."
+      aria-label={ariaLabel ?? "Peta lokasi. Klik peta untuk memilih titik, geser pin untuk memindahkannya."}
     />
   );
 }
@@ -160,6 +183,34 @@ function drawPoints(
     marker.on("click", () => latest.current.handlers.onPointSelect?.(index));
     if (point.label) marker.bindTooltip(point.label, { direction: "top", offset: [0, -30] });
   });
+}
+
+function drawMe({ L, meLayer }: MapState, me: MapMe | null | undefined) {
+  meLayer.clearLayers();
+  if (!me) return;
+  L.circle([me.lat, me.lng], {
+    radius: me.accuracy,
+    color: "#2563eb",
+    weight: 1,
+    fillColor: "#2563eb",
+    fillOpacity: 0.1,
+    interactive: false,
+  }).addTo(meLayer);
+  L.circleMarker([me.lat, me.lng], {
+    radius: 8,
+    color: "#fff",
+    weight: 3,
+    fillColor: "#2563eb",
+    fillOpacity: 1,
+  })
+    .bindTooltip("Posisi Anda", { direction: "top" })
+    .addTo(meLayer);
+}
+
+// Semua titik lokasi + posisi pengguna terlihat; zoom tidak lebih dekat dari 17.
+function fitWithMe({ L, map }: MapState, points: MapPoint[], me: MapMe) {
+  const all = [...points.map((point) => [point.lat, point.lng] as [number, number]), [me.lat, me.lng] as [number, number]];
+  map.fitBounds(L.latLngBounds(all).pad(0.2), { maxZoom: 17 });
 }
 
 function fitPoints({ L, map }: MapState, points: MapPoint[]) {

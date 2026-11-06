@@ -863,7 +863,7 @@ punya role lain.
 
 ### 18.5 Absen masuk
 
-1. HP mengambil GPS. **Akurasi > 100 m ditolak** ("coba di tempat terbuka").
+1. HP mengambil GPS **otomatis begitu halaman Absen dibuka** (tanpa tombol; browser meminta izin lokasi) dan menampilkannya di peta bersama lokasi absensi dan lingkaran radiusnya. Fix GPS pertama biasanya kasar, jadi HP menunggu GPS menajam sampai akurasi ≤ 100 m (paling lama 25 detik; akurasi sementara tampil di layar). Bila gagal (izin ditolak / GPS belum terbaca), muncul tombol "Coba lagi". **Akurasi > 100 m ditolak** ("coba di tempat terbuka").
 2. Server mengurutkan lokasi aktif dari yang terdekat:
    - satu lokasi dalam radius → dipilih otomatis;
    - beberapa lokasi dalam radius → karyawan memilih;

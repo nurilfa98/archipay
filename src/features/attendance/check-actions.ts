@@ -44,6 +44,8 @@ export type CheckLocation = {
   name: string;
   distance: number; // meter
   radiusMeters: number;
+  latitude: number; // untuk peta di halaman absen
+  longitude: number;
   inRadius: boolean;
   timezone: string;
   localMinutes: number; // jam setempat sekarang
@@ -145,6 +147,8 @@ async function locationsAround(companyId: string, userId: string, point: { lat: 
         name: location.name,
         distance,
         radiusMeters: location.radiusMeters,
+        latitude: location.latitude,
+        longitude: location.longitude,
         inRadius: distance <= location.radiusMeters,
         timezone: location.timezone,
         localMinutes: local.minutes,

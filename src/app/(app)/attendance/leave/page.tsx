@@ -5,7 +5,7 @@
 //   setelah waktu delegasi), riwayat terbaru, dan sisa cuti per karyawan
 //   (Owner bisa mengubah kuota khusus).
 
-import { PlusIcon } from "lucide-react";
+import { ArrowRightIcon, FilePenLineIcon } from "lucide-react";
 import type { Metadata } from "next";
 import { io } from "next/cache";
 import Link from "next/link";
@@ -107,9 +107,16 @@ async function LeaveContent() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button nativeButton={false} render={<Link href="/attendance/leave/new" />}>
-              <PlusIcon />
+            <Button
+              variant="brand"
+              size="lg"
+              className="group/cta w-full sm:w-auto"
+              nativeButton={false}
+              render={<Link href="/attendance/leave/new" />}
+            >
+              <FilePenLineIcon />
               Ajukan cuti / izin
+              <ArrowRightIcon className="transition-transform group-hover/cta:translate-x-0.5" />
             </Button>
           </CardContent>
         </Card>
