@@ -136,7 +136,7 @@ export const users = pgTable(
 
 // Kode OTP verifikasi nomor WhatsApp yang sedang berjalan, satu baris per
 // user. Kode disimpan sebagai hash (SHA-256), tidak pernah teks asli.
-// Batas: berlaku 10 menit, maks. 5 kali coba per kode, kirim ulang tiap 60
+// Batas: berlaku 5 menit, maks. 5 kali coba per kode, kirim ulang tiap 60
 // detik, maks. 3 kode per hari (hemat kuota WhatsApp).
 export const phoneVerifications = pgTable("phone_verifications", {
   userId: varchar("user_id", { length: 36 })

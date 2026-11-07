@@ -34,6 +34,7 @@ import { PayrollSettingsForm } from "@/features/salaries/components/payroll-sett
 import { getPayrollSettings } from "@/features/salaries/queries";
 import { getAttendanceSettings, listHolidays } from "@/features/attendance/queries";
 import { ExpenseCategoriesManager } from "@/features/settings/components/expense-categories-manager";
+import { SettingsJumpNav } from "@/features/settings/components/settings-jump-nav";
 import { SettingsSection } from "@/features/settings/components/settings-section";
 import { getCompanySettings, getSettingsUpdateInfo, listAllExpenseCategories } from "@/features/settings/queries";
 import { requirePermission } from "@/lib/auth/dal";
@@ -95,20 +96,7 @@ async function SettingsContent() {
 
   return (
     <>
-      <nav
-        aria-label="Bagian pengaturan"
-        className="sticky top-14 z-10 -mx-4 flex gap-1.5 overflow-x-auto border-b bg-background/95 px-4 py-2 backdrop-blur supports-backdrop-filter:bg-background/80"
-      >
-        {jumps.map((jump) => (
-          <a
-            key={jump.id}
-            href={`#${jump.id}`}
-            className="shrink-0 rounded-full border px-3 py-1 text-sm transition-colors hover:border-brand/40 hover:bg-brand/5 hover:text-brand"
-          >
-            {jump.label}
-          </a>
-        ))}
-      </nav>
+      <SettingsJumpNav jumps={jumps} />
 
       {jumps.length === 0 && (
         <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">

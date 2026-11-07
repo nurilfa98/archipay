@@ -2,10 +2,10 @@
 // daftar semua orang di /attendance/today. Jam ditampilkan dalam zona waktu
 // lokasi absen.
 //
-// Selfie absen tidak disimpan: yang tampil adalah hasil cocok wajah (skor).
-// Skor 0 = absen hasil koreksi Owner (tanpa cocok wajah).
+// Selfie absen tidak disimpan, dan skor cocok wajah tidak ditampilkan di daftar ini.
+// Skor 0 = absen hasil koreksi Owner (tanpa cocok wajah): diberi tanda "Koreksi Owner".
 
-import { CalendarDaysIcon, ExternalLinkIcon, LogInIcon, LogOutIcon, MapPinIcon, ScanFaceIcon } from "lucide-react";
+import { CalendarDaysIcon, ExternalLinkIcon, LogInIcon, LogOutIcon, MapPinIcon } from "lucide-react";
 import { ToneBadge } from "@/components/tone-badge";
 import { formatDateOnly } from "@/lib/dates";
 import { cn } from "@/lib/utils";
@@ -188,16 +188,12 @@ function CheckSide({
             </a>
           </span>
         </p>
-        <div>
-          {faceScore > 0 ? (
-            <ToneBadge tone="success">
-              <ScanFaceIcon />
-              Wajah cocok {faceScore}%
-            </ToneBadge>
-          ) : (
+        {/* Skor cocok wajah tidak ditampilkan; skor 0 = absen hasil koreksi Owner (tanpa cocok wajah). */}
+        {faceScore === 0 && (
+          <div>
             <ToneBadge tone="pending">Koreksi Owner</ToneBadge>
-          )}
-        </div>
+          </div>
+        )}
         {notes.filter(Boolean).map((note) => (
           <p key={String(note)} className="text-muted-foreground">
             {note}

@@ -124,7 +124,7 @@ export function PhoneVerifyForm({
             autoFocus
             required
           />
-          <FieldDescription>Dikirim ke WhatsApp {phone ? formatPhone(phone) : ""}. Berlaku 10 menit.</FieldDescription>
+          <FieldDescription>Dikirim ke WhatsApp {phone ? formatPhone(phone) : ""}. Berlaku 5 menit.</FieldDescription>
           <FieldError>{errors.code}</FieldError>
         </Field>
         <Button type="submit" disabled={pending}>

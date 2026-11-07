@@ -28,7 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { isPeriodLocked } from "@/features/attendance/period-lock";
 import { periodLabel } from "@/features/attendance/review-data";
 import {
-  AddManualLineButton,
+  AddLineInline,
   EditLineButton,
   FinalizeButton,
   PayDateForm,
@@ -321,8 +321,22 @@ function PayslipCard({ slip, draft, editable }: { slip: Payslip; draft: boolean;
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <div className="grid gap-4 lg:grid-cols-2">
-          <LineTable title="Pendapatan" lines={earnings} total={slip.totalEarnings} draft={editable} />
-          <LineTable title="Potongan" lines={deductions} total={slip.totalDeductions} draft={editable} />
+          <LineTable
+            title="Pendapatan"
+            type="EARNING"
+            payslipId={slip.id}
+            lines={earnings}
+            total={slip.totalEarnings}
+            draft={editable}
+          />
+          <LineTable
+            title="Potongan"
+            type="DEDUCTION"
+            payslipId={slip.id}
+            lines={deductions}
+            total={slip.totalDeductions}
+            draft={editable}
+          />
         </div>
         {overLimit && (
           <p className="flex items-center gap-1.5 text-sm text-amber-700 dark:text-amber-300">
@@ -330,20 +344,16 @@ function PayslipCard({ slip, draft, editable }: { slip: Payslip; draft: boolean;
             Potongan melebihi {MAX_DEDUCTION_PERCENT}% pendapatan (batas potongan upah PP 36/2021).
           </p>
         )}
-        <div>
-          {draft ? (
-            editable ? (
-              <AddManualLineButton payslipId={slip.id} fullName={slip.fullName} />
-            ) : (
-              <p className="text-sm text-muted-foreground">Slip ini hanya bisa diubah Owner.</p>
-            )
-          ) : (
+        {/* Draf yang bisa diubah: tombol tambah baris ada di kolom Pendapatan / Potongan. */}
+        {draft && !editable && <p className="text-sm text-muted-foreground">Slip ini hanya bisa diubah Owner.</p>}
+        {!draft && (
+          <div>
             <Button variant="outline" size="sm" nativeButton={false} render={<a href={`/api/payslips/${slip.id}`} />}>
               <DownloadIcon />
               Slip {slip.fullName.split(" ")[0]} (PDF)
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -351,11 +361,15 @@ function PayslipCard({ slip, draft, editable }: { slip: Payslip; draft: boolean;
 
 function LineTable({
   title,
+  type,
+  payslipId,
   lines,
   total,
   draft,
 }: {
   title: string;
+  type: "EARNING" | "DEDUCTION";
+  payslipId: string;
   lines: PayslipLine[];
   total: number;
   draft: boolean;
@@ -394,6 +408,7 @@ function LineTable({
         <span>Total {title.toLowerCase()}</span>
         <span className="tabular-nums">{formatRupiah(total)}</span>
       </p>
+      {draft && <AddLineInline payslipId={payslipId} type={type} />}
     </div>
   );
 }

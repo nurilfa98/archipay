@@ -6,7 +6,7 @@
 //
 // Nomor di tabel users hanya berubah setelah kode cocok, jadi nomor yang
 // salah ketik tidak pernah tersimpan. Hemat kuota WhatsApp & anti-spam:
-// kode berlaku 10 menit, kirim ulang tiap 60 detik, maks. 3 kode per hari,
+// kode berlaku 5 menit, kirim ulang tiap 60 detik, maks. 3 kode per hari,
 // maks. 5 kali coba per kode.
 //
 // Jeda & batas harian dicek ATOMIK saat menyimpan kode (upsert bersyarat),
@@ -37,7 +37,7 @@ import type { ActionResult } from "@/types/action-result";
 import { maskPhone } from "./device-info";
 import { phoneChangedEmail } from "./emails";
 
-const CODE_TTL_MS = 10 * 60 * 1000;
+const CODE_TTL_MS = 5 * 60 * 1000;
 const RESEND_COOLDOWN_MS = 60 * 1000;
 const MAX_SENDS_PER_DAY = 3;
 const MAX_ATTEMPTS = 5;
@@ -119,7 +119,7 @@ export async function requestPhoneOtp(
     to: phone,
     text:
       `Kode verifikasi ArchiPay Anda: *${code}*\n\n` +
-      `Berlaku 10 menit. Jangan berikan kode ini kepada siapa pun, termasuk atasan atau admin.`,
+      `Berlaku 5 menit. Jangan berikan kode ini kepada siapa pun, termasuk atasan atau admin.`,
   });
   if (!sent) {
     return {

@@ -15,6 +15,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { CopyButton } from "@/components/copy-button";
 import { ToneBadge } from "@/components/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -84,7 +85,16 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
             <ProjectIcon name={card.icon} className="size-7" />
           </div>
           <div className="flex min-w-0 flex-col gap-1">
-            <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">{card.name}</h1>
+            <div className="flex items-start gap-1">
+              <h1 className="text-xl font-semibold tracking-tight break-words sm:text-2xl">{card.name}</h1>
+              {/* Salin nama proyek, mis. untuk diisi sebagai nama lokasi absensi. */}
+              <CopyButton
+                value={card.name}
+                label={`Salin nama proyek ${card.name}`}
+                successMessage="Nama proyek disalin."
+                className="mt-0.5 sm:mt-1"
+              />
+            </div>
             <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
               <span>{card.client ?? "Tanpa nama klien"}</span>
               <ToneBadge tone={active ? "success" : "pending"}>{PROJECT_STATUS_LABELS[card.status]}</ToneBadge>
@@ -97,7 +107,7 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
               <>
                 <Button
                   variant="outline"
-                  className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950/40 dark:hover:text-orange-300"
+                  className="border-orange-500 bg-card text-orange-600 hover:border-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-500/70 dark:bg-card dark:text-orange-400 dark:hover:bg-orange-950/40 dark:hover:text-orange-300"
                   nativeButton={false}
                   render={<Link href={`/projects/${id}/edit`} />}
                 >

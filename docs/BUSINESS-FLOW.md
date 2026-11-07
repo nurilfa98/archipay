@@ -395,7 +395,7 @@ versi Owner.
 **Nomor WhatsApp wajib & terverifikasi.** Setiap pengguna company (termasuk
 Owner) wajib mengisi nomor WhatsApp dan memverifikasinya dengan kode OTP 6
 angka lewat WhatsApp sebelum bisa memakai aplikasi (`/verify-phone`, setelah
-ganti password pertama). Kode berlaku 10 menit, kirim ulang tiap 60 detik,
+ganti password pertama). Kode berlaku 5 menit, kirim ulang tiap 60 detik,
 maks. 3 kode per hari, maks. 5 kali coba per kode. Nomor hanya tersimpan
 setelah kode cocok, dan hanya bisa diganti pengguna sendiri lewat Profil
 (dengan OTP lagi). Nomor yang sudah ada sebelum fitur ini dianggap
@@ -923,7 +923,7 @@ beberapa tanda sekaligus (misal Terlambat + Di luar radius).
 ### 18.9 Review bulanan (Owner)
 
 - **Rekap per karyawan:** hari hadir, terlambat (kali & total menit), pulang cepat, di luar radius, tidak absen pulang, tidak hadir, cuti/sakit/izin (dibayar & tidak dibayar), total denda.
-- **Detail per karyawan:** setiap hari dengan hasil cocok wajah (skor), link peta, jarak, alasan, dan sanggahan.
+- **Detail per karyawan:** setiap hari dengan jam masuk/pulang, link peta, jarak, alasan, dan sanggahan.
 - **Bebaskan denda (Waive Penalty):** setiap denda punya centang; mencabut centang = denda dibebaskan, catatan opsional, sekali klik. Bisa dicentang lagi selama periode belum dikunci.
 - **Koreksi** (misal HP mati): Owner menambah absen yang terlewat atau mengganti jam masuk/pulang satu tanggal (pilih lokasi, jam, alasan wajib). Terlambat, pulang cepat, dan denda dihitung ulang (bila jadi tidak terlambat, dendanya dibebaskan otomatis). Absen hasil koreksi tidak punya selfie dan ditandai "Dikoreksi Owner" beserta alasannya. Cuti/izin tidak perlu dikoreksi manual karena sudah tercatat dari pengajuan.
 - **Kunci periode:** setelah dikunci, absensi, denda, dan cuti/izin bulan itu tidak bisa diubah (mengajukan, menyetujui, membatalkan cuti/izin, koreksi, dan bebaskan denda ditolak). Hanya bulan yang **sudah berakhir** yang bisa dikunci, dan tidak bisa dikunci selama masih ada **pengajuan cuti/izin yang menunggu** di bulan itu. Kunci bisa dibuka lagi selama belum ada denda yang ditandai dipotong.

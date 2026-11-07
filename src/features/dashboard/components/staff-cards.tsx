@@ -71,8 +71,8 @@ export async function AttendanceOverviewCard({ user }: { user: CompanyUser }) {
           href="/attendance/today"
         />
         <StatTile icon={ClockAlertIcon} label="Terlambat" value={late} tone="amber" href="/attendance/today" />
-        <StatTile icon={PlaneIcon} label="Cuti / izin" value={onLeave} tone="indigo" href="/attendance/today" />
-        <StatTile icon={UserXIcon} label="Belum absen" value={absent} tone="rose" href="/attendance/today" />
+        <StatTile icon={PlaneIcon} label="Cuti / izin" value={onLeave} tone="indigo" href="/attendance/today?tab=cuti" />
+        <StatTile icon={UserXIcon} label="Belum absen" value={absent} tone="rose" href="/attendance/today?tab=belum" />
       </div>
       <div className="flex flex-col gap-2">
         {canApproveFaces && (

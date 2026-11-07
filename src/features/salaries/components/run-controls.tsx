@@ -1,6 +1,6 @@
 // Tombol & form penggajian bulanan (BUSINESS-FLOW §20.1, §20.4): buat
 // penggajian, hitung ulang, tanggal bayar, ubah/hapus baris, tambah baris
-// manual, hapus data gaji (Owner & Finance), kirim ke Owner (Finance),
+// manual (langsung di kolom, tanpa dialog), hapus data gaji (Owner & Finance), kirim ke Owner (Finance),
 // selesaikan & buka kunci (Owner). Server Action selalu memeriksa ulang status
 // draf & hak akses.
 
@@ -9,6 +9,7 @@
 import {
   CalculatorIcon,
   CheckCheckIcon,
+  LoaderCircleIcon,
   LockOpenIcon,
   PencilIcon,
   PlusIcon,
@@ -17,15 +18,15 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { startTransition, useActionState, useState } from "react";
+import { startTransition, useActionState, useState, useTransition, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ActionDialog } from "@/features/advances/components/action-dialog";
 import { useActionResult } from "@/hooks/use-action-result";
 import { formatRupiah } from "@/lib/format";
 import { notify } from "@/lib/notify";
+import type { ActionResult } from "@/types/action-result";
 import { deleteSalaryProfile } from "../actions";
 import {
   addManualLine,
@@ -200,6 +201,7 @@ export function EditLineButton({ lineId, label, amount }: { lineId: string; labe
       icon={<PencilIcon />}
       size="icon-sm"
       variant="ghost"
+      className="text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:text-orange-400 dark:hover:bg-orange-950/40 dark:hover:text-orange-300"
       title="Ubah nominal"
       description={label}
       confirmLabel="Simpan"
@@ -233,6 +235,7 @@ export function RemoveLineButton({ lineId, label }: { lineId: string; label: str
       icon={<Trash2Icon />}
       size="icon-sm"
       variant="ghost"
+      className="text-red-600 hover:bg-red-50 hover:text-red-700 dark:text-red-400 dark:hover:bg-red-950/40 dark:hover:text-red-300"
       title="Hapus baris ini?"
       description={`${label}. Baris otomatis akan muncul lagi saat Hitung ulang; sisa uang muka & denda tetap di Potong Gaji untuk bulan lain.`}
       confirmLabel="Hapus"
@@ -242,66 +245,96 @@ export function RemoveLineButton({ lineId, label }: { lineId: string; label: str
   );
 }
 
-export function AddManualLineButton({ payslipId, fullName }: { payslipId: string; fullName: string }) {
+// Tambah baris manual langsung di kolom Pendapatan / Potongan (tanpa dialog): tombol "Tambah
+// pendapatan" / "Tambah potongan" membuka satu baris isian di bawah daftar. Jenisnya ikut kolom,
+// jadi tidak perlu memilih lagi.
+export function AddLineInline({ payslipId, type }: { payslipId: string; type: "EARNING" | "DEDUCTION" }) {
+  const [open, setOpen] = useState(false);
   const [digits, setDigits] = useState("");
+  const [error, setError] = useState<Extract<ActionResult, { success: false }> | null>(null);
+  const [pending, startAdding] = useTransition();
+  const fieldError = (name: string) => error?.fieldErrors?.[name]?.[0];
+  const noun = type === "EARNING" ? "pendapatan" : "potongan";
+
+  function close() {
+    setOpen(false);
+    setDigits("");
+    setError(null);
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    startAdding(async () => {
+      const result = await addManualLine(payslipId, formData);
+      if (!result.success) {
+        setError(result);
+        if (!result.fieldErrors) notify.error(result.message);
+        return;
+      }
+      notify.success("Baris ditambahkan.");
+      close();
+    });
+  }
+
+  if (!open) {
+    return (
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="w-full border-dashed border-violet-300 text-violet-700 hover:border-violet-400 hover:bg-violet-50 hover:text-violet-800 dark:border-violet-800 dark:text-violet-300 dark:hover:bg-violet-950/40 dark:hover:text-violet-200"
+        onClick={() => setOpen(true)}
+      >
+        <PlusIcon />
+        Tambah {noun}
+      </Button>
+    );
+  }
+
   return (
-    <ActionDialog
-      label="Tambah baris"
-      icon={<PlusIcon />}
-      showLabel
-      size="sm"
-      variant="outline"
-      title={`Tambah baris untuk ${fullName}`}
-      description="Mis. lembur, bonus, THR, atau potongan lain bulan ini."
-      confirmLabel="Tambah"
-      successMessage="Baris ditambahkan."
-      onConfirm={async (formData) => {
-        const result = await addManualLine(payslipId, formData);
-        if (result.success) setDigits("");
-        return result;
-      }}
-    >
-      {(fieldError) => (
-        <>
-          <Field data-invalid={!!fieldError("type")}>
-            <FieldLabel>Jenis</FieldLabel>
-            <RadioGroup name="type" defaultValue="EARNING" className="flex gap-4">
-              <Field orientation="horizontal" className="w-auto">
-                <RadioGroupItem value="EARNING" id={`type-earning-${payslipId}`} />
-                <FieldLabel htmlFor={`type-earning-${payslipId}`} className="font-normal">
-                  Pendapatan
-                </FieldLabel>
-              </Field>
-              <Field orientation="horizontal" className="w-auto">
-                <RadioGroupItem value="DEDUCTION" id={`type-deduction-${payslipId}`} />
-                <FieldLabel htmlFor={`type-deduction-${payslipId}`} className="font-normal">
-                  Potongan
-                </FieldLabel>
-              </Field>
-            </RadioGroup>
-            <FieldError>{fieldError("type")}</FieldError>
-          </Field>
-          <Field data-invalid={!!fieldError("label")}>
-            <FieldLabel htmlFor={`label-${payslipId}`}>Keterangan</FieldLabel>
-            <Input id={`label-${payslipId}`} name="label" maxLength={150} placeholder="Mis. Lembur 6 jam" required />
-            <FieldError>{fieldError("label")}</FieldError>
-          </Field>
-          <Field data-invalid={!!fieldError("amount")}>
-            <FieldLabel htmlFor={`manual-amount-${payslipId}`}>Nominal</FieldLabel>
-            <Input
-              id={`manual-amount-${payslipId}`}
-              name="amount"
-              inputMode="numeric"
-              className="tabular-nums"
-              value={digits ? Number(digits).toLocaleString("id-ID") : ""}
-              onChange={(event) => setDigits(event.target.value.replace(/\D/g, "").slice(0, 11))}
-              required
-            />
-            <FieldError>{fieldError("amount")}</FieldError>
-          </Field>
-        </>
-      )}
-    </ActionDialog>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2 rounded-lg border border-dashed bg-muted/30 p-3">
+      <input type="hidden" name="type" value={type} />
+      <Field data-invalid={!!fieldError("label")}>
+        <FieldLabel htmlFor={`label-${type}-${payslipId}`} className="sr-only">
+          Keterangan
+        </FieldLabel>
+        <Input
+          id={`label-${type}-${payslipId}`}
+          name="label"
+          maxLength={150}
+          placeholder={type === "EARNING" ? "Keterangan, mis. Bonus proyek" : "Keterangan, mis. Cicilan koperasi"}
+          autoFocus
+          required
+        />
+        <FieldError>{fieldError("label")}</FieldError>
+      </Field>
+      <Field data-invalid={!!fieldError("amount")}>
+        <FieldLabel htmlFor={`amount-${type}-${payslipId}`} className="sr-only">
+          Nominal
+        </FieldLabel>
+        <Input
+          id={`amount-${type}-${payslipId}`}
+          name="amount"
+          inputMode="numeric"
+          placeholder="Nominal (Rp)"
+          className="tabular-nums"
+          value={digits ? Number(digits).toLocaleString("id-ID") : ""}
+          onChange={(event) => setDigits(event.target.value.replace(/\D/g, "").slice(0, 11))}
+          required
+        />
+        <FieldError>{fieldError("amount")}</FieldError>
+      </Field>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" variant="brand" disabled={pending}>
+          {pending && <LoaderCircleIcon className="animate-spin" />}
+          Simpan
+        </Button>
+        <Button type="button" size="sm" variant="outline" disabled={pending} onClick={close}>
+          Batal
+        </Button>
+      </div>
+    </form>
   );
 }
 
