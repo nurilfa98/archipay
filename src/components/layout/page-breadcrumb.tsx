@@ -11,7 +11,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { isPlatformPath, matchesPath, MENU_ITEMS, PLATFORM_PAGES, SUB_PAGES } from "./nav-config";
 
-type Crumb = { title: string; href: string };
+type Crumb = { title: string; href: string; keepParams?: string[]; detailOf?: boolean };
 
 function trailOf(pathname: string): Crumb[] {
   const platform = PLATFORM_PAGES.find((page) => matchesPath(pathname, page.href));
@@ -36,8 +36,25 @@ function trailOf(pathname: string): Crumb[] {
   return parent ? [parent, sub] : [sub];
 }
 
+// Link crumb: membawa query yang dibutuhkan halaman tujuan, supaya crumb yang
+// diklik membuka halaman itu sendiri (bukan terlempar ke halaman lain).
+function hrefOf(crumb: Crumb, pathname: string, searchParams: URLSearchParams) {
+  const query = new URLSearchParams();
+  for (const key of crumb.keepParams ?? []) {
+    const value = searchParams.get(key);
+    if (value) query.set(key, value);
+  }
+  if (crumb.detailOf && !query.has("project")) {
+    const id = pathname.startsWith(`${crumb.href}/`) ? pathname.slice(crumb.href.length + 1).split("/")[0] : "";
+    if (id && id !== "new" && id !== "request") query.set("from", id);
+  }
+  const text = query.toString();
+  return text ? `${crumb.href}?${text}` : crumb.href;
+}
+
 export function PageBreadcrumb() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   if (pathname === "/") return null;
   const trail = trailOf(pathname);
   const showMenu = !isPlatformPath(pathname);
@@ -56,6 +73,7 @@ export function PageBreadcrumb() {
             crumb={crumb}
             // Item terakhir yang URL-nya persis = halaman ini (bukan link).
             current={index === trail.length - 1 && pathname === crumb.href}
+            href={hrefOf(crumb, pathname, searchParams)}
             first={index === 0}
             separator={showMenu || index > 0}
           />
@@ -67,11 +85,13 @@ export function PageBreadcrumb() {
 
 function CrumbItem({
   crumb,
+  href,
   current,
   first,
   separator,
 }: {
   crumb: Crumb;
+  href: string;
   current: boolean;
   first: boolean;
   separator: boolean;
@@ -83,7 +103,7 @@ function CrumbItem({
         {current ? (
           <BreadcrumbPage className="truncate font-medium">{crumb.title}</BreadcrumbPage>
         ) : (
-          <BreadcrumbLink className="truncate" render={<Link href={crumb.href} />}>
+          <BreadcrumbLink className="truncate" render={<Link href={href} />}>
             {crumb.title}
           </BreadcrumbLink>
         )}

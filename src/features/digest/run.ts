@@ -4,7 +4,11 @@
 //
 // Menggantikan WhatsApp informasi ke Owner/Finance (konfirmasi terima dana,
 // pertanggungjawaban dikirim, pengingat lewat batas) agar hemat kuota
-// WhatsApp. Email hanya dikirim bila ada isinya.
+// WhatsApp. Email hanya dikirim bila ada isinya, dan sudah dikurangi karena
+// tugas harian kini ada di lonceng (features/notifications):
+// - hari Senin: ringkasan lengkap;
+// - hari lain: hanya bila ada yang BARU lewat batas atau sudah menunggu terlalu
+//   lama (penggantian, laporan pengembalian), supaya email tetap berarti.
 //
 // Anti-dobel: digest_logs (user + tanggal) dicatat sebelum email dikirim;
 // bila gagal terkirim, catatannya dihapus agar dicoba di jadwal berikutnya.
@@ -25,11 +29,14 @@ import { digestEmail, type DigestAudience } from "./email";
 import { getDigestData } from "./queries";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+// Hari ringkasan lengkap dikirim (0 = Minggu ... 1 = Senin).
+const FULL_DIGEST_WEEKDAY = 1;
 
 export async function sendDailyDigests() {
   const now = new Date();
   const since = new Date(now.getTime() - DAY_MS);
   const today = zonedDateString(now);
+  const fullDigestDay = new Date(`${today}T00:00:00Z`).getUTCDay() === FULL_DIGEST_WEEKDAY;
   const { graceDays } = await getPlatformSettings();
 
   const activeCompanies = (
@@ -69,6 +76,13 @@ export async function sendDailyDigests() {
     }
 
     const data = await getDigestData(company.id, since, { attendance: company.attendance });
+    const urgent =
+      data.newlyOverdue.length +
+        data.unpaidReimbursements.length +
+        data.unconfirmedReimbursements.length +
+        data.pendingReturnClaims.length >
+      0;
+    if (!fullDigestDay && !urgent) continue;
     for (const [userId, person] of recipients) {
       const message = digestEmail({
         to: person.email,

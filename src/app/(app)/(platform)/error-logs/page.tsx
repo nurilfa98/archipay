@@ -75,6 +75,9 @@ async function ErrorLogsContent({ params }: { params: Record<string, string | st
     const text = query.toString();
     return text ? `/error-logs?${text}` : "/error-logs";
   };
+  // Link ke detail membawa filter yang sedang dipakai, agar setelah "Tandai selesai" /
+  // "Abaikan" Superadmin kembali ke daftar yang sama (lihat error-logs/[fingerprint]).
+  const filterQuery = hrefFor(tab).split("?")[1];
 
   return (
     <div className="flex flex-col gap-4">
@@ -105,7 +108,7 @@ async function ErrorLogsContent({ params }: { params: Record<string, string | st
           {groups.map((group) => (
             <li key={group.fingerprint}>
               <Link
-                href={`/error-logs/${group.fingerprint}`}
+                href={`/error-logs/${group.fingerprint}${filterQuery ? `?${filterQuery}` : ""}`}
                 className="flex flex-col gap-2 rounded-xl border bg-card p-3 transition-colors hover:bg-muted/50 sm:p-4"
               >
                 <div className="flex flex-wrap items-center gap-1.5">

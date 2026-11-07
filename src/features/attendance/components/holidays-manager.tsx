@@ -99,8 +99,8 @@ function HolidayItem({ holiday, readOnly }: { holiday: HolidayRow; readOnly: boo
   return (
     <li className="flex items-center justify-between gap-3 p-3">
       <div className="min-w-0">
-        <p className="font-medium">{holiday.name}</p>
-        <p className="text-sm text-muted-foreground">{holiday.dateText}</p>
+        <p className="text-sm font-medium">{holiday.name}</p>
+        <p className="text-xs text-muted-foreground">{holiday.dateText}</p>
       </div>
       {!readOnly && (
         <Button

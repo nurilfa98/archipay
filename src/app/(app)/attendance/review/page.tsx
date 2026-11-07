@@ -9,6 +9,7 @@ import type { Metadata } from "next";
 import { io } from "next/cache";
 import Link from "next/link";
 import { Suspense } from "react";
+import { EXCEL_BUTTON_CLASS, PDF_BUTTON_CLASS } from "@/components/download-button-styles";
 import { PageHeader } from "@/components/layout/page-header";
 import { ToneBadge } from "@/components/tone-badge";
 import { Button } from "@/components/ui/button";
@@ -25,12 +26,6 @@ import { formatRupiah } from "@/lib/format";
 export const metadata: Metadata = {
   title: "Review Bulanan Absensi",
 };
-
-// Tombol unduh: PDF merah, Excel hijau.
-const PDF_BUTTON =
-  "border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100 hover:text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70 dark:hover:text-red-200";
-const EXCEL_BUTTON =
-  "border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100 hover:text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70 dark:hover:text-emerald-200";
 
 export default function ReviewPage({ searchParams }: PageProps<"/attendance/review">) {
   return (
@@ -76,7 +71,7 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
         <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
-            className={PDF_BUTTON}
+            className={PDF_BUTTON_CLASS}
             nativeButton={false}
             render={<a href={`/api/attendance/review/export?period=${period}&format=pdf`} />}
           >
@@ -85,7 +80,7 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
           </Button>
           <Button
             variant="outline"
-            className={EXCEL_BUTTON}
+            className={EXCEL_BUTTON_CLASS}
             nativeButton={false}
             render={<a href={`/api/attendance/review/export?period=${period}&format=xlsx`} />}
           >

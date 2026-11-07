@@ -50,7 +50,7 @@ async function LocationsContent() {
           </Button>
           <Button variant="outline" nativeButton={false} render={<Link href="/attendance/locations/import" />}>
             <TablePropertiesIcon />
-            Tambah banyak / impor Excel
+            Impor Excel
           </Button>
         </div>
       )}

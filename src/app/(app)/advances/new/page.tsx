@@ -12,7 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AdvanceCreateForm } from "@/features/advances/components/advance-create-form";
 import { countOverdueAdvances, listApprovers, listRecipientOptions } from "@/features/advances/queries";
 import { eligibleApprovers } from "@/features/advances/service";
-import { BackToProjectList } from "@/features/projects/components/back-to-list";
 import { ProjectBanner } from "@/features/projects/components/project-banner";
 import { resolveProjectScope } from "@/features/projects/queries";
 import { readProjectParam } from "@/features/projects/schemas";
@@ -27,7 +26,6 @@ export const metadata: Metadata = {
 export default function NewAdvancePage({ searchParams }: PageProps<"/advances/new">) {
   return (
     <>
-      <BackToProjectList basePath="/advances" label="Daftar uang muka" searchParams={searchParams} />
       <PageHeader
         title="Pencairan uang muka"
         description="Berikan dana operasional kepada karyawan. Karyawan wajib mengonfirmasi penerimaan dan mempertanggungjawabkannya dengan nota."

@@ -7,6 +7,7 @@
 
 import { FileDownIcon, LoaderCircleIcon } from "lucide-react";
 import { useTransition } from "react";
+import { PDF_BUTTON_CLASS } from "@/components/download-button-styles";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notify";
 
@@ -36,6 +37,7 @@ export function ProjectReportButton({ projectId, projectName }: { projectId: str
     <Button
       variant="outline"
       size="sm"
+      className={PDF_BUTTON_CLASS}
       disabled={pending}
       onClick={handleDownload}
       aria-label={`Unduh laporan PDF ${projectName}`}

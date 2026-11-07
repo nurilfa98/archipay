@@ -14,7 +14,7 @@ import { io } from "next/cache";
 import { cache } from "react";
 import { AWAITING_RECEIPT_STATUSES, type AdvanceStatus } from "@/features/advances/constants";
 import { db } from "@/lib/db";
-import { advanceRequests, projects } from "@/lib/db/schema";
+import { advanceRequests, projects, settlements } from "@/lib/db/schema";
 import { DEFAULT_PROJECT_ICON, isProjectIcon, NO_PROJECT, type ProjectIconKey, type ProjectStatus } from "./constants";
 
 export type ProjectInfo = {
@@ -70,6 +70,31 @@ export const resolveProjectScope = cache(async (companyId: string, param: string
   const project = await getProjectInfo(companyId, param);
   return project ? { kind: "project", project } : { kind: "picker" };
 });
+
+// Nilai ?project= (id project, atau NO_PROJECT) dari satu uang muka / pertanggungjawaban.
+// Dipakai breadcrumb di halaman detail: link "Uang Muka" / "Pertanggungjawaban"
+// membawa ?from=<id>, lalu halaman daftar mengarahkannya ke daftar project yang tepat.
+// null bila tidak ditemukan di perusahaan ini.
+export async function projectParamOfAdvance(companyId: string, advanceId: string): Promise<string | null> {
+  await io();
+  const [row] = await db
+    .select({ projectId: advanceRequests.projectId })
+    .from(advanceRequests)
+    .where(and(eq(advanceRequests.id, advanceId), eq(advanceRequests.companyId, companyId)))
+    .limit(1);
+  return row ? (row.projectId ?? NO_PROJECT) : null;
+}
+
+export async function projectParamOfSettlement(companyId: string, settlementId: string): Promise<string | null> {
+  await io();
+  const [row] = await db
+    .select({ projectId: advanceRequests.projectId })
+    .from(settlements)
+    .innerJoin(advanceRequests, eq(settlements.advanceId, advanceRequests.id))
+    .where(and(eq(settlements.id, settlementId), eq(settlements.companyId, companyId)))
+    .limit(1);
+  return row ? (row.projectId ?? NO_PROJECT) : null;
+}
 
 // Project aktif untuk pilihan "tetapkan project" uang muka lama.
 export async function listActiveProjects(companyId: string): Promise<{ id: string; name: string }[]> {

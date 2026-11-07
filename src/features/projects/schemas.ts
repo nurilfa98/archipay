@@ -28,6 +28,12 @@ export const projectSchema = z.object({
 
 export const projectStatusSchema = z.enum(PROJECT_STATUS);
 
+// ?from=<id uang muka / pertanggungjawaban> dari link breadcrumb halaman detail.
+export function readFromParam(params: Record<string, string | string[] | undefined>): string | undefined {
+  const value = Array.isArray(params.from) ? params.from[0] : params.from;
+  return value && value.length <= 36 ? value : undefined;
+}
+
 // ?project= dari URL. Mengembalikan teks apa adanya (maksimal 36 karakter);
 // project-nya sendiri dicari di database oleh resolveProjectScope().
 export function readProjectParam(params: Record<string, string | string[] | undefined>): string | undefined {

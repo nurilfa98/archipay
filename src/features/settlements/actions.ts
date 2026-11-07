@@ -518,7 +518,7 @@ export async function verifySettlement(
       approvedAmount,
       ...result,
     };
-    after(() => notifyVerified(summary, recipient));
+    after(() => notifyVerified(summary, recipient, actor.company.id));
   }
   revalidateSettlements();
   return done();
@@ -620,7 +620,7 @@ async function recordBalancePayment(
   const recipient = await getActiveRecipient(actor.company.id, settlement.recipientId);
   if (recipient && settlement.number && !(type === "RETURN" && input.method === "CASH")) {
     const summary = { id: settlement.id, number: settlement.number, advanceNumber: settlement.advanceNumber };
-    after(() => notifyBalanceRecorded(summary, recipient, { type, ...result }));
+    after(() => notifyBalanceRecorded(summary, recipient, { type, ...result }, actor.company.id));
   }
   revalidateSettlements();
   return done();

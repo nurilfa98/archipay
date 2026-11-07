@@ -381,8 +381,11 @@ kosong), pesan hanya dicetak di terminal `pnpm dev`; kosongkan
 
 **Hemat kuota WhatsApp** (kuota Fonnte dipakai bersama semua company):
 WhatsApp hanya untuk hal yang butuh tindakan segera. Informasi & antrean kerja
-Owner/Finance dikirim sebagai **ringkasan email harian** (pukul 08.00 WIB,
+Owner/Finance dikirim sebagai **ringkasan email** (pukul 08.00 WIB,
 `features/digest`), hanya bila ada isinya, maksimal sekali per orang per hari.
+**Sejak lonceng ada (bagian 23), email dikurangi:** ringkasan lengkap hanya hari
+**Senin**; hari lain hanya bila ada yang baru lewat batas atau sudah menunggu
+terlalu lama (penggantian, laporan pengembalian).
 Isinya: perlu persetujuan (uang muka & foto wajah, khusus Owner),
 pertanggungjawaban menunggu verifikasi (tanda terlambat), sudah disetujui
 belum dicairkan, baru lewat batas (24 jam terakhir), dan "Kemarin"
@@ -537,10 +540,12 @@ Tombol **PDF** di tabel "Keuangan per project" (Beranda Owner) dan di detail pro
 satu project. Hanya Owner. PDF dibuat saat diminta dengan data terbaru, tidak
 disimpan. Isinya (A4, foto nota tidak disertakan):
 
-1. **Ringkasan:** nilai kontrak, pengeluaran, keuntungan dan margin (*sementara* / *final*), dana beredar, uang muka dicairkan, dan jumlah nota.
-2. **Pengeluaran per kategori:** jumlah nota, total, dan porsinya.
-3. **Per karyawan:** jumlah uang muka, total dicairkan, dan pengeluaran yang disetujui.
-4. **Daftar nota yang disetujui:** tanggal nota, nomor pertanggungjawaban, karyawan, kategori, keterangan (biaya tanpa nota diberi tanda), dan jumlah.
+1. **Ringkasan:** nilai kontrak, pengeluaran disetujui, keuntungan dan margin (*sementara* / *final*), bilah pemakaian nilai kontrak (kuning ≥ 80%, merah bila melebihi kontrak) beserta sisa nilai kontrak, lalu uang muka dicairkan, dana beredar, jumlah nota (rata-rata per nota), dan **nota tanpa bukti** (jumlah dan nilainya, ditandai kuning).
+2. **Pengeluaran per kategori:** jumlah nota, total, porsi, dan bilah perbandingan.
+3. **Pengeluaran per bulan** (menurut tanggal nota; tampil bila ada dua bulan atau lebih): untuk melihat laju pengeluaran.
+4. **Per karyawan:** jumlah uang muka, dicairkan, pengeluaran disetujui, dan sisa dana (dicairkan dikurangi pengeluaran; belum final untuk uang muka yang masih berjalan).
+5. **5 nota terbesar** (hanya bila notanya lebih dari 20).
+6. **Daftar nota yang disetujui:** tanggal nota, nomor pertanggungjawaban, karyawan, kategori, keterangan (biaya tanpa nota diberi tanda), dan jumlah. Daftar mulai di halaman pertama bila masih ada tempat; judul kolom diulang di setiap halaman.
 
 Kartu "Tanpa project" tidak punya PDF karena tidak punya nilai kontrak.
 
@@ -838,7 +843,7 @@ punya role lain.
 - Isi: nama, **project tertaut** (opsional), titik koordinat, **radius** (10–5.000 m), **zona waktu** (WIB / WITA / WIT), dan **jam kerja khusus lokasi** (opsional; kosong = jam company).
 - Titik dipilih tanpa membuka Google Maps: **cari alamat** (Nominatim/OpenStreetMap, lewat server ArchiPay, maks. 1 pencarian/detik, hasil di-cache), **"Pakai lokasi saya sekarang"** (GPS perangkat, paling akurat untuk lahan proyek), klik di peta lalu geser pin, atau menempel koordinat / link Google Maps. Data alamat OSM di Indonesia belum selengkap Google, jadi pin tetap perlu dicek.
 - Radius di bawah 50 m diberi peringatan (GPS HP bisa meleset 5–20 m).
-- **Tambah banyak lokasi** (`/attendance/locations/import`): setiap klik di peta menambah satu baris, atau **unggah file .xlsx** dari tombol "Unduh template" (kolom: Nama lokasi, Koordinat, Radius (meter), Zona waktu, Project, Jam masuk, Jam pulang; sheet "Petunjuk" berisi cara mengisi). File .csv juga diterima (pemisah koma atau titik koma). Koordinat & jam di template berupa teks agar Excel berbahasa Indonesia tidak mengubah titik desimal.
+- **Tambah banyak lokasi** (`/attendance/locations/import`): setiap klik di peta menambah satu baris, atau **unggah file .xlsx** dari tombol "Unduh template" (kolom: Nama lokasi, Koordinat, Radius (meter), Zona waktu, Project, Jam masuk, Jam pulang; sheet "Petunjuk" berisi cara mengisi). File .csv juga diterima (pemisah koma atau titik koma). Koordinat & jam di template berupa teks agar Excel berbahasa Indonesia tidak mengubah titik desimal. **Zona waktu terisi otomatis dari koordinat** (garis bujur: < 114,5°BT WIB, < 127°BT WITA, selebihnya WIT) saat klik peta, geser pin, mengetik koordinat, atau kolom Zona waktu di file kosong; perkiraan ini bisa meleset di dekat batas zona, jadi tetap bisa diubah per baris.
 - Isi file tampil sebagai **pratinjau** yang bisa diperbaiki. Semua baris disimpan sekaligus atau tidak sama sekali (maks. 200 baris); baris yang salah ditandai beserta alasannya. **Nama lokasi yang sudah ada ditolak** (tidak menimpa data lama). Project diisi dengan nama project persis.
 - Lokasi tidak dihapus, hanya **dinonaktifkan**, agar riwayat absen tetap utuh. Nama unik per company.
 - Semua perubahan tercatat di Audit Log (kategori **Absensi**).
@@ -858,7 +863,7 @@ punya role lain.
    - Karyawan mengambil ulang foto → penolakan dan file lama langsung dihapus.
    - Karyawan masih punya foto acuan yang disetujui → kartu penolakan tampil **3 hari**, lalu baris dan filenya dihapus otomatis (cron harian). Tidak menghalangi absen.
    - Karyawan belum punya foto acuan → kartu penolakan tetap tampil sampai ia mengambil ulang, tetapi **file fotonya dihapus setelah 30 hari** (alasan tetap tampil, tanpa foto).
-10. **Kabar ke Owner & Admin HR:** cron harian (bagian 9) mengirim WhatsApp ke semua Owner dan Admin HR aktif bila ada foto baru yang menunggu persetujuan (Admin HR tidak dikabari foto miliknya sendiri). Hemat kuota: semua foto baru dalam satu company digabung jadi **satu pesan per penerima**, dan setiap foto hanya dikabarkan **sekali** (`face_profiles.owner_notified_at`); foto yang belum diproses tidak dikirim ulang, jumlahnya tetap tampil di menu Absensi. Foto yang diganti karyawan dihitung sebagai foto baru.
+10. **Kabar ke Owner & Admin HR:** foto baru yang menunggu persetujuan muncul sebagai kartu **"Foto wajah menunggu persetujuan"** di lonceng (bagian 23) dan jumlahnya tampil di menu Absensi; tidak ada WhatsApp (hemat kuota). Kartu hilang sendiri setelah semua foto diproses. Kolom `face_profiles.owner_notified_at` dari cara lama tidak dipakai lagi.
 11. Liveness saat pendaftaran & absen: tepat satu wajah, cukup dekat, di tengah bingkai (garis hijau setengah), lalu **tersenyum** (garis hijau penuh); foto diambil otomatis dari frame netral sesaat sebelum tersenyum, lalu harus lolos model anti-spoof & liveness (skor ≥ 0,5). Setiap frame hanya memakai model ringan (deteksi, mesh, ekspresi); embedding, anti-spoof & liveness dihitung sekali saat foto diambil. Senyum menggantikan kedip (2026-11-05) karena kedip sering terlewat di HP. Foto dipotong **persegi** (bagian tengah frame, sama dengan yang terlihat di layar) lalu disimpan JPEG maks. 640 × 640 px, tercermin seperti tampilan kamera depan; kartu persetujuan menampilkannya persegi (foto lama yang portrait dipotong tengah-atas).
 
 ### 18.5 Absen masuk
@@ -1003,7 +1008,7 @@ diajukan, jadi mengubah jenis tidak mengubah pengajuan lama. Lampiran: foto
 - Disetujui → hari itu tampil sebagai Cuti/Sakit/Izin di absensi, bukan Tidak hadir.
 - **Izin datang terlambat** disetujui → absen masuk sampai jam yang diizinkan + toleransi **tidak didenda**. Bila disetujui setelah karyawan terlanjur absen terlambat, dendanya otomatis dibebaskan (tercatat sebagai "dibebaskan karena izin").
 - **Izin pulang cepat** disetujui → pulang mulai jam yang diizinkan tidak ditandai pulang cepat.
-- **Delegasi ke Admin HR** (pengaturan khusus Owner: aktif/nonaktif + waktu tunggu, bawaan 24 jam): pengajuan cuti/izin yang belum diproses Owner setelah waktu tunggu boleh diproses Admin HR; cron mengirim satu WhatsApp ke Admin HR berisi daftar pengajuan yang kini jadi tugasnya. Owner tetap bisa memproses kapan saja (yang lebih dulu berlaku). Admin HR tidak bisa memproses pengajuannya sendiri. Persetujuan uang muka, bebaskan denda, dan kunci periode **tidak** didelegasikan (menyangkut uang).
+- **Delegasi ke Admin HR** (pengaturan khusus Owner: aktif/nonaktif + waktu tunggu, bawaan 24 jam): pengajuan cuti/izin yang belum diproses Owner setelah waktu tunggu boleh diproses Admin HR; pengajuan yang kini jadi tugasnya muncul sebagai kartu **"Cuti & izin menunggu diproses"** di lonceng Admin HR (tanpa WhatsApp). Pengajuan baru tetap dikabari lewat WhatsApp ke Owner dan Admin HR. Owner tetap bisa memproses kapan saja (yang lebih dulu berlaku). Admin HR tidak bisa memproses pengajuannya sendiri. Persetujuan uang muka, bebaskan denda, dan kunci periode **tidak** didelegasikan (menyangkut uang).
 
 ### 19.5 Pembatalan
 
@@ -1251,3 +1256,64 @@ Hal yang sudah diketahui tetapi belum diputuskan/dikerjakan:
 6. **Notifikasi WhatsApp belum menyebut project.** Pesan pengajuan, pencairan, dan pengingat belum memuat nama project.
 7. **Cuti/izin bergantung pada Owner bila tidak ada Admin HR** (bagian 19.4). Dengan Admin HR, pengajuan didelegasikan setelah waktu tunggu; tanpa Admin HR, pengajuan tetap menunggu Owner.
 8. **Zona waktu absensi per lokasi, tetapi fitur lain masih memakai satu `APP_TIMEZONE`** (bagian 16). Batas nota, pengingat, dan audit log belum mengikuti zona waktu lokasi.
+
+---
+
+## 23. Pemberitahuan (lonceng)
+
+Ikon **lonceng** di navbar (kiri tombol tema) menampilkan angka dan membuka halaman
+**Pemberitahuan** (`/notifications`) berisi kartu info yang bisa diklik dan langsung
+membuka halaman tujuannya.
+
+Ada dua sumber kartu:
+
+1. **Tugas & pengingat dihitung langsung dari data yang ada** (tanpa tabel), sehingga
+   selalu akurat dan **hilang sendiri begitu urusannya selesai** (bukan saat dibuka).
+2. **Kabar sekali lewat disimpan di tabel `notifications`** (migration 0021) dan
+   **hilang setelah dibuka**: klik kartunya membuka halaman tujuan sekaligus menandainya
+   sudah dibaca; tombol "Tandai semua dibaca" tersedia. Kabar yang sudah dibuka disimpan
+   14 hari, yang tidak pernah dibuka 60 hari, lalu dihapus cron harian. Kabar yang ditampilkan
+   maksimal 30 terbaru.
+
+- **Angka lonceng = jumlah kartu**, bukan jumlah item (5 nota menunggu verifikasi =
+  1 kartu). Merah bila ada kartu mendesak (lewat batas), selain itu biru.
+- Kartu dikelompokkan **Perlu tindakan**, **Pengingat**, dan **Kabar terbaru**, mendesak lebih dulu. Setiap kabar yang belum dibuka dihitung satu kartu.
+- Angka lonceng disegarkan di browser setiap pindah halaman, saat jendela kembali aktif, dan tiap 90 detik.
+- Isi mengikuti role dan add-on (`can()`); fitur Absensi/Penggajian hanya muncul bila
+  add-on aktif. Kartu dengan satu item langsung membuka dokumennya; bila lebih dari
+  satu, membuka daftarnya.
+
+| Kartu | Siapa | Kapan muncul |
+|---|---|---|
+| Tugas uang muka (setujui/tolak, catat penyerahan, konfirmasi terima, dilaporkan tidak sesuai) | Owner, Finance, penerima | per jenis tugas |
+| Tugas pertanggungjawaban (isi/perbaiki nota, verifikasi, kembalikan/catat sisa, konfirmasi laporan pengembalian, penggantian) | Karyawan, Owner, Finance | per jenis tugas; merah bila lewat batas |
+| Foto wajah Anda belum ada / ditolak | Karyawan wajib absen | selama belum punya foto acuan |
+| Foto wajah menunggu persetujuan | Owner, Admin HR | ada foto menunggu |
+| Cuti & izin menunggu diproses | Owner; Admin HR setelah waktu tunggu delegasi (bila delegasi aktif) | ada pengajuan orang lain yang menunggu |
+| Review & kunci absensi bulan lalu | Owner | periode bulan lalu belum dikunci dan ada catatan absen |
+| Hari libur belum diisi | Owner | **1 Desember** (untuk tahun depan) sampai akhir Januari (untuk tahun berjalan), selama daftarnya kosong |
+| Sisa uang muka menunggu dipotong gaji | Owner, Finance | ada di daftar Potong Gaji |
+| Penggajian belum diselesaikan / belum dibuat | Owner, Finance | draf masih terbuka; belum dibuat mulai **tanggal 25** |
+| Masa gratis / langganan segera berakhir, masa tenggang, terkunci | Owner | mulai H-7 |
+| Error baru di log, tagihan menunggu verifikasi | Superadmin | selama ada |
+
+Superadmin hanya melihat kartu platform (dua baris terakhir).
+
+**Kabar sekali lewat (kartu "Kabar terbaru"):**
+
+| Peristiwa | Untuk | Sebelumnya |
+|---|---|---|
+| Pengajuan/usulan uang muka ditolak | pengaju | WhatsApp |
+| Pencairan uang muka dibatalkan | penerima | WhatsApp |
+| Pertanggungjawaban selesai diverifikasi | karyawan | WhatsApp |
+| Pengembalian sisa dana diterima, atau dipotong dari gaji | karyawan | WhatsApp |
+| Cuti/izin disetujui atau ditolak | pengaju | WhatsApp |
+| Cuti/izin yang sudah disetujui dibatalkan | Owner | WhatsApp |
+| Slip gaji terbit (penggajian diselesaikan) | karyawan | tidak ada |
+
+**Tetap WhatsApp** (mendesak atau butuh jawaban): pengajuan uang muka baru ke penyetuju,
+dana dicairkan, uang muka dilaporkan tidak sesuai, nota dikembalikan untuk diperbaiki,
+penggantian dibayar (karyawan harus menjawab) dan belum diterima, laporan pengembalian
+ditolak, pengajuan cuti/izin baru ke Owner dan Admin HR, pengingat batas nota, pengingat
+langganan, OTP, dan perangkat baru. WhatsApp **tidak lagi** dipakai untuk foto wajah
+menunggu dan delegasi cuti ke Admin HR (diganti kartu lonceng).

@@ -43,7 +43,7 @@ export function LeaveSettingsForm({ settings, readOnly }: { settings: LeaveSetti
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl">
+    <form onSubmit={handleSubmit} className="max-w-2xl">
       <fieldset disabled={readOnly} className="min-w-0">
         <FieldGroup>
           <Field data-invalid={!!fieldError("annualLeaveQuota")}>
@@ -68,44 +68,50 @@ export function LeaveSettingsForm({ settings, readOnly }: { settings: LeaveSetti
             <FieldError>{fieldError("annualLeaveQuota")}</FieldError>
           </Field>
 
-          <Field orientation="horizontal">
-            <Checkbox
-              id="leaveDelegationEnabled"
-              name="leaveDelegationEnabled"
-              checked={delegation}
-              onCheckedChange={(checked) => setDelegation(checked)}
-            />
-            <FieldLabel htmlFor="leaveDelegationEnabled" className="font-normal">
-              Delegasikan ke Admin HR bila saya belum memproses
-            </FieldLabel>
-          </Field>
-          <Field data-invalid={!!fieldError("leaveDelegationHours")}>
-            <FieldLabel htmlFor="leaveDelegationHours">Waktu tunggu delegasi</FieldLabel>
-            <div className="flex items-center gap-2">
-              <Input
-                id="leaveDelegationHours"
-                name="leaveDelegationHours"
-                type="number"
-                min={1}
-                max={168}
-                defaultValue={settings.leaveDelegationHours}
-                className="w-24 tabular-nums"
-                disabled={!delegation}
-                required
+          <div className="flex flex-col gap-4 rounded-lg border p-3 sm:p-4">
+            <Field orientation="horizontal">
+              <Checkbox
+                id="leaveDelegationEnabled"
+                name="leaveDelegationEnabled"
+                checked={delegation}
+                onCheckedChange={(checked) => setDelegation(checked)}
               />
-              <span className="text-sm text-muted-foreground">jam</span>
-            </div>
-            <FieldDescription>
-              Setelah waktu ini, Admin HR boleh menyetujui/menolak cuti & izin dan diberi tahu lewat WhatsApp. Anda
-              tetap bisa memproses kapan saja. Uang muka & denda tidak didelegasikan.
-            </FieldDescription>
-            {/* Isian yang dinonaktifkan tidak terkirim: kirim nilai lama. */}
-            {!delegation && <input type="hidden" name="leaveDelegationHours" value={settings.leaveDelegationHours} />}
-            <FieldError>{fieldError("leaveDelegationHours")}</FieldError>
-          </Field>
+              <div className="flex flex-col gap-0.5">
+                <FieldLabel htmlFor="leaveDelegationEnabled">Delegasikan ke Admin HR bila saya belum memproses</FieldLabel>
+                <FieldDescription>
+                  Berlaku bila perusahaan punya pengguna dengan role Admin HR. Tanpa Admin HR, pengajuan tetap menunggu
+                  Anda.
+                </FieldDescription>
+              </div>
+            </Field>
+            <Field data-invalid={!!fieldError("leaveDelegationHours")}>
+              <FieldLabel htmlFor="leaveDelegationHours">Waktu tunggu delegasi</FieldLabel>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="leaveDelegationHours"
+                  name="leaveDelegationHours"
+                  type="number"
+                  min={1}
+                  max={168}
+                  defaultValue={settings.leaveDelegationHours}
+                  className="w-24 tabular-nums"
+                  disabled={!delegation}
+                  required
+                />
+                <span className="text-sm text-muted-foreground">jam</span>
+              </div>
+              <FieldDescription>
+                Setelah waktu ini, Admin HR boleh menyetujui/menolak cuti & izin dan diberi tahu lewat WhatsApp. Anda
+                tetap bisa memproses kapan saja.
+              </FieldDescription>
+              {/* Isian yang dinonaktifkan tidak terkirim: kirim nilai lama. */}
+              {!delegation && <input type="hidden" name="leaveDelegationHours" value={settings.leaveDelegationHours} />}
+              <FieldError>{fieldError("leaveDelegationHours")}</FieldError>
+            </Field>
+          </div>
 
           {!readOnly && (
-            <Field orientation="horizontal">
+            <Field orientation="horizontal" className="border-t pt-4">
               <Button type="submit" disabled={pending}>
                 {pending && <LoaderCircleIcon className="animate-spin" />}
                 {pending ? "Menyimpan..." : "Simpan pengaturan cuti"}
@@ -131,8 +137,8 @@ export function LeaveTypesManager({ types, readOnly }: { types: LeaveType[]; rea
           ) : (
             <li key={type.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
               <div className="min-w-0">
-                <p className="font-medium">{type.name}</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm font-medium">{type.name}</p>
+                <p className="text-xs text-muted-foreground">
                   {LEAVE_KIND_LABELS[type.kind]} · {type.isPaid ? "dibayar" : "tidak dibayar"}
                   {type.usesQuota ? " · potong kuota" : ""} · {LEAVE_ATTACHMENT_LABELS[type.attachment].toLowerCase()}
                   {type.kind === "FULL_DAY" && type.backdateDays > 0 ? ` · mundur maks. ${type.backdateDays} hari` : ""}
@@ -299,7 +305,7 @@ function TypeActiveSwitch({ type, readOnly }: { type: LeaveType; readOnly: boole
         }
         className="data-checked:bg-emerald-600 dark:data-checked:bg-emerald-500"
       />
-      <span className="text-sm text-muted-foreground">{active ? "Aktif" : "Nonaktif"}</span>
+      <span className="text-xs text-muted-foreground">{active ? "Aktif" : "Nonaktif"}</span>
     </div>
   );
 }

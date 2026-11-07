@@ -34,12 +34,18 @@ import { MenuFab } from "@/components/layout/menu-fab";
 import { ActiveCompanyBar } from "@/features/companies/components/active-company-bar";
 import { SubscriptionBanner } from "@/features/subscriptions/components/subscription-banner";
 import { UserMenu, UserMenuSkeleton } from "@/features/auth/components/user-menu";
+import { NotificationBell, NotificationBellSkeleton } from "@/features/notifications/components/notification-bell";
 import { verifyAccount } from "@/lib/auth/dal";
 
 export default function AppLayout({ children }: LayoutProps<"/">) {
   return (
     <div className="flex min-h-svh flex-col">
       <AppHeader
+        bell={
+          <Suspense fallback={<NotificationBellSkeleton />}>
+            <NotificationBell />
+          </Suspense>
+        }
         userMenu={
           <Suspense fallback={<UserMenuSkeleton />}>
             <HeaderUserMenu />

@@ -130,27 +130,39 @@ export const MENU_ITEMS: MenuItem[] = [
 ];
 
 // Halaman yang bukan menu, tetapi tampil di breadcrumb di bawah induknya.
-export const SUB_PAGES: { title: string; href: string; parent?: string }[] = [
-  { title: "Uang Muka", href: "/advances", parent: "/projects" },
-  { title: "Pertanggungjawaban", href: "/settlements", parent: "/projects" },
+//
+// keepParams: query URL halaman ini yang ikut dibawa saat crumb diklik (misal
+// ?project= di form uang muka, ?period= di rekap karyawan). detailOf: di halaman
+// detail (/advances/<id>, /settlements/<id>) crumb membawa ?from=<id>, karena URL
+// detail tidak memuat project (daftar uang muka & pertanggungjawaban wajib per project).
+export const SUB_PAGES: {
+  title: string;
+  href: string;
+  parent?: string;
+  keepParams?: string[];
+  detailOf?: boolean;
+}[] = [
+  { title: "Uang Muka", href: "/advances", parent: "/projects", keepParams: ["project"], detailOf: true },
+  { title: "Pertanggungjawaban", href: "/settlements", parent: "/projects", keepParams: ["project"], detailOf: true },
   { title: "Profil", href: "/profile" },
+  { title: "Pemberitahuan", href: "/notifications" },
   { title: "Lokasi", href: "/attendance/locations", parent: "/attendance" },
   { title: "Foto wajah", href: "/attendance/faces", parent: "/attendance" },
   { title: "Daftar foto wajah", href: "/attendance/enroll", parent: "/attendance" },
   { title: "Absen", href: "/attendance/check", parent: "/attendance" },
   { title: "Hari ini", href: "/attendance/today", parent: "/attendance" },
   { title: "Cuti & izin", href: "/attendance/leave", parent: "/attendance" },
-  { title: "Review bulanan", href: "/attendance/review", parent: "/attendance" },
+  { title: "Review bulanan", href: "/attendance/review", parent: "/attendance", keepParams: ["period"] },
   { title: "Data gaji", href: "/payroll/salaries", parent: "/payroll" },
 ];
 
 // Halaman platform Superadmin (tidak terikat company), berpindah lewat tab di
 // app/(app)/(platform)/layout.tsx. Di halaman ini breadcrumb tidak
 // menampilkan "Menu" dan tombol kembali ke menu disembunyikan.
-export const PLATFORM_PAGES: { title: string; href: string }[] = [
+export const PLATFORM_PAGES: { title: string; href: string; keepParams?: string[] }[] = [
   { title: "Perusahaan", href: "/companies" },
   { title: "Tagihan", href: "/billing" },
-  { title: "Log error", href: "/error-logs" },
+  { title: "Log error", href: "/error-logs", keepParams: ["status", "source", "q"] },
   { title: "Pengaturan platform", href: "/platform-settings" },
 ];
 

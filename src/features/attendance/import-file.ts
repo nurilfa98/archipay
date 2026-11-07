@@ -6,6 +6,7 @@
 // membaca & merapikan teks.
 
 import { ATTENDANCE_TIMEZONES, type AttendanceTimezone } from "./constants";
+import { parseCoordinates, timezoneForPoint } from "./geo";
 import { formatMinutes } from "./schedule";
 
 export const IMPORT_COLUMNS = {
@@ -61,11 +62,17 @@ export async function readLocationFile(file: File, defaults: { radius: string; t
       name: cell(row, columns.name),
       coordinates: cell(row, columns.coordinates),
       radius: cell(row, columns.radius) || defaults.radius,
-      timezone: toTimezone(cell(row, columns.timezone)) ?? defaults.timezone,
+      timezone: toTimezone(cell(row, columns.timezone)) ?? zoneFromCoordinates(cell(row, columns.coordinates)) ?? defaults.timezone,
       projectName: cell(row, columns.project),
       workStart: time(columns.workStart === -1 ? null : row[columns.workStart]),
       workEnd: time(columns.workEnd === -1 ? null : row[columns.workEnd]),
     }));
+}
+
+// Kolom zona waktu kosong: perkirakan dari koordinat, bila ada.
+function zoneFromCoordinates(value: string) {
+  const point = parseCoordinates(value);
+  return point ? timezoneForPoint(point) : null;
 }
 
 async function readXlsx(file: File): Promise<Cell[][]> {

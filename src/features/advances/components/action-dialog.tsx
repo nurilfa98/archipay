@@ -45,6 +45,7 @@ export function ActionDialog({
   confirmLabel,
   successMessage,
   onConfirm,
+  onSuccess,
   children,
 }: {
   label: string;
@@ -61,6 +62,8 @@ export function ActionDialog({
   confirmLabel: string;
   successMessage: string;
   onConfirm: (formData: FormData) => Promise<ActionResult>;
+  // Dipanggil setelah berhasil (dialog sudah tertutup), misal untuk pindah halaman.
+  onSuccess?: () => void;
   children?: (fieldError: FieldErrorOf) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -84,6 +87,7 @@ export function ActionDialog({
       if (result.success) {
         setOpen(false);
         notify.success(successMessage);
+        onSuccess?.();
       } else {
         setError(result);
         if (!result.fieldErrors) notify.error(result.message);
@@ -112,7 +116,8 @@ export function ActionDialog({
         )}
       </Button>
       <AlertDialog open={open} onOpenChange={handleOpenChange}>
-        <AlertDialogContent>
+        {/* HP: hampir selebar layar (margin 8px) dan bisa digulir bila isiannya panjang. */}
+        <AlertDialogContent className="max-h-[calc(100dvh-1rem)] overflow-y-auto data-[size=default]:max-w-[calc(100%-1rem)] data-[size=default]:sm:max-w-md">
           <form onSubmit={handleSubmit} className="contents">
             <AlertDialogHeader>
               <AlertDialogTitle>{title}</AlertDialogTitle>

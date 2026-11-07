@@ -36,10 +36,10 @@ export function CompanySettingsForm({ settings, readOnly = false }: { settings: 
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl">
+    <form onSubmit={handleSubmit} className="max-w-2xl">
       <fieldset disabled={readOnly} className="min-w-0">
         <FieldGroup>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             <DaysField
               name="settlementDueDays"
               label="Batas unggah nota"
@@ -54,43 +54,41 @@ export function CompanySettingsForm({ settings, readOnly = false }: { settings: 
               description="Hari kalender sejak nota diverifikasi."
               error={fieldError("returnDueDays")}
             />
+            <DaysField
+              name="maxOverdueAdvances"
+              label="Batas uang muka tertunda"
+              max={10}
+              unit="uang muka"
+              defaultValue={settings.maxOverdueAdvances}
+              description="Karyawan dengan uang muka lewat batas unggah nota sebanyak ini tidak bisa menerima uang muka baru."
+              error={fieldError("maxOverdueAdvances")}
+            />
+            <Field data-invalid={!!fieldError("noReceiptMaxAmount")}>
+              <FieldLabel htmlFor="noReceiptMaxAmount">Batas biaya tanpa nota (per item)</FieldLabel>
+              <div className="relative max-w-60">
+                <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-muted-foreground">
+                  Rp
+                </span>
+                <Input
+                  id="noReceiptMaxAmount"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  className="pl-9 tabular-nums"
+                  value={maxDigits ? Number(maxDigits).toLocaleString("id-ID") : ""}
+                  onChange={(event) => setMaxDigits(event.target.value.replace(/\D/g, "").slice(0, 9))}
+                  aria-invalid={!!fieldError("noReceiptMaxAmount")}
+                  required
+                />
+              </div>
+              <FieldDescription>Untuk parkir, ojek, dll. Isi 0 bila semua biaya wajib bernota.</FieldDescription>
+              <FieldError>{fieldError("noReceiptMaxAmount")}</FieldError>
+            </Field>
           </div>
-
-          <DaysField
-            name="maxOverdueAdvances"
-            label="Batas uang muka tertunda"
-            max={10}
-            unit="uang muka"
-            defaultValue={settings.maxOverdueAdvances}
-            description="Karyawan yang sudah mencapai jumlah ini (lewat batas unggah nota, belum dipertanggungjawabkan) tidak bisa menerima uang muka baru."
-            error={fieldError("maxOverdueAdvances")}
-          />
-
-          <Field data-invalid={!!fieldError("noReceiptMaxAmount")}>
-            <FieldLabel htmlFor="noReceiptMaxAmount">Batas biaya tanpa nota (per item)</FieldLabel>
-            <div className="relative max-w-60">
-              <span className="pointer-events-none absolute inset-y-0 left-2.5 flex items-center text-sm text-muted-foreground">
-                Rp
-              </span>
-              <Input
-                id="noReceiptMaxAmount"
-                inputMode="numeric"
-                autoComplete="off"
-                className="pl-9 tabular-nums"
-                value={maxDigits ? Number(maxDigits).toLocaleString("id-ID") : ""}
-                onChange={(event) => setMaxDigits(event.target.value.replace(/\D/g, "").slice(0, 9))}
-                aria-invalid={!!fieldError("noReceiptMaxAmount")}
-                required
-              />
-            </div>
-            <FieldDescription>Untuk parkir, ojek, dll. Isi 0 bila semua biaya wajib bernota.</FieldDescription>
-            <FieldError>{fieldError("noReceiptMaxAmount")}</FieldError>
-          </Field>
 
           {readOnly ? (
             <p className="text-sm text-muted-foreground">Baca saja. Pengaturan perusahaan diubah oleh Owner.</p>
           ) : (
-            <Field orientation="horizontal">
+            <Field orientation="horizontal" className="border-t pt-4">
               <Button type="submit" disabled={pending}>
                 {pending && <LoaderCircleIcon className="animate-spin" />}
                 {pending ? "Menyimpan..." : "Simpan pengaturan"}

@@ -5,11 +5,9 @@
 //   dijalankan SETELAH pengingat karena membaca reminder_logs yang baru dicatat
 // - pengingat masa aktif langganan H-3/H-1 ke Owner lewat WhatsApp & email
 //   (features/subscriptions/reminders.ts)
-// - kabar foto acuan wajah baru yang menunggu persetujuan ke Owner lewat
-//   WhatsApp, sekali per foto (features/attendance/reminders.ts)
 // - penggantian yang belum dijawab karyawan > 3 hari dianggap diterima (features/settlements/reimbursement-ack.ts)
 // - hapus file nota & bukti pengembalian yang lewat masa simpan (features/settlements/receipt-retention.ts)
-// - kabar delegasi cuti/izin ke Admin HR (features/attendance/leave-reminders.ts)
+// - hapus pemberitahuan lonceng yang lewat masa simpan (features/notifications/service.ts)
 // - hapus foto acuan wajah yang ditolak (features/attendance/face-retention.ts)
 // - hapus catatan error (error_logs) yang lewat masa simpan (features/error-logs/queries.ts)
 // - hapus riwayat perangkat login yang sudah kedaluwarsa > 90 hari (features/auth/sessions.ts)
@@ -27,11 +25,10 @@
 
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
-import { notifyDelegatedLeaves } from "@/features/attendance/leave-reminders";
 import { purgeRejectedFaces } from "@/features/attendance/face-retention";
-import { notifyPendingFaces } from "@/features/attendance/reminders";
 import { sendDailyDigests } from "@/features/digest/run";
 import { purgeOldSessions } from "@/features/auth/sessions";
+import { purgeOldNotifications } from "@/features/notifications/service";
 import { runReminders } from "@/features/reminders/run";
 import { autoConfirmReimbursements } from "@/features/settlements/reimbursement-ack";
 import { purgeOldErrorLogs } from "@/features/error-logs/queries";
@@ -55,11 +52,6 @@ export async function GET(request: Request) {
     await logError(error, { source: "CRON", action: "ringkasan email harian" });
     return null;
   });
-  // Gagal kabar foto wajah tidak boleh menggagalkan tugas cron lainnya.
-  const pendingFaces = await notifyPendingFaces().catch(async (error: unknown) => {
-    await logError(error, { source: "CRON", action: "kabar foto wajah menunggu persetujuan" });
-    return null;
-  });
   // Gagal hapus nota tidak boleh menggagalkan pengingat yang sudah terkirim.
   const receipts = await purgeExpiredReceipts().catch(async (error: unknown) => {
     await logError(error, { source: "CRON", action: "hapus nota lewat masa simpan" });
@@ -73,8 +65,8 @@ export async function GET(request: Request) {
     await logError(error, { source: "CRON", action: "hapus bukti pengembalian lewat masa simpan" });
     return null;
   });
-  const delegatedLeaves = await notifyDelegatedLeaves().catch(async (error: unknown) => {
-    await logError(error, { source: "CRON", action: "kabar delegasi cuti/izin" });
+  const notifications = await purgeOldNotifications().catch(async (error: unknown) => {
+    await logError(error, { source: "CRON", action: "hapus pemberitahuan lama" });
     return null;
   });
   const rejectedFaces = await purgeRejectedFaces().catch(async (error: unknown) => {
@@ -90,7 +82,7 @@ export async function GET(request: Request) {
     return null;
   });
   return NextResponse.json(
-    { ok: true, sent, digests, subscriptionReminders, pendingFaces, delegatedLeaves, receipts, proofs, reimbursements, rejectedFaces, errorLogs, sessions },
+    { ok: true, sent, digests, subscriptionReminders, notifications, receipts, proofs, reimbursements, rejectedFaces, errorLogs, sessions },
     { headers: { "Cache-Control": "no-store" } },
   );
 }

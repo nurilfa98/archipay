@@ -18,7 +18,7 @@ export default function ImportLocationsPage() {
     <>
       <PageHeader
         title="Tambah banyak lokasi"
-        description="Klik peta untuk menambah lokasi satu per satu, atau unggah file Excel dari template. Periksa pratinjau, lalu simpan sekaligus."
+        description="Tambah lokasi lewat klik peta atau file Excel, periksa pratinjau, lalu simpan sekaligus."
       />
       <Suspense fallback={<Skeleton className="h-[40rem] w-full" />}>
         <ImportContent />

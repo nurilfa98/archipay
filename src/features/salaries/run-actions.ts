@@ -23,6 +23,8 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { z } from "zod";
 import { isPeriodLocked } from "@/features/attendance/period-lock";
+import { periodLabel } from "@/features/attendance/review-data";
+import { createNotifications } from "@/features/notifications/service";
 import { postBalanceEntry } from "@/features/settlements/ledger";
 import { getSettlementDetail, listPendingReturnClaims } from "@/features/settlements/queries";
 import { logAudit } from "@/lib/audit";
@@ -31,7 +33,7 @@ import { can } from "@/lib/auth/permissions";
 import { formatRupiah } from "@/lib/format";
 import { db, isUniqueViolation } from "@/lib/db";
 import { attendancePenalties, payrollRuns, payslipLines, payslips } from "@/lib/db/schema";
-import { zonedDateString } from "@/lib/dates";
+import { formatDateOnly, zonedDateString } from "@/lib/dates";
 import { getClientIp } from "@/lib/request";
 import type { ActionResult } from "@/types/action-result";
 import { SALARY_EDIT_DENIED, salaryEditChecker } from "./access";
@@ -687,6 +689,23 @@ export async function finalizePayrollRun(period: string): Promise<ActionResult> 
     return true;
   });
   if (!finalized) return NOT_DRAFT;
+
+  // Kabar "slip gaji terbit" ke tiap karyawan lewat lonceng (tanpa WhatsApp/email, hemat kuota).
+  const periodText = periodLabel(parsedPeriod.data);
+  after(() =>
+    createNotifications(
+      slips
+        .filter((slip) => slip.userId !== actor.id)
+        .map((slip) => ({
+          companyId,
+          userId: slip.userId,
+          kind: "PAYSLIP_PUBLISHED" as const,
+          title: `Slip gaji ${periodText} sudah terbit`,
+          body: run.payDate ? `Gaji bersih ${formatRupiah(slip.netPay)}, dibayar ${formatDateOnly(run.payDate)}.` : null,
+          href: "/payslips",
+        })),
+    ),
+  );
 
   revalidatePayroll();
   revalidatePath("/payroll-deductions");

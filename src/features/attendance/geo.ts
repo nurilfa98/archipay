@@ -1,7 +1,21 @@
 // Koordinat & jarak untuk lokasi absensi. Fungsi murni, dipakai server dan
 // client.
 
+import type { AttendanceTimezone } from "./constants";
+
 export type LatLng = { lat: number; lng: number };
+
+// Perkiraan zona waktu dari koordinat (garis bujur), untuk mengisi zona waktu
+// lokasi otomatis. Batas: WIB < 114,5°BT <= WITA < 127°BT <= WIT. Di dekat batas
+// bisa meleset (mis. Kalimantan Tengah bagian timur seharusnya WIB, Pulau Wetar
+// WIT), karena itu pengguna tetap bisa mengubahnya. null bila titik di luar
+// Indonesia.
+export function timezoneForPoint({ lat, lng }: LatLng): AttendanceTimezone | null {
+  if (lat < -11.5 || lat > 6.5 || lng < 94 || lng > 141.5) return null;
+  if (lng < 114.5) return "Asia/Jakarta";
+  if (lng < 127) return "Asia/Makassar";
+  return "Asia/Jayapura";
+}
 
 // Membaca koordinat dari teks yang ditempel pengguna:
 // - "-6.27181, 106.71335"  (klik kanan di Google Maps → klik angka koordinat)

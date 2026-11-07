@@ -1,13 +1,13 @@
 // Header di bagian atas setiap halaman setelah login. Isinya dibatasi
 // container yang sama dengan konten, sehingga sejajar di tengah layar.
 //
-//   [logo] | Menu > Project > Uang Muka               [tema] [menu user]
+//   [logo] | Menu > Project > Uang Muka        [lonceng] [tema] [menu user]
 //
 // - Logo kembali ke kotak menu di /.
 // - `sticky top-0`: header tetap terlihat saat halaman di-scroll.
 // - [tema] (ThemeToggle): pilihan Terang / Gelap / Sistem.
-// - Menu user diterima lewat prop `userMenu` (slot) agar layout bisa
-//   membungkusnya dengan <Suspense>.
+// - Menu user dan lonceng pemberitahuan diterima lewat prop `userMenu` / `bell`
+//   (slot) agar layout bisa membungkusnya dengan <Suspense>.
 // - PageBreadcrumb membaca URL (usePathname). Di halaman dengan segmen dinamis
 //   seperti /users/[id], URL baru diketahui saat request, jadi breadcrumb
 //   wajib di dalam <Suspense>. Di halaman statis breadcrumb tetap ikut prerender.
@@ -20,7 +20,7 @@ import { Separator } from "@/components/ui/separator";
 import { Brand } from "./brand";
 import { PageBreadcrumb } from "./page-breadcrumb";
 
-export function AppHeader({ userMenu }: { userMenu: ReactNode }) {
+export function AppHeader({ userMenu, bell }: { userMenu: ReactNode; bell: ReactNode }) {
   return (
     <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
       <div className="mx-auto flex h-14 w-full max-w-6xl items-center gap-3 px-4">
@@ -32,6 +32,7 @@ export function AppHeader({ userMenu }: { userMenu: ReactNode }) {
           <PageBreadcrumb />
         </Suspense>
         <div className="ml-auto flex shrink-0 items-center gap-1">
+          {bell}
           <ThemeToggle />
           {userMenu}
         </div>

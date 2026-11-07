@@ -5,7 +5,6 @@
 // dikunci; Admin HR & Superadmin melihat.
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -77,9 +76,6 @@ async function ReviewPersonContent({ params, searchParams }: PageProps<"/attenda
         title={person.fullName}
         description={`Review ${label}${review.lock ? " · periode sudah dikunci" : ""}`}
       />
-      <Link href={`/attendance/review?period=${period}`} className="text-sm text-brand hover:underline">
-        ← Kembali ke rekap {label}
-      </Link>
 
       <div className="flex flex-wrap gap-2">
         <ToneBadge tone="success">Hadir {summary.present}</ToneBadge>

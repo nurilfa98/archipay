@@ -41,8 +41,8 @@ export function ExpenseCategoriesManager({
           ) : (
             <li key={category.id} className="flex flex-wrap items-center justify-between gap-2 p-3">
               <div className="min-w-0">
-                <p className="font-medium">{category.name}</p>
-                <p className="text-sm text-muted-foreground tabular-nums">Dipakai {category.usageCount} nota</p>
+                <p className="text-sm font-medium">{category.name}</p>
+                <p className="text-xs text-muted-foreground tabular-nums">Dipakai {category.usageCount} nota</p>
               </div>
               <div className="flex items-center gap-2">
                 <CategoryActiveSwitch

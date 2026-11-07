@@ -4,7 +4,6 @@
 // (features/salaries/access.ts).
 
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -66,9 +65,6 @@ async function SalaryProfileContent({ params }: Pick<PageProps<"/payroll/salarie
           profile && !readOnly ? <DeleteSalaryProfileButton userId={person.id} fullName={person.fullName} /> : undefined
         }
       />
-      <Link href="/payroll/salaries" className="text-sm text-brand hover:underline">
-        ← Kembali ke Data gaji
-      </Link>
       <Card>
         <CardContent>
           {readOnly && (

@@ -13,13 +13,10 @@
 // - node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/dynamic-routes.md
 // - node_modules/next/dist/docs/01-app/03-api-reference/04-functions/not-found.md
 
-import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyDeleteAction } from "@/features/companies/components/company-delete-action";
@@ -48,12 +45,6 @@ export const metadata: Metadata = {
 export default function CompanyDetailPage({ params }: PageProps<"/companies/[id]">) {
   return (
     <>
-      <div>
-        <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/companies" />}>
-          <ArrowLeftIcon />
-          Daftar perusahaan
-        </Button>
-      </div>
       <Suspense fallback={<CompanyDetailSkeleton />}>
         {params.then(({ id }) => (
           <CompanyDetailContent id={id} />

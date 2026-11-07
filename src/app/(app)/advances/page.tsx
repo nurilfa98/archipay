@@ -52,8 +52,8 @@ import { parseAdvanceFilters } from "@/features/advances/schemas";
 import { needsActionFrom } from "@/features/advances/service";
 import { NO_PROJECT } from "@/features/projects/constants";
 import { ProjectBanner } from "@/features/projects/components/project-banner";
-import { resolveProjectScope } from "@/features/projects/queries";
-import { readProjectParam } from "@/features/projects/schemas";
+import { projectParamOfAdvance, resolveProjectScope } from "@/features/projects/queries";
+import { readFromParam, readProjectParam } from "@/features/projects/schemas";
 import { getCompanySettings } from "@/features/settings/queries";
 import { requirePermission, verifySession } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
@@ -155,6 +155,12 @@ async function AdvancesContent({ searchParams }: Pick<PageProps<"/advances">, "s
   const user = await requirePermission("advance:view-own");
   const companyId = user.company.id;
   const params = await searchParams;
+  // Dari breadcrumb halaman detail (?from=<id uang muka>): buka daftar project-nya.
+  const from = readFromParam(params);
+  if (!readProjectParam(params) && from) {
+    const project = await projectParamOfAdvance(companyId, from);
+    if (project) redirect(`/advances?project=${encodeURIComponent(project)}`);
+  }
   const scope = await resolveProjectScope(companyId, readProjectParam(params));
 
   // Uang muka selalu dibuka dari kartu project; tanpa project yang valid

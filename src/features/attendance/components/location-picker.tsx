@@ -45,8 +45,8 @@ export function PlaceSearch({ onPick }: { onPick: (point: LatLng) => void }) {
       <div className="flex gap-2">
         <Input
           type="search"
-          aria-label="Cari alamat atau nama tempat"
-          placeholder="Cari alamat atau nama tempat, misal: Jl. Sudirman Jakarta"
+          aria-label="Cari alamat"
+          placeholder="Cari alamat, misal: Jl. Sudirman Jakarta"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           onKeyDown={handleKeyDown}

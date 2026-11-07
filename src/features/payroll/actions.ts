@@ -84,7 +84,7 @@ export async function recordPayrollDeduction(settlementId: string, formData: For
         type: "PAYROLL_DEDUCTION",
         ...result,
         payrollPeriod: parsed.data.period,
-      }),
+      }, actor.company.id),
     );
   }
 

@@ -252,7 +252,9 @@ export async function rejectAdvance(advanceId: string, reason: string): Promise<
   const creator = await getActiveRecipient(actor.company.id, advance.createdById);
   if (creator) {
     const isOwnRequest = advance.createdById === advance.recipientId;
-    after(() => notifyRejected(advance, creator, isOwnRequest, actor.fullName, parsedReason.data));
+    after(() =>
+      notifyRejected(advance, creator, isOwnRequest, actor.fullName, parsedReason.data, actor.company.id),
+    );
   }
   return done();
 }
@@ -331,7 +333,7 @@ export async function cancelAdvance(advanceId: string, reason: string): Promise<
   // Karyawan hanya perlu tahu bila sebelumnya sudah diberi tahu dana cair.
   if (advance.status === "DISBURSED") {
     const recipient = await getActiveRecipient(actor.company.id, advance.recipientId);
-    if (recipient) after(() => notifyCancelled(advance, recipient, parsedReason.data));
+    if (recipient) after(() => notifyCancelled(advance, recipient, parsedReason.data, actor.company.id));
   }
   return done();
 }

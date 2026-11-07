@@ -132,7 +132,7 @@ export function LocationForm({
                 ))}
               </SelectContent>
             </Select>
-            <FieldDescription>Untuk lokasi proyek. Kantor atau gudang cukup tanpa proyek.</FieldDescription>
+            <FieldDescription>Kantor atau gudang cukup tanpa proyek.</FieldDescription>
             <FieldError>{fieldError("projectId")}</FieldError>
           </Field>
         </div>

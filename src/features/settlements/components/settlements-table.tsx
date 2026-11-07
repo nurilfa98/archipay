@@ -2,7 +2,10 @@
 // sama dengan tabel uang muka: pencarian di browser, filter Tahun/Bulan/
 // Status di panel "Filter" yang diterapkan server lewat URL.
 //
-// - Kolom Penerima hanya untuk OWNER/FINANCE.
+// - Penerima hanya untuk OWNER/FINANCE. Agar tabel muat tanpa scroll horizontal,
+//   nomor uang muka tampil di bawah No. Transaksi dan penerima di bawah
+//   Keperluan (bukan kolom sendiri); pencarian tetap mencakup keduanya.
+// - Kolom Dikirim hanya menampilkan tanggal; jam lengkap ada di tooltip.
 // - Sisa saldo: setelah diverifikasi = saldo TERKINI dari ledger (berkurang saat
 //   sisa dikembalikan, dipotong gaji, atau penggantian dibayar). Sebelum itu =
 //   PERKIRAAN (dana uang muka − total nota), sama dengan kartu di halaman detail;
@@ -44,6 +47,7 @@ export type SettlementRow = {
   purpose: string;
   recipientName: string;
   submittedAtLabel: string | null; // "24 Okt 2026, 15.30 WIB"
+  submittedDateLabel: string | null; // "24 Okt 2026"
   submittedAtTime: number | null;
   itemCount: number;
   itemTotal: number;
@@ -83,44 +87,48 @@ function balanceNote({ amount, estimate }: { amount: number; estimate: boolean }
 
 const column = createDataTableColumns<SettlementRow>();
 
-const numberColumn = column.accessor("numberLabel", {
+// Nomor PJ + nomor uang muka di satu kolom (nilai gabungan agar keduanya bisa dicari).
+const numberColumn = column.accessor((row) => `${row.numberLabel} ${row.advanceNumber}`, {
+  id: "number",
   header: "No. Transaksi",
   sortFn: "text",
-  meta: { className: "w-32 whitespace-nowrap" },
+  meta: { className: "whitespace-nowrap" },
   cell: ({ row }) => (
-    <span className="flex items-center gap-1.5">
-      <Link
-        href={`/settlements/${row.original.id}`}
-        className={cn(
-          "font-medium after:absolute after:inset-0 hover:underline",
-          row.original.status === "DRAFT" && "text-muted-foreground",
-        )}
-      >
-        {row.original.numberLabel}
-      </Link>
-      <LateReasonIndicator reason={row.original.lateReason} />
+    <span className="flex flex-col">
+      <span className="flex items-center gap-1.5">
+        <Link
+          href={`/settlements/${row.original.id}`}
+          className={cn(
+            "font-medium after:absolute after:inset-0 hover:underline",
+            row.original.status === "DRAFT" && "text-muted-foreground",
+          )}
+        >
+          {row.original.numberLabel}
+        </Link>
+        <LateReasonIndicator reason={row.original.lateReason} />
+      </span>
+      <span className="text-xs text-muted-foreground">{row.original.advanceNumber}</span>
     </span>
   ),
-});
-
-const advanceColumn = column.accessor("advanceNumber", {
-  header: "Uang muka",
-  sortFn: "text",
-  meta: { className: "whitespace-nowrap" },
 });
 
 const purposeColumn = column.accessor("purpose", {
   header: "Keperluan",
   enableSorting: false,
-  cell: ({ getValue }) => (
-    <span className="block max-w-40 truncate md:max-w-60">{getValue()}</span>
-  ),
+  cell: ({ getValue }) => <span className="block max-w-48 truncate lg:max-w-64">{getValue()}</span>,
 });
 
-const recipientColumn = column.accessor("recipientName", {
-  header: "Penerima",
-  sortFn: "text",
-  meta: { className: "whitespace-nowrap" },
+// Keperluan + nama penerima (OWNER/FINANCE); nilai gabungan agar penerima bisa dicari.
+const purposeRecipientColumn = column.accessor((row) => `${row.purpose} ${row.recipientName}`, {
+  id: "purpose",
+  header: "Keperluan / Penerima",
+  enableSorting: false,
+  cell: ({ row }) => (
+    <span className="flex max-w-48 flex-col lg:max-w-64">
+      <span className="truncate">{row.original.purpose}</span>
+      <span className="truncate text-xs text-muted-foreground">{row.original.recipientName}</span>
+    </span>
+  ),
 });
 
 // sortUndefined hanya berlaku untuk undefined: draf (belum dikirim) di bawah.
@@ -133,7 +141,9 @@ const submittedColumn = column.accessor(
     sortUndefined: "last",
     meta: { className: "whitespace-nowrap" },
     cell: ({ row }) =>
-      row.original.submittedAtLabel ?? (
+      row.original.submittedDateLabel ? (
+        <span title={row.original.submittedAtLabel ?? undefined}>{row.original.submittedDateLabel}</span>
+      ) : (
         <span className="text-muted-foreground">-</span>
       ),
   },
@@ -205,9 +215,7 @@ const openColumn = column.display({
 // Dibuat sekali di luar komponen (wajib stabil untuk TanStack Table v9).
 const COLUMNS_WITH_RECIPIENT = column.columns([
   numberColumn,
-  advanceColumn,
-  purposeColumn,
-  recipientColumn,
+  purposeRecipientColumn,
   submittedColumn,
   totalColumn,
   balanceColumn,
@@ -216,7 +224,6 @@ const COLUMNS_WITH_RECIPIENT = column.columns([
 ]);
 const COLUMNS_OWN = column.columns([
   numberColumn,
-  advanceColumn,
   purposeColumn,
   submittedColumn,
   totalColumn,
@@ -225,13 +232,8 @@ const COLUMNS_OWN = column.columns([
   openColumn,
 ]);
 
-const SEARCHABLE_WITH_RECIPIENT = [
-  "numberLabel",
-  "advanceNumber",
-  "purpose",
-  "recipientName",
-] as const;
-const SEARCHABLE_OWN = ["numberLabel", "advanceNumber", "purpose"] as const;
+// id kolom gabungan: "number" = No. PJ + uang muka, "purpose" = keperluan (+ penerima).
+const SEARCHABLE = ["number", "purpose"] as const;
 
 const STATUS_OPTIONS: FilterOption[] = [
   { value: FILTER_ALL, label: "Semua status" },
@@ -272,9 +274,7 @@ export function SettlementsTable({
     <DataTable
       columns={showRecipient ? COLUMNS_WITH_RECIPIENT : COLUMNS_OWN}
       data={rows}
-      searchableColumns={
-        showRecipient ? SEARCHABLE_WITH_RECIPIENT : SEARCHABLE_OWN
-      }
+      searchableColumns={SEARCHABLE}
       searchPlaceholder={
         showRecipient
           ? "Cari nomor, keperluan, penerima"

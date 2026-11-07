@@ -21,41 +21,46 @@ type DateRange = { today: string; minDate: string };
 export function ReturnClaimButton({
   settlementId,
   outstanding,
-  summary,
   today,
   minDate,
-}: { settlementId: string; outstanding: number; summary: string } & DateRange) {
+}: { settlementId: string; outstanding: number } & DateRange) {
   const [method, setMethod] = useState<SettleMethod>("CASH");
   return (
     <ActionDialog
       label="Saya sudah mengembalikan"
       icon={<SendIcon />}
       showLabel
-      title="Lapor sudah mengembalikan sisa dana?"
-      description={`${summary}. Sisa yang harus dikembalikan ${formatRupiah(outstanding)}. Isi setelah Anda benar-benar menyerahkan atau mentransfer. Owner/Finance akan mengecek lalu mengonfirmasi; selama menunggu, Anda tidak ditagih dan tidak dipotong gaji.`}
+      title="Lapor pengembalian sisa dana"
+      description={
+        <>
+          Sisa yang harus dikembalikan{" "}
+          <strong className="font-semibold text-foreground">{formatRupiah(outstanding)}</strong>. Isi setelah uang
+          benar-benar diserahkan atau ditransfer. Selama menunggu konfirmasi Owner/Finance, Anda tidak ditagih dan gaji
+          tidak dipotong.
+        </>
+      }
       confirmLabel="Kirim laporan"
       successMessage="Laporan terkirim. Menunggu konfirmasi Owner/Finance."
       onConfirm={(formData) => reportReturn(settlementId, formData)}
     >
       {(fieldError) => (
         <>
-          <AmountField defaultValue={outstanding} error={fieldError("amount")} />
           <MethodField legend="Dikembalikan secara" value={method} onChange={setMethod} error={fieldError("method")} />
-          <DateField
-            name="returnedOn"
-            label="Tanggal pengembalian"
-            description="Tanggal Anda menyerahkan uangnya atau mentransfernya."
-            defaultValue={today}
-            min={minDate}
-            max={today}
-            error={fieldError("returnedOn")}
-          />
+          <div className="grid grid-cols-2 gap-3">
+            <AmountField defaultValue={outstanding} error={fieldError("amount")} />
+            <DateField
+              name="returnedOn"
+              label="Tanggal"
+              defaultValue={today}
+              min={minDate}
+              max={today}
+              error={fieldError("returnedOn")}
+            />
+          </div>
           <ProofField
             error={fieldError("proof")}
             description={
-              method === "TRANSFER"
-                ? "Screenshot bukti transfer, maksimal 4 MB."
-                : "Foto kuitansi atau tanda terima bila ada, maksimal 4 MB."
+              method === "TRANSFER" ? "Screenshot bukti transfer. Maks. 4 MB." : "Foto kuitansi bila ada. Maks. 4 MB."
             }
           />
           <Field data-invalid={!!fieldError("note")}>

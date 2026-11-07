@@ -3,10 +3,8 @@
 
 import type { Metadata } from "next";
 import { io } from "next/cache";
-import Link from "next/link";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ConsentForm } from "@/features/attendance/components/consent-form";
@@ -65,11 +63,6 @@ async function EnrollContent() {
             {formatDateTime(lockedUntil)}.
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Button variant="outline" nativeButton={false} render={<Link href="/attendance" />}>
-            Kembali ke Absensi
-          </Button>
-        </CardContent>
       </Card>
     );
   }

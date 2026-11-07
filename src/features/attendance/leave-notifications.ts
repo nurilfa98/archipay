@@ -1,10 +1,11 @@
-// WhatsApp cuti & izin (BUSINESS-FLOW §19). Dipanggil di dalam after() agar
-// tombol tidak menunggu Fonnte. Penerima tanpa nomor dilewati.
+// Pemberitahuan cuti & izin (BUSINESS-FLOW §19). Dipanggil di dalam after() agar
+// tombol tidak menunggu Fonnte. Penerima WhatsApp tanpa nomor dilewati.
 //
-// - Pengajuan baru         → Owner & Admin HR (selain pengaju)
-// - Disetujui / ditolak    → karyawan pengaju
-// - Cuti disetujui dibatalkan → Owner
-// Kabar delegasi ke Admin HR dikirim cron (leave-reminders.ts).
+// - Pengajuan baru            → WhatsApp ke Owner & Admin HR (selain pengaju)
+// - Disetujui / ditolak       → lonceng karyawan pengaju
+// - Cuti disetujui dibatalkan → lonceng Owner
+// Admin HR melihat pengajuan yang didelegasikan sebagai kartu di lonceng
+// (features/notifications/queries.ts), tanpa WhatsApp.
 
 import "server-only";
 import { and, eq, inArray } from "drizzle-orm";
@@ -12,6 +13,7 @@ import { db } from "@/lib/db";
 import { roles, userRoles, users } from "@/lib/db/schema";
 import { formatDateOnly } from "@/lib/dates";
 import { env } from "@/lib/env";
+import { createNotifications } from "@/features/notifications/service";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { formatMinutes } from "./schedule";
 
@@ -68,26 +70,37 @@ export async function notifyLeaveRequested(companyId: string, requester: Person,
 }
 
 export async function notifyLeaveDecided(
+  companyId: string,
   recipient: Person,
   leave: LeaveSummary,
   decision: { approved: boolean; reason?: string | null },
 ) {
-  await send(
-    [recipient],
-    () =>
-      `Halo ${recipient.fullName},\n\nPengajuan *${leave.typeName}* (${leave.number}) untuk ${leavePeriodText(leave)} ` +
-      (decision.approved ? "*disetujui*." : `*ditolak*.\nAlasan: ${decision.reason ?? "-"}`) +
-      `\n\n${link()}`,
-  );
+  await createNotifications([
+    {
+      companyId,
+      userId: recipient.id,
+      kind: "LEAVE_DECIDED",
+      title: decision.approved ? `${leave.typeName} disetujui` : `${leave.typeName} ditolak`,
+      body:
+        `${leave.number} · ${leavePeriodText(leave)}` + (decision.approved ? "" : `. Alasan: ${decision.reason ?? "-"}`),
+      href: "/attendance/leave",
+    },
+  ]);
 }
 
 export async function notifyLeaveCancelled(companyId: string, requester: Person, leave: LeaveSummary, note: string) {
   const owners = await getLeaveApprovers(companyId, ["OWNER"]);
-  await send(
-    owners.filter((person) => person.id !== requester.id),
-    (person) =>
-      `Halo ${person.fullName},\n\n${requester.fullName} membatalkan *${leave.typeName}* (${leave.number}) ` +
-      `yang sudah disetujui. ${note}\n\n${link()}`,
+  await createNotifications(
+    owners
+      .filter((person) => person.id !== requester.id)
+      .map((person) => ({
+        companyId,
+        userId: person.id,
+        kind: "LEAVE_CANCELLED" as const,
+        title: `${requester.fullName} membatalkan ${leave.typeName}`,
+        body: `${leave.number} · ${leavePeriodText(leave)}. ${note}`,
+        href: "/attendance/leave",
+      })),
   );
 }
 

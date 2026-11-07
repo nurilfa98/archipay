@@ -129,9 +129,6 @@ async function PayrollRunContent({ params }: Pick<PageProps<"/payroll/[period]">
             : `Diselesaikan ${run.finalizedAt ? formatDateTime(run.finalizedAt) : ""}${run.finalizedByName ? ` oleh ${run.finalizedByName}` : ""}${run.payDate ? ` · dibayar ${formatDateOnly(run.payDate)}` : ""}.`
         }
       />
-      <Link href="/payroll" className="text-sm text-brand hover:underline">
-        ← Kembali ke Penggajian
-      </Link>
 
       {draft && run.reviewRequestedAt && (
         <Alert>

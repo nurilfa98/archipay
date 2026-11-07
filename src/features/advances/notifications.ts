@@ -1,4 +1,8 @@
-// Isi & penerima notifikasi WhatsApp untuk uang muka.
+// Isi & penerima notifikasi untuk uang muka.
+//
+// - WhatsApp (mendesak): pengajuan baru ke penyetuju, dana dicairkan, dilaporkan
+//   tidak sesuai.
+// - Lonceng (features/notifications; kabar sekali lewat): ditolak, dibatalkan.
 //
 // Dipanggil dari Server Action di dalam after() (next/server): pesan dikirim
 // SETELAH respons dikirim ke browser, sehingga tombol tidak ikut menunggu
@@ -12,6 +16,7 @@ import "server-only";
 import { formatDate } from "@/lib/dates";
 import { env } from "@/lib/env";
 import { formatRupiah } from "@/lib/format";
+import { createNotifications } from "@/features/notifications/service";
 import { sendWhatsApp } from "@/lib/whatsapp";
 import { DISBURSEMENT_METHOD_LABELS, type DisbursementMethod } from "./constants";
 
@@ -24,6 +29,7 @@ type AdvanceSummary = {
 };
 
 type Person = { fullName: string; phoneNumber: string | null };
+type PersonWithId = Person & { id: string };
 
 // Pengajuan karyawan / usulan FINANCE baru → penyetuju (OWNER selain
 // penerima & pengusul, lihat eligibleApprovers di service.ts).
@@ -50,21 +56,24 @@ export function notifyApprovalRequested(
 // belum pernah diberi tahu, jadi tidak ikut dikirimi.
 export function notifyRejected(
   advance: AdvanceSummary & { recipientName: string },
-  creator: Person,
+  creator: PersonWithId,
   isOwnRequest: boolean,
   deciderName: string,
   reason: string,
+  companyId: string,
 ) {
-  const subject = isOwnRequest
-    ? `Pengajuan uang muka *${advance.number}*`
-    : `Usulan uang muka *${advance.number}* untuk ${advance.recipientName}`;
-  return send(
-    [creator],
-    () =>
-      `Halo ${creator.fullName},\n\n` +
-      `${subject} sebesar ${formatRupiah(advance.amount)} *ditolak* oleh ${deciderName}.\n` +
-      `Alasan: ${reason}\n\n${link(advance.id)}`,
-  );
+  return createNotifications([
+    {
+      companyId,
+      userId: creator.id,
+      kind: "ADVANCE_REJECTED",
+      title: isOwnRequest
+        ? "Pengajuan uang muka ditolak"
+        : `Usulan uang muka untuk ${advance.recipientName} ditolak`,
+      body: `${advance.number} · ${formatRupiah(advance.amount)} · ditolak ${deciderName}. Alasan: ${reason}`,
+      href: `/advances/${advance.id}`,
+    },
+  ]);
 }
 
 // Dana dicairkan → karyawan diminta konfirmasi.
@@ -82,14 +91,17 @@ export function notifyDisbursed(advance: AdvanceSummary & { settlementDueAt: Dat
 
 // Pencairan dibatalkan → karyawan diberi tahu (hanya bila sebelumnya sudah
 // mendapat notifikasi pencairan).
-export function notifyCancelled(advance: AdvanceSummary, recipient: Person, reason: string) {
-  return send(
-    [recipient],
-    () =>
-      `Halo ${recipient.fullName},\n\n` +
-      `Uang muka *${advance.number}* sebesar ${formatRupiah(advance.amount)} *dibatalkan*.\n` +
-      `Alasan: ${reason}\n\n${link(advance.id)}`,
-  );
+export function notifyCancelled(advance: AdvanceSummary, recipient: PersonWithId, reason: string, companyId: string) {
+  return createNotifications([
+    {
+      companyId,
+      userId: recipient.id,
+      kind: "ADVANCE_CANCELLED",
+      title: "Uang muka dibatalkan",
+      body: `${advance.number} · ${formatRupiah(advance.amount)}. Alasan: ${reason}`,
+      href: `/advances/${advance.id}`,
+    },
+  ]);
 }
 
 // Karyawan melaporkan dana tidak sesuai → OWNER & pencair dana.

@@ -18,7 +18,6 @@ import { Suspense } from "react";
 import { ToneBadge } from "@/components/tone-badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BackToList } from "@/features/projects/components/back-to-list";
 import { CategoryChart } from "@/features/projects/components/expense-charts";
 import { FinanceKpis } from "@/features/projects/components/finance-kpis";
 import { ProjectAccessCards } from "@/features/projects/components/project-access-cards";
@@ -41,7 +40,6 @@ export const metadata: Metadata = {
 export default function ProjectDetailPage({ params }: PageProps<"/projects/[id]">) {
   return (
     <>
-      <BackToList href="/projects" label="Daftar proyek" />
       <Suspense fallback={<DetailSkeleton />}>
         <ProjectDetail params={params} />
       </Suspense>
@@ -97,7 +95,12 @@ async function ProjectDetail({ params }: Pick<PageProps<"/projects/[id]">, "para
           <div className="flex flex-wrap gap-2 sm:justify-end">
             {canManage && (
               <>
-                <Button variant="outline" nativeButton={false} render={<Link href={`/projects/${id}/edit`} />}>
+                <Button
+                  variant="outline"
+                  className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700 dark:border-orange-800 dark:text-orange-400 dark:hover:bg-orange-950/40 dark:hover:text-orange-300"
+                  nativeButton={false}
+                  render={<Link href={`/projects/${id}/edit`} />}
+                >
                   <PencilIcon />
                   Ubah proyek
                 </Button>

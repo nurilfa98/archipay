@@ -50,6 +50,7 @@ import {
   companies,
   companyPricing,
   companySettings,
+  notifications,
   documentSequences,
   expenseCategories,
   loginAttempts,
@@ -276,6 +277,9 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
       tx.select({ key: faceProfiles.photoKey }).from(faceProfiles).where(eq(faceProfiles.companyId, id)),
       tx.select({ key: leaveRequests.attachmentKey }).from(leaveRequests).where(eq(leaveRequests.companyId, id)),
     ]);
+
+    // Pemberitahuan lonceng (§23).
+    await tx.delete(notifications).where(eq(notifications.companyId, id));
 
     // Absensi (BUSINESS-FLOW §18.11) & cuti/izin (§19).
     await tx.delete(leaveRequests).where(eq(leaveRequests.companyId, id));

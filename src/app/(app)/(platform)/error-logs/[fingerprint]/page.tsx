@@ -2,15 +2,12 @@
 // trace terbaru dan 20 kejadian terakhir (siapa, di perusahaan mana, halaman,
 // versi aplikasi). BUSINESS-FLOW §21.
 
-import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { PageHeader } from "@/components/layout/page-header";
 import { ToneBadge } from "@/components/tone-badge";
-import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorStatusButtons } from "@/features/error-logs/components/error-status-buttons";
 import { ERROR_SOURCE_LABELS, ERROR_STATUS_LABELS, ERROR_STATUS_TONES } from "@/features/error-logs/constants";
@@ -22,29 +19,34 @@ export const metadata: Metadata = {
   title: "Detail Error",
 };
 
-export default function ErrorDetailPage({ params }: PageProps<"/error-logs/[fingerprint]">) {
+export default function ErrorDetailPage({ params, searchParams }: PageProps<"/error-logs/[fingerprint]">) {
   return (
     <>
       <PageHeader
         title="Detail error"
         description="Stack trace terbaru dan kejadian terakhir."
-        action={
-          <Button variant="outline" nativeButton={false} render={<Link href="/error-logs" />}>
-            <ArrowLeftIcon />
-            Semua error
-          </Button>
-        }
       />
       <Suspense fallback={<Skeleton className="h-96 w-full" />}>
-        {params.then(({ fingerprint }) => (
-          <ErrorDetail fingerprint={fingerprint} />
+        {Promise.all([params, searchParams]).then(([{ fingerprint }, query]) => (
+          <ErrorDetail fingerprint={fingerprint} listHref={listHrefOf(query)} />
         ))}
       </Suspense>
     </>
   );
 }
 
-async function ErrorDetail({ fingerprint }: { fingerprint: string }) {
+// Daftar error dengan filter yang dibawa dari daftar (?status=&source=&q=).
+function listHrefOf(query: Record<string, string | string[] | undefined>) {
+  const out = new URLSearchParams();
+  for (const key of ["status", "source", "q"]) {
+    const value = Array.isArray(query[key]) ? query[key][0] : query[key];
+    if (value) out.set(key, value.slice(0, 100));
+  }
+  const text = out.toString();
+  return text ? `/error-logs?${text}` : "/error-logs";
+}
+
+async function ErrorDetail({ fingerprint, listHref }: { fingerprint: string; listHref: string }) {
   await requirePlatformAdmin();
   const group = fingerprint.length === 40 ? await getErrorGroup(fingerprint) : null;
   if (!group) notFound();
@@ -75,7 +77,7 @@ async function ErrorDetail({ fingerprint }: { fingerprint: string }) {
             {group.note}
           </p>
         )}
-        <ErrorStatusButtons fingerprint={group.fingerprint} status={group.status} />
+        <ErrorStatusButtons fingerprint={group.fingerprint} status={group.status} listHref={listHref} />
       </section>
 
       {stack && (

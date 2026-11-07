@@ -19,8 +19,8 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { NO_PROJECT } from "@/features/projects/constants";
 import { ProjectBanner } from "@/features/projects/components/project-banner";
-import { resolveProjectScope } from "@/features/projects/queries";
-import { readProjectParam } from "@/features/projects/schemas";
+import { projectParamOfSettlement, resolveProjectScope } from "@/features/projects/queries";
+import { readFromParam, readProjectParam } from "@/features/projects/schemas";
 import { SettlementTodoList } from "@/features/settlements/components/settlement-todo-list";
 import { SettlementsTable, type SettlementRow } from "@/features/settlements/components/settlements-table";
 import { toAdvanceStatus } from "@/features/settlements/constants";
@@ -33,7 +33,7 @@ import {
 import { parseSettlementFilters } from "@/features/settlements/schemas";
 import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
-import { formatDateTime } from "@/lib/dates";
+import { formatDateTime, formatShortDate } from "@/lib/dates";
 
 export const metadata: Metadata = {
   title: "Pertanggungjawaban",
@@ -61,6 +61,12 @@ async function SettlementsContent({ searchParams }: Pick<PageProps<"/settlements
   const user = await requirePermission("advance:view-own");
   const companyId = user.company.id;
   const params = await searchParams;
+  // Dari breadcrumb halaman detail (?from=<id pertanggungjawaban>): buka daftar project-nya.
+  const from = readFromParam(params);
+  if (!readProjectParam(params) && from) {
+    const project = await projectParamOfSettlement(companyId, from);
+    if (project) redirect(`/settlements?project=${encodeURIComponent(project)}`);
+  }
   const scope = await resolveProjectScope(companyId, readProjectParam(params));
 
   // Pertanggungjawaban selalu dibuka dari kartu project; tanpa project yang
@@ -123,6 +129,7 @@ function toRow(settlement: SettlementListItem): SettlementRow {
     purpose: settlement.purpose,
     recipientName: settlement.recipientName,
     submittedAtLabel: settlement.submittedAt ? formatDateTime(settlement.submittedAt) : null,
+    submittedDateLabel: settlement.submittedAt ? formatShortDate(settlement.submittedAt) : null,
     submittedAtTime: settlement.submittedAt?.getTime() ?? null,
     itemCount: settlement.itemCount,
     itemTotal: settlement.itemTotal,

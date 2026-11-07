@@ -11,13 +11,10 @@
 //   (bagian "With Cache Components" → "Without generateStaticParams")
 // - node_modules/next/dist/docs/01-app/03-api-reference/04-functions/not-found.md
 
-import { ArrowLeftIcon } from "lucide-react";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import { PageHeader } from "@/components/layout/page-header";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -45,12 +42,6 @@ export const metadata: Metadata = {
 export default function UserDetailPage({ params }: PageProps<"/users/[id]">) {
   return (
     <>
-      <div>
-        <Button variant="ghost" size="sm" nativeButton={false} render={<Link href="/users" />}>
-          <ArrowLeftIcon />
-          Daftar pengguna
-        </Button>
-      </div>
       <Suspense fallback={<UserDetailSkeleton />}>
         {params.then(({ id }) => (
           <UserDetailContent id={id} />

@@ -51,10 +51,10 @@ export function AttendanceSettingsForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl">
+    <form onSubmit={handleSubmit} className="max-w-2xl">
       <fieldset disabled={readOnly} className="min-w-0">
         <FieldGroup>
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             <TimeField
               name="workStart"
               label="Jam masuk"
@@ -72,7 +72,7 @@ export function AttendanceSettingsForm({
             Waktu setempat di lokasi absen. Lokasi boleh punya jam sendiri (menu Absensi → Lokasi).
           </FieldDescription>
 
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-x-6 gap-y-5 sm:grid-cols-2">
             <Field data-invalid={!!fieldError("lateToleranceMinutes")}>
               <FieldLabel htmlFor="lateToleranceMinutes">Toleransi terlambat</FieldLabel>
               <div className="flex items-center gap-2">
@@ -143,7 +143,7 @@ export function AttendanceSettingsForm({
           {readOnly ? (
             <p className="text-sm text-muted-foreground">Baca saja. Pengaturan absensi diubah oleh Owner.</p>
           ) : (
-            <Field orientation="horizontal">
+            <Field orientation="horizontal" className="border-t pt-4">
               <Button type="submit" disabled={pending}>
                 {pending && <LoaderCircleIcon className="animate-spin" />}
                 {pending ? "Menyimpan..." : "Simpan pengaturan absensi"}

@@ -36,8 +36,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { NO_PROJECT } from "@/features/projects/constants";
-import { BackToList } from "@/features/projects/components/back-to-list";
 import { ReimbursementAckButtons } from "@/features/settlements/components/reimbursement-ack-buttons";
 import { ClaimDecisionButtons, ReturnClaimButton } from "@/features/settlements/components/return-claim-forms";
 import { SettlementBalanceAction } from "@/features/settlements/components/settlement-balance-action";
@@ -120,12 +118,6 @@ async function SettlementDetailContent({ id }: { id: string }) {
 
   return (
     <>
-      <BackToList
-        href={`/settlements?project=${settlement.projectId ?? NO_PROJECT}`}
-        label={
-          settlement.projectName ? `Pertanggungjawaban ${settlement.projectName}` : "Daftar pertanggungjawaban"
-        }
-      />
       <PageHeader
         title={
           <span className="flex items-center gap-2">
@@ -214,7 +206,6 @@ async function SettlementDetailContent({ id }: { id: string }) {
               <ReturnClaimButton
                 settlementId={settlement.id}
                 outstanding={currentBalance}
-                summary={`${title} · ${settlement.recipientName}`}
                 today={today}
                 minDate={minDate}
               />
@@ -525,7 +516,7 @@ function SettlementSummary({
       {settlement.returnDueAt && (
         <Item label="Batas pengembalian sisa">
           <span className={cn(settlement.returnOverdue && "font-medium text-amber-700 dark:text-amber-300")}>
-            {formatDate(settlement.returnDueAt)}, 23.59
+            {formatDate(settlement.returnDueAt)}
             {settlement.returnOverdue && " (terlewati)"}
           </span>
         </Item>
@@ -533,7 +524,7 @@ function SettlementSummary({
       {settlement.settlementDueAt && (
         <Item label="Batas unggah nota">
           <span className={cn(overdue && "font-medium text-amber-700 dark:text-amber-300")}>
-            {formatDate(settlement.settlementDueAt)}, 23.59
+            {formatDate(settlement.settlementDueAt)}
             {overdue && " (terlewati)"}
           </span>
         </Item>
@@ -708,7 +699,6 @@ function Item({ label, children }: { label: string; children: ReactNode }) {
 function SettlementDetailSkeleton() {
   return (
     <>
-      <BackToList href="/projects" label="Daftar proyek" />
       <Skeleton className="h-12 w-64" />
       <Skeleton className="h-40 w-full" />
       <Skeleton className="h-64 w-full" />

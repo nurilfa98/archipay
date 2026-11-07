@@ -12,7 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AdvanceCreateForm } from "@/features/advances/components/advance-create-form";
 import { MissingPhoneNotice } from "@/features/advances/components/missing-phone-notice";
 import { countOverdueAdvances, getActiveRecipient } from "@/features/advances/queries";
-import { BackToProjectList } from "@/features/projects/components/back-to-list";
 import { ProjectBanner } from "@/features/projects/components/project-banner";
 import { resolveProjectScope } from "@/features/projects/queries";
 import { readProjectParam } from "@/features/projects/schemas";
@@ -26,7 +25,6 @@ export const metadata: Metadata = {
 export default function RequestAdvancePage({ searchParams }: PageProps<"/advances/request">) {
   return (
     <>
-      <BackToProjectList basePath="/advances" label="Daftar uang muka" searchParams={searchParams} />
       <PageHeader
         title="Ajukan uang muka"
         description="Ajukan dana operasional untuk keperluan pekerjaan. Owner akan meninjau pengajuan Anda."

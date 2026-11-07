@@ -21,6 +21,7 @@ import {
   settlements,
   users,
 } from "@/lib/db/schema";
+import { MONTH_NAMES } from "@/lib/format";
 import { type ProjectStatus } from "./constants";
 
 // Sudah dicairkan (dana pernah berpindah ke karyawan).
@@ -36,6 +37,9 @@ const DISBURSED_STATUSES: readonly AdvanceStatus[] = [
 // Dicairkan tetapi nota belum diverifikasi: sama dengan "Dana beredar" di Beranda.
 const OUTSTANDING_STATUSES: readonly AdvanceStatus[] = ["DISBURSED", "ACKNOWLEDGED", "SUBMITTED", "REVISION_REQUESTED"];
 
+// Jumlah nota terbesar yang ditampilkan di ringkasan laporan.
+const TOP_RECEIPTS = 5;
+
 export type ReportReceipt = {
   date: string; // tanggal di nota, "2026-10-24"
   settlementNumber: string | null;
@@ -48,6 +52,7 @@ export type ReportReceipt = {
 };
 
 export type ReportRow = { name: string; count: number; amount: number };
+export type ReportMonth = { key: string; label: string; count: number; amount: number };
 export type ReportEmployee = { name: string; advances: number; disbursed: number; expense: number };
 
 export type ProjectReport = {
@@ -63,8 +68,14 @@ export type ProjectReport = {
     disbursedTotal: number;
     receiptCount: number;
   };
+  // Rentang tanggal nota yang disetujui, null bila belum ada nota.
+  period: { from: string; to: string } | null;
+  // Nota yang disetujui tanpa lampiran bukti (hasReceipt = false).
+  noProof: { count: number; amount: number };
   categories: ReportRow[];
+  months: ReportMonth[];
   employees: ReportEmployee[];
+  topReceipts: ReportReceipt[];
   receipts: ReportReceipt[];
 };
 
@@ -131,6 +142,17 @@ export async function getProjectReport(companyId: string, projectId: string): Pr
     categories.set(receipt.category, row);
   }
 
+  // Pengeluaran per bulan (menurut tanggal di nota), urut dari yang paling lama.
+  const months = new Map<string, ReportMonth>();
+  for (const receipt of receipts) {
+    const key = receipt.date.slice(0, 7);
+    const [year, month] = key.split("-").map(Number);
+    const row = months.get(key) ?? { key, label: `${MONTH_NAMES[month - 1].slice(0, 3)} ${year}`, count: 0, amount: 0 };
+    row.count += 1;
+    row.amount += receipt.amount;
+    months.set(key, row);
+  }
+
   const employees = new Map<string, ReportEmployee>();
   const employeeOf = (id: string, name: string) => {
     const row = employees.get(id) ?? { name, advances: 0, disbursed: 0, expense: 0 };
@@ -143,6 +165,17 @@ export async function getProjectReport(companyId: string, projectId: string): Pr
     row.disbursed += advance.amount;
   }
   for (const receipt of receipts) employeeOf(receipt.recipientId, receipt.employee).expense += receipt.amount;
+
+  const mapped: ReportReceipt[] = receipts.map((receipt) => ({
+    date: receipt.date,
+    settlementNumber: receipt.settlementNumber,
+    advanceNumber: receipt.advanceNumber,
+    employee: receipt.employee,
+    category: receipt.category,
+    description: receipt.description,
+    hasReceipt: receipt.hasReceipt,
+    amount: receipt.amount,
+  }));
 
   return {
     project: { ...project, status: project.status as ProjectStatus },
@@ -159,17 +192,15 @@ export async function getProjectReport(companyId: string, projectId: string): Pr
       disbursedTotal: disbursed.reduce((sum, advance) => sum + advance.amount, 0),
       receiptCount: receipts.length,
     },
+    period: receipts.length > 0 ? { from: receipts[0].date, to: receipts[receipts.length - 1].date } : null,
+    noProof: {
+      count: receipts.filter((receipt) => !receipt.hasReceipt).length,
+      amount: receipts.filter((receipt) => !receipt.hasReceipt).reduce((sum, receipt) => sum + receipt.amount, 0),
+    },
     categories: [...categories.values()].sort((a, b) => b.amount - a.amount),
+    months: [...months.values()].sort((a, b) => a.key.localeCompare(b.key)),
     employees: [...employees.values()].sort((a, b) => b.expense - a.expense),
-    receipts: receipts.map((receipt) => ({
-      date: receipt.date,
-      settlementNumber: receipt.settlementNumber,
-      advanceNumber: receipt.advanceNumber,
-      employee: receipt.employee,
-      category: receipt.category,
-      description: receipt.description,
-      hasReceipt: receipt.hasReceipt,
-      amount: receipt.amount,
-    })),
+    topReceipts: mapped.toSorted((a, b) => b.amount - a.amount).slice(0, TOP_RECEIPTS),
+    receipts: mapped,
   };
 }

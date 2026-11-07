@@ -4,6 +4,7 @@
 "use client";
 
 import { CheckIcon, EyeOffIcon, RotateCcwIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { ActionDialog } from "@/features/advances/components/action-dialog";
@@ -26,7 +27,19 @@ function NoteField({ error }: { error?: string }) {
   );
 }
 
-export function ErrorStatusButtons({ fingerprint, status }: { fingerprint: string; status: ErrorStatus }) {
+// listHref: daftar error beserta filter yang sedang dipakai; setelah "Tandai selesai"
+// atau "Abaikan" Superadmin langsung diantar ke sana.
+export function ErrorStatusButtons({
+  fingerprint,
+  status,
+  listHref,
+}: {
+  fingerprint: string;
+  status: ErrorStatus;
+  listHref: string;
+}) {
+  const router = useRouter();
+  const backToList = () => router.push(listHref);
   return (
     <div className="flex flex-wrap gap-2">
       {status !== "RESOLVED" && (
@@ -39,6 +52,7 @@ export function ErrorStatusButtons({ fingerprint, status }: { fingerprint: strin
           confirmLabel="Tandai selesai"
           successMessage="Error ditandai selesai."
           onConfirm={(formData) => setErrorGroupStatus(fingerprint, "RESOLVED", formData)}
+          onSuccess={backToList}
         >
           {(fieldError) => <NoteField error={fieldError("note")} />}
         </ActionDialog>
@@ -54,6 +68,7 @@ export function ErrorStatusButtons({ fingerprint, status }: { fingerprint: strin
           confirmLabel="Abaikan"
           successMessage="Error diabaikan."
           onConfirm={(formData) => setErrorGroupStatus(fingerprint, "IGNORED", formData)}
+          onSuccess={backToList}
         >
           {(fieldError) => <NoteField error={fieldError("note")} />}
         </ActionDialog>

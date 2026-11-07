@@ -43,7 +43,7 @@ export function PayrollSettingsForm({
   const [method, setMethod] = useState<DailyRateMethod>(settings.dailyRateMethod);
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl">
+    <form onSubmit={handleSubmit} className="max-w-2xl">
       <FieldGroup>
         <Field orientation="horizontal" className="rounded-lg border p-3">
           <Checkbox
@@ -55,10 +55,17 @@ export function PayrollSettingsForm({
           <div className="flex flex-col gap-0.5">
             <FieldLabel htmlFor="absenceDeduction">Potong otomatis ketidakhadiran</FieldLabel>
             <FieldDescription>
-              Hari tidak hadir dan cuti/izin yang jenisnya &quot;tidak dibayar&quot; dipotong × tarif per hari. Sakit,
-              cuti tahunan, dan izin berbayar tidak dipotong. Periode absensi wajib dikunci sebelum penggajian bulan itu
-              diselesaikan.
-              {!attendanceActive && " Butuh add-on Absensi aktif; tanpa itu potongan diisi manual."}
+              <span className="block">
+                Gaji dipotong untuk hari tidak masuk tanpa keterangan dan hari izin yang tidak digaji (misalnya
+                &quot;Izin tidak dibayar&quot;). Potongan = jumlah hari × tarif per hari.
+              </span>
+              <span className="block">Tidak dipotong: sakit, cuti tahunan, dan izin yang tetap digaji.</span>
+              <span className="block">
+                Syarat: absensi bulan itu harus sudah dikunci sebelum penggajian diselesaikan.
+              </span>
+              {!attendanceActive && (
+                <span className="block">Butuh add-on Absensi aktif; tanpa itu potongan diisi manual.</span>
+              )}
             </FieldDescription>
           </div>
         </Field>
@@ -121,7 +128,9 @@ export function PayrollSettingsForm({
           <FieldError>{fieldError("deductionBase")}</FieldError>
         </FieldSet>
 
-        <SubmitButton pending={pending} label="Simpan pengaturan penggajian" />
+        <div className="border-t pt-4">
+          <SubmitButton pending={pending} label="Simpan pengaturan penggajian" />
+        </div>
       </FieldGroup>
     </form>
   );

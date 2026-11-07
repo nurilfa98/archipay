@@ -1459,3 +1459,28 @@ export const payslipLines = pgTable(
     check("payslip_lines_amount", sql`${t.amount} >= 0`),
   ],
 );
+
+// Pemberitahuan di lonceng (features/notifications, BUSINESS-FLOW §23): kabar
+// sekali lewat untuk satu pengguna ("uang muka ditolak", "cuti disetujui").
+// Tugas dan pengingat TIDAK disimpan di sini; itu dihitung langsung dari data.
+// Hilang dari lonceng setelah dibuka (read_at diisi); baris dibersihkan cron.
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: id(),
+    companyId: companyRef(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id),
+    // ADVANCE_REJECTED, ADVANCE_CANCELLED, SETTLEMENT_VERIFIED, BALANCE_RECORDED,
+    // LEAVE_DECIDED, LEAVE_CANCELLED, PAYSLIP_PUBLISHED.
+    kind: varchar("kind", { length: 30 }).notNull(),
+    title: varchar("title", { length: 120 }).notNull(),
+    body: varchar("body", { length: 300 }),
+    // Halaman tujuan di dalam aplikasi, misal "/advances/<id>".
+    href: varchar("href", { length: 200 }).notNull(),
+    createdAt: createdAt(),
+    readAt: timestamptz("read_at"),
+  },
+  (t) => [index("notifications_user_idx").on(t.userId, t.readAt, t.createdAt)],
+);

@@ -26,12 +26,9 @@ import { AdvanceStatusBadge } from "@/features/advances/components/advance-statu
 import { DISBURSEMENT_METHOD_LABELS, isAwaitingReceipts } from "@/features/advances/constants";
 import { getAdvanceDetail, type AdvanceDetail } from "@/features/advances/queries";
 import { buildAcknowledgmentText, getAvailableActions } from "@/features/advances/service";
-import { NO_PROJECT } from "@/features/projects/constants";
 import { AssignProjectDialog } from "@/features/projects/components/assign-project-dialog";
-import { BackToList } from "@/features/projects/components/back-to-list";
 import { listActiveProjects } from "@/features/projects/queries";
-import { SettlementStatusBadge } from "@/features/settlements/components/settlement-status-badge";
-import { EDITABLE_ADVANCE_STATUSES, toSettlementStatus } from "@/features/settlements/constants";
+import { EDITABLE_ADVANCE_STATUSES } from "@/features/settlements/constants";
 import { getSettlementRefByAdvance } from "@/features/settlements/queries";
 import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
@@ -78,10 +75,6 @@ async function AdvanceDetailContent({ id }: { id: string }) {
 
   return (
     <>
-      <BackToList
-        href={`/advances?project=${advance.projectId ?? NO_PROJECT}`}
-        label={advance.projectName ? `Uang muka ${advance.projectName}` : "Daftar uang muka"}
-      />
       <PageHeader
         title={number}
         description={advance.purpose}
@@ -170,7 +163,8 @@ async function AdvanceDetailContent({ id }: { id: string }) {
   );
 }
 
-// Ringkas: status laporan + tombol ke halaman pertanggungjawaban.
+// Ringkas: tombol ke halaman pertanggungjawaban (statusnya sudah tampil sebagai
+// status uang muka di judul halaman, jadi tidak diulang di sini).
 function SettlementCard({
   settlementId,
   settlementNumber,
@@ -194,10 +188,9 @@ function SettlementCard({
             : `${settlementNumber ?? "Draf"} · laporan penggunaan uang muka ini.`}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-wrap items-center justify-between gap-3">
-        <SettlementStatusBadge status={toSettlementStatus(advance.status)} />
+      <CardContent>
         <Button
-          variant={fill ? "brand" : "outline"}
+          variant={fill ? "brand" : "brand-outline"}
           nativeButton={false}
           render={<Link href={`/settlements/${settlementId}`} />}
         >
@@ -318,7 +311,7 @@ function AdvanceDetails({
       {advance.settlementDueAt && (
         <Item label="Batas unggah nota">
           <span className={cn(settlementOverdue && "font-medium text-amber-700 dark:text-amber-300")}>
-            {formatDate(advance.settlementDueAt)}, 23.59
+            {formatDate(advance.settlementDueAt)}
             {settlementOverdue && " (terlewati)"}
           </span>
         </Item>
@@ -349,7 +342,6 @@ function isFinished(status: AdvanceDetail["status"]) {
 function AdvanceDetailSkeleton() {
   return (
     <>
-      <BackToList href="/projects" label="Daftar proyek" />
       <Skeleton className="h-12 w-64" />
       <Skeleton className="h-64 w-full" />
     </>

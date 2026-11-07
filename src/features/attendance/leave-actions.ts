@@ -393,7 +393,7 @@ async function decide(requestId: string, approve: boolean, rejectReason: string 
 
   const recipient = await getPerson(result.request.userId);
   const summary = summaryOf(result.request, result.typeName);
-  after(() => notifyLeaveDecided(recipient, summary, { approved: approve, reason: rejectReason }));
+  after(() => notifyLeaveDecided(actor.company.id, recipient, summary, { approved: approve, reason: rejectReason }));
   revalidateLeave();
   return { success: true, data: undefined };
 }
