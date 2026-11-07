@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ReviewCardList } from "@/features/attendance/components/review-card-list";
 import { LockControls } from "@/features/attendance/components/review-controls";
+import { formatOvertimeHours } from "@/features/attendance/overtime";
 import { getMonthReview, PERIOD_PATTERN, periodLabel, previousPeriod } from "@/features/attendance/review-data";
 import { requirePermission } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
@@ -128,7 +129,7 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
         <>
           <ReviewCardList rows={review.summaries} period={period} />
           <div className="hidden overflow-x-auto rounded-lg border md:block">
-            <table className="w-full min-w-[56rem] text-sm">
+            <table className="w-full min-w-[60rem] text-sm">
               <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
                 <tr>
                   <th className="p-3 font-medium">Karyawan</th>
@@ -138,6 +139,7 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
                   <th className="p-3 text-right font-medium">Luar radius</th>
                   <th className="p-3 text-right font-medium">Tdk absen pulang</th>
                   <th className="p-3 text-right font-medium">Tidak hadir</th>
+                  <th className="p-3 text-right font-medium">Lembur</th>
                   <th className="p-3 text-right font-medium">Cuti/izin</th>
                   <th className="p-3 text-right font-medium">Denda</th>
                 </tr>
@@ -162,6 +164,14 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
                     <td className="p-3 text-right tabular-nums">{row.noCheckout || "-"}</td>
                     <td className="p-3 text-right tabular-nums">{row.absent || "-"}</td>
                     <td className="p-3 text-right tabular-nums">
+                      {row.overtimeDays > 0 ? `${row.overtimeDays} hari (${formatOvertimeHours(row.overtimeMinutes)})` : "-"}
+                      {row.holidayWorkNoOrderDays > 0 && (
+                        <span className="block text-xs text-amber-700 dark:text-amber-300">
+                          {row.holidayWorkNoOrderDays} libur tanpa izin
+                        </span>
+                      )}
+                    </td>
+                    <td className="p-3 text-right tabular-nums">
                       {row.paidLeaveDays + row.unpaidLeaveDays > 0
                         ? `${row.paidLeaveDays}${row.unpaidLeaveDays ? ` + ${row.unpaidLeaveDays} tdk dibayar` : ""}`
                         : "-"}
@@ -180,7 +190,8 @@ async function ReviewContent({ searchParams }: Pick<PageProps<"/attendance/revie
         </>
       )}
       <p className="text-xs text-muted-foreground">
-        Hari ini belum dihitung tidak hadir. Cuti/izin dihitung dalam hari kerja. Klik nama untuk detail, sanggahan,
+        Hari ini belum dihitung tidak hadir. Cuti/izin dihitung dalam hari kerja. Absen di hari libur tidak dihitung
+        Hadir, tetapi sebagai lembur (jam dari absen nyata, dibatasi izin lembur). Klik nama untuk detail, sanggahan,
         bebaskan denda, dan koreksi absen.
       </p>
     </>

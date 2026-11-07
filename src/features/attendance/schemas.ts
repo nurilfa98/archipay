@@ -299,6 +299,26 @@ export const leaveRequestSchema = z.object({
     .max(500, "Alasan maksimal 500 karakter"),
 });
 
+// Lembur di hari libur (BUSINESS-FLOW §24). Jam rencana tidak melewati tengah malam.
+const overtimeFields = {
+  date: z.iso.date("Isi tanggal"),
+  start: time("Jam mulai"),
+  end: time("Jam selesai"),
+  reason: z
+    .string("Isi alasan")
+    .trim()
+    .min(REASON_MIN, `Alasan minimal ${REASON_MIN} karakter`)
+    .max(500, "Alasan maksimal 500 karakter"),
+};
+const overtimeOrder = (value: { start: number; end: number }) => value.start < value.end;
+const overtimeOrderIssue = { message: "Jam selesai harus setelah jam mulai", path: ["end"] };
+
+export const overtimeRequestSchema = z.object(overtimeFields).refine(overtimeOrder, overtimeOrderIssue);
+
+export const overtimeAssignSchema = z
+  .object({ userId: idSchema, ...overtimeFields })
+  .refine(overtimeOrder, overtimeOrderIssue);
+
 export const leaveTypeSchema = z.object({
   name: z.string().trim().min(2, "Nama jenis minimal 2 karakter").max(60, "Nama jenis maksimal 60 karakter"),
   kind: z.enum(["FULL_DAY", "LATE_ARRIVAL", "EARLY_LEAVE"], "Pilih bentuk izin"),
@@ -320,6 +340,18 @@ export const leaveSettingsSchema = z.object({
     .max(60, "Kuota cuti maksimal 60 hari"),
   leaveDelegationEnabled: z.boolean(),
   leaveDelegationHours: z.coerce
+    .number("Waktu tunggu harus berupa angka")
+    .int("Waktu tunggu harus bilangan bulat")
+    .min(1, "Waktu tunggu minimal 1 jam")
+    .max(168, "Waktu tunggu maksimal 168 jam (7 hari)"),
+});
+
+// Pengaturan lembur (BUSINESS-FLOW §24): wajib izin lembur untuk absen di hari libur, dan
+// delegasi persetujuan ke Admin HR (terpisah dari cuti).
+export const overtimeSettingsSchema = z.object({
+  attendanceOvertimeRequired: z.boolean(),
+  overtimeDelegationEnabled: z.boolean(),
+  overtimeDelegationHours: z.coerce
     .number("Waktu tunggu harus berupa angka")
     .int("Waktu tunggu harus bilangan bulat")
     .min(1, "Waktu tunggu minimal 1 jam")

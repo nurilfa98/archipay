@@ -545,6 +545,29 @@ export async function finalizePayrollRun(period: string): Promise<ActionResult> 
     .from(payslips)
     .where(eq(payslips.runId, run.id));
   if (slips.length === 0) return { success: false, message: "Belum ada slip di penggajian ini." };
+
+  // Upah lembur (BUSINESS-FLOW §24.6): jamnya dari absensi, jadi periode absensi wajib sudah dikunci;
+  // baris Rp0 berarti tarif lembur karyawan belum diisi.
+  const overtimeLines = await db
+    .select({ amount: payslipLines.amount, fullName: payslips.fullName })
+    .from(payslipLines)
+    .innerJoin(payslips, eq(payslipLines.payslipId, payslips.id))
+    .where(and(eq(payslips.runId, run.id), eq(payslipLines.source, "OVERTIME")));
+  if (overtimeLines.length > 0) {
+    const unpriced = overtimeLines.find((line) => line.amount === 0);
+    if (unpriced) {
+      return {
+        success: false,
+        message: `Tarif lembur ${unpriced.fullName} belum diisi. Isi di Data gaji lalu Hitung ulang, atau hapus baris upah lembur-nya.`,
+      };
+    }
+    if (actor.company.attendance && !(await isPeriodLocked(companyId, parsedPeriod.data))) {
+      return {
+        success: false,
+        message: "Ada upah lembur di slip. Kunci periode absensi bulan ini dulu (Absensi → Review bulanan), lalu Hitung ulang.",
+      };
+    }
+  }
   const negative = slips.find((slip) => slip.netPay < 0);
   if (negative) {
     return { success: false, message: `Gaji bersih ${negative.fullName} minus. Kurangi potongannya dulu.` };

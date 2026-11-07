@@ -18,7 +18,11 @@ export type NotificationKind =
   | "BALANCE_RECORDED"
   | "LEAVE_DECIDED"
   | "LEAVE_CANCELLED"
-  | "PAYSLIP_PUBLISHED";
+  | "PAYSLIP_PUBLISHED"
+  | "OVERTIME_ASSIGNED"
+  | "OVERTIME_DECIDED"
+  | "OVERTIME_CANCELLED"
+  | "OVERTIME_DECLINED";
 
 export type NewNotification = {
   companyId: string;

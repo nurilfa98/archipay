@@ -3,6 +3,7 @@
 // Fungsi murni: dipakai halaman review, PDF, dan Excel.
 
 import { addDays, datesBetween, isoWeekdayOf } from "./leave-days";
+import { overtimeMinutes } from "./overtime";
 import { isWorkDay } from "./schedule";
 
 export type ReviewPerson = { id: string; fullName: string; startDate: string };
@@ -14,9 +15,14 @@ export type ReviewRecord = {
   earlyMinutes: number | null;
   checkInInRadius: boolean;
   checkOutInRadius: boolean | null;
+  checkInAt?: Date;
   checkOutAt: Date | null;
   isWorkDay: boolean;
+  // Izin lembur yang dipakai absen di hari libur (BUSINESS-FLOW §24).
+  overtimeOrderId?: string | null;
 };
+// Izin lembur yang disetujui: jam rencana jadi batas atas jam lembur.
+export type ReviewOvertimeOrder = { id: string; startMinute: number; endMinute: number };
 export type ReviewLeave = {
   userId: string;
   typeName: string;
@@ -26,7 +32,8 @@ export type ReviewLeave = {
 };
 export type ReviewPenalty = { userId: string; amount: number; status: string };
 
-export type DayStatus = "PRESENT" | "LEAVE" | "ABSENT" | "OFF" | "UPCOMING";
+// OVERTIME = ada absen di hari libur (berizin atau tidak): tidak dihitung "Hadir" (BUSINESS-FLOW §24.3).
+export type DayStatus = "PRESENT" | "OVERTIME" | "LEAVE" | "ABSENT" | "OFF" | "UPCOMING";
 
 export type PersonSummary = {
   userId: string;
@@ -38,6 +45,11 @@ export type PersonSummary = {
   outsideCount: number;
   noCheckout: number;
   absent: number;
+  // Absen di hari libur dengan izin lembur: jumlah hari dan menit lembur terhitung.
+  overtimeDays: number;
+  overtimeMinutes: number;
+  // Absen di hari libur tanpa izin lembur (saklar "wajib izin lembur" dimatikan).
+  holidayWorkNoOrderDays: number;
   paidLeaveDays: number;
   unpaidLeaveDays: number;
   leaveByType: Record<string, number>;
@@ -65,7 +77,7 @@ export function dayStatus(input: {
   leave: ReviewLeave | undefined;
 }): DayStatus {
   const { date, today, record, leave } = input;
-  if (record) return "PRESENT";
+  if (record) return record.isWorkDay ? "PRESENT" : "OVERTIME";
   if (leave) return "LEAVE";
   const working = isWorkDay(input.workDays, isoWeekdayOf(date)) && !input.holidays.has(date);
   if (!working || date < input.startDate) return "OFF";
@@ -81,7 +93,9 @@ export function summarizeMonth(input: {
   records: ReviewRecord[];
   leaves: ReviewLeave[];
   penalties: ReviewPenalty[];
+  overtimeOrders?: ReviewOvertimeOrder[];
 }): PersonSummary[] {
+  const orders = new Map((input.overtimeOrders ?? []).map((order) => [order.id, order]));
   const dates = monthDates(input.period);
   return input.people.map((person) => {
     const records = new Map(
@@ -98,6 +112,9 @@ export function summarizeMonth(input: {
       outsideCount: 0,
       noCheckout: 0,
       absent: 0,
+      overtimeDays: 0,
+      overtimeMinutes: 0,
+      holidayWorkNoOrderDays: 0,
       paidLeaveDays: 0,
       unpaidLeaveDays: 0,
       leaveByType: {},
@@ -109,8 +126,24 @@ export function summarizeMonth(input: {
       const record = records.get(date);
       const leave = leaves.find((item) => item.startDate <= date && item.endDate >= date);
       const status = dayStatus({ ...input, date, startDate: person.startDate, record, leave });
-      if (status === "PRESENT" && record) {
-        summary.present += 1;
+      if ((status === "PRESENT" || status === "OVERTIME") && record) {
+        if (status === "PRESENT") {
+          summary.present += 1;
+        } else {
+          // Hari libur: dihitung terpisah sebagai lembur (jam dari absen nyata, dibatasi izin).
+          const order = record.overtimeOrderId ? orders.get(record.overtimeOrderId) : undefined;
+          if (order && record.checkInAt) {
+            summary.overtimeDays += 1;
+            summary.overtimeMinutes += overtimeMinutes({
+              checkInAt: record.checkInAt,
+              checkOutAt: record.checkOutAt,
+              plannedStartMinute: order.startMinute,
+              plannedEndMinute: order.endMinute,
+            });
+          } else {
+            summary.holidayWorkNoOrderDays += 1;
+          }
+        }
         if (record.lateMinutes > 0) {
           summary.lateCount += 1;
           summary.lateMinutes += record.lateMinutes;

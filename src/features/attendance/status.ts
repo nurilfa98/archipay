@@ -10,6 +10,8 @@ type RecordLike = {
   workDate: string;
   timezone: string;
   isWorkDay: boolean;
+  // Absen di hari libur yang memakai izin lembur (BUSINESS-FLOW §24).
+  overtimeOrderId?: string | null;
   lateMinutes: number;
   earlyMinutes: number | null;
   checkInInRadius: boolean;
@@ -19,7 +21,9 @@ type RecordLike = {
 
 export function dayTags(record: RecordLike, now: Date): DayTag[] {
   const tags: DayTag[] = [];
-  if (!record.isWorkDay) tags.push({ label: "Hari libur", tone: "pending" });
+  if (!record.isWorkDay) {
+    tags.push(record.overtimeOrderId ? { label: "Lembur", tone: "active" } : { label: "Hari libur", tone: "pending" });
+  }
   if (record.lateMinutes > 0) tags.push({ label: `Terlambat ${record.lateMinutes} mnt`, tone: "warning" });
   if ((record.earlyMinutes ?? 0) > 0) tags.push({ label: `Pulang cepat ${record.earlyMinutes} mnt`, tone: "warning" });
   if (!record.checkInInRadius || record.checkOutInRadius === false) {

@@ -11,6 +11,8 @@
 import "server-only";
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { listHolidayDates } from "@/features/attendance/leave-queries";
+import { overtimeMinutes, workWeekOf } from "@/features/attendance/overtime";
+import { listMonthOvertimeOrders } from "@/features/attendance/overtime-queries";
 import { listMonthRecords } from "@/features/attendance/queries";
 import { monthDates } from "@/features/attendance/review";
 import { periodLabel } from "@/features/attendance/review-data";
@@ -20,10 +22,12 @@ import { zonedDateString } from "@/lib/dates";
 import { db } from "@/lib/db";
 import { advanceLedgerEntries, advanceRequests, attendancePenalties, settlements, users } from "@/lib/db/schema";
 import { getPayrollSettings, listProfiles } from "./queries";
+import { overtimeMonthlyBase, overtimePay } from "./overtime-math";
 import {
   countMonthDays,
   dailyRateOf,
   employedInPeriod,
+  overtimeLine,
   salaryLines,
   type LineDraft,
   type MonthDays,
@@ -70,13 +74,16 @@ export async function buildPayslipDrafts(
     .where(and(eq(users.companyId, companyId), inArray(users.id, userIds)));
 
   // Absensi bulan ini (hanya bila add-on Absensi aktif).
-  const [reviewPeople, records, leaves] = options.attendanceActive
+  const [reviewPeople, records, leaves, overtimeOrders] = options.attendanceActive
     ? await Promise.all([
         listReviewPeople(companyId, period),
         listMonthRecords(companyId, period),
         listMonthLeaves(companyId, period),
+        listMonthOvertimeOrders(companyId, period),
       ])
-    : [[], [], []];
+    : [[], [], [], []];
+  const orderById = new Map(overtimeOrders.map((order) => [order.id, order]));
+  const week = workWeekOf(settings.workDays);
   const tracked = new Map(reviewPeople.map((person) => [person.id, person.startDate]));
 
   const [advanceCandidates, postedAdvances, penaltyCandidates, postedPenalties, reimbursementCandidates, postedReimbursements] =
@@ -123,6 +130,31 @@ export async function buildPayslipDrafts(
       dailyRate,
       absenceDeductionActive,
     }).map((line) => ({ ...line, postedAt: null }));
+
+    // Upah lembur (BUSINESS-FLOW §24): jam dari absen di hari libur yang memakai izin lembur.
+    const dayMinutes = records.flatMap((record) => {
+      const order = record.userId === person.id && record.overtimeOrderId ? orderById.get(record.overtimeOrderId) : undefined;
+      return order
+        ? [
+            overtimeMinutes({
+              checkInAt: record.checkInAt,
+              checkOutAt: record.checkOutAt,
+              plannedStartMinute: order.startMinute,
+              plannedEndMinute: order.endMinute,
+            }),
+          ]
+        : [];
+    });
+    const overtime = overtimeLine(
+      settings.overtimeMethod === "GOVERNMENT"
+        ? overtimePay({ method: "GOVERNMENT", dayMinutes, monthlyBase: overtimeMonthlyBase(profile), week })
+        : overtimePay({ method: "CUSTOM", dayMinutes, hourlyRate: profile.overtimeHourlyRate }),
+    );
+    if (overtime) {
+      // Setelah baris pendapatan terakhir, sebelum potongan.
+      const lastEarning = lines.map((line) => line.type).lastIndexOf("EARNING");
+      lines.splice(lastEarning + 1, 0, { ...overtime, postedAt: null });
+    }
 
     for (const advance of postedAdvances.filter((row) => row.recipientId === person.id)) {
       lines.push({

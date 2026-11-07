@@ -4,9 +4,17 @@
 
 import { isoWeekdayOf } from "@/features/attendance/leave-days";
 import { dayStatus, monthDates, type ReviewLeave, type ReviewRecord } from "@/features/attendance/review";
+import { formatOvertimeHours } from "@/features/attendance/overtime";
 import { isWorkDay } from "@/features/attendance/schedule";
 import { formatRupiah } from "@/lib/format";
-import { MAX_DEDUCTION_PERCENT, type ComponentType, type DailyRateMethod, type DeductionBase } from "./constants";
+import {
+  MAX_DEDUCTION_PERCENT,
+  type ComponentType,
+  type DailyRateMethod,
+  type DeductionBase,
+  type OvertimeMethod,
+} from "./constants";
+import type { OvertimePay } from "./overtime-math";
 import type { LineSource, LineType } from "./constants";
 
 export type PayrollSettings = {
@@ -14,6 +22,8 @@ export type PayrollSettings = {
   dailyRateMethod: DailyRateMethod;
   dailyDivisor: number;
   deductionBase: DeductionBase;
+  // Cara hitung upah lembur (BUSINESS-FLOW §24.5).
+  overtimeMethod: OvertimeMethod;
 };
 
 export type SalaryComponentInput = { type: ComponentType; name: string; amount: number; perDay: boolean };
@@ -21,6 +31,8 @@ export type SalaryComponentInput = { type: ComponentType; name: string; amount: 
 export type SalaryProfileInput = {
   baseSalary: number;
   dailyRate: number | null;
+  // Hanya untuk cara hitung lembur CUSTOM.
+  overtimeHourlyRate: number | null;
   startDate: string | null; // "2026-11-10"
   endDate: string | null;
   absenceExempt: boolean;
@@ -176,6 +188,25 @@ export function salaryLines(input: {
     }
   }
   return lines;
+}
+
+// Baris pendapatan "Upah lembur" (satu per bulan). null = tidak ada lembur. Tarif sendiri yang belum
+// diisi menghasilkan baris Rp0 sebagai peringatan di draf (penggajian tidak bisa diselesaikan
+// sebelum baris itu diperbaiki atau dihapus).
+export function overtimeLine(pay: OvertimePay): LineDraft | null {
+  if (pay.days === 0) return null;
+  const detail = `${pay.days} hari, ${formatOvertimeHours(Math.round(pay.hours * 60))}`;
+  if (pay.missingRate) {
+    return {
+      type: "EARNING",
+      source: "OVERTIME",
+      label: `Upah lembur (${detail}): isi tarif lembur di Data gaji`,
+      amount: 0,
+      refId: null,
+    };
+  }
+  if (pay.amount <= 0) return null;
+  return { type: "EARNING", source: "OVERTIME", label: `Upah lembur (${detail})`, amount: pay.amount, refId: null };
 }
 
 export function totalsOf(lines: readonly { type: LineType; amount: number }[]) {

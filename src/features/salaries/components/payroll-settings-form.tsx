@@ -25,6 +25,9 @@ import {
   DAILY_RATE_METHODS,
   DEDUCTION_BASE_LABELS,
   DEDUCTION_BASES,
+  OVERTIME_METHOD_DESCRIPTIONS,
+  OVERTIME_METHOD_LABELS,
+  OVERTIME_METHODS,
   type DailyRateMethod,
 } from "../constants";
 import type { PayrollSettings } from "../payslip-math";
@@ -126,6 +129,26 @@ export function PayrollSettingsForm({
             ))}
           </RadioGroup>
           <FieldError>{fieldError("deductionBase")}</FieldError>
+        </FieldSet>
+
+        <FieldSet>
+          <FieldLegend variant="label">Cara menghitung upah lembur</FieldLegend>
+          <FieldDescription>
+            Dipakai saat menyusun slip gaji dari lembur di hari libur (menu Absensi → Lembur). Butuh add-on Absensi
+            aktif.
+          </FieldDescription>
+          <RadioGroup name="overtimeMethod" defaultValue={settings.overtimeMethod} className="flex flex-col gap-2">
+            {OVERTIME_METHODS.map((option) => (
+              <Field key={option} orientation="horizontal" className="rounded-lg border p-3">
+                <RadioGroupItem value={option} id={`overtime-${option}`} />
+                <div className="flex flex-col gap-0.5">
+                  <FieldLabel htmlFor={`overtime-${option}`}>{OVERTIME_METHOD_LABELS[option]}</FieldLabel>
+                  <FieldDescription>{OVERTIME_METHOD_DESCRIPTIONS[option]}</FieldDescription>
+                </div>
+              </Field>
+            ))}
+          </RadioGroup>
+          <FieldError>{fieldError("overtimeMethod")}</FieldError>
         </FieldSet>
 
         <div className="border-t pt-4">

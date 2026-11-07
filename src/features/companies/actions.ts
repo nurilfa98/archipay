@@ -51,6 +51,7 @@ import {
   companyPricing,
   companySettings,
   notifications,
+  overtimeOrders,
   documentSequences,
   expenseCategories,
   loginAttempts,
@@ -286,6 +287,8 @@ export async function deleteCompany(companyId: string, confirmName: string): Pro
     await tx.delete(leaveTypes).where(eq(leaveTypes.companyId, id));
     await tx.delete(attendancePenalties).where(eq(attendancePenalties.companyId, id));
     await tx.delete(attendanceRecords).where(eq(attendanceRecords.companyId, id));
+    // Izin lembur dihapus setelah absen yang menautkannya (BUSINESS-FLOW §24).
+    await tx.delete(overtimeOrders).where(eq(overtimeOrders.companyId, id));
     await tx.delete(faceProfiles).where(eq(faceProfiles.companyId, id));
     await tx.delete(attendanceConsents).where(eq(attendanceConsents.companyId, id));
     await tx.delete(attendanceHolidays).where(eq(attendanceHolidays.companyId, id));

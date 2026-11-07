@@ -76,6 +76,7 @@ async function SalaryProfileContent({ params }: Pick<PageProps<"/payroll/salarie
             userId={person.id}
             profile={profile}
             dailyRateMethod={settings.dailyRateMethod}
+            overtimeMethod={settings.overtimeMethod}
             readOnly={readOnly}
           />
         </CardContent>

@@ -10,7 +10,15 @@
 // Tampilan: tiap bagian = SettingsSection (penjelasan di kiri, isian di kanan),
 // dengan baris pintasan (anchor) yang menempel di atas untuk lompat antar bagian.
 
-import { BanknoteIcon, CalendarOffIcon, ClockIcon, PlaneIcon, ReceiptTextIcon, TagsIcon } from "lucide-react";
+import {
+  BanknoteIcon,
+  CalendarOffIcon,
+  Clock3Icon,
+  ClockIcon,
+  PlaneIcon,
+  ReceiptTextIcon,
+  TagsIcon,
+} from "lucide-react";
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import { PageHeader } from "@/components/layout/page-header";
@@ -19,7 +27,9 @@ import { CompanySettingsForm } from "@/features/settings/components/company-sett
 import { AttendanceSettingsForm } from "@/features/attendance/components/attendance-settings-form";
 import { HolidaysManager } from "@/features/attendance/components/holidays-manager";
 import { LeaveSettingsForm, LeaveTypesManager } from "@/features/attendance/components/leave-settings";
+import { OvertimeSettingsForm } from "@/features/attendance/components/overtime-settings";
 import { getLeaveSettings, listLeaveTypes } from "@/features/attendance/leave-queries";
+import { getOvertimeSettings } from "@/features/attendance/overtime-queries";
 import { PayrollSettingsForm } from "@/features/salaries/components/payroll-settings-form";
 import { getPayrollSettings } from "@/features/salaries/queries";
 import { getAttendanceSettings, listHolidays } from "@/features/attendance/queries";
@@ -78,6 +88,7 @@ async function SettingsContent() {
           { id: "absensi", label: "Jam kerja & denda" },
           { id: "libur", label: "Hari libur" },
           { id: "cuti", label: "Cuti & izin" },
+          { id: "lembur", label: "Lembur" },
         ]
       : []),
   ];
@@ -182,12 +193,14 @@ async function AttendanceSettings({
 }) {
   // Hari libur tahun ini & tahun depan (tahun menurut zona waktu perusahaan).
   const year = Number(zonedDateString(new Date()).slice(0, 4));
-  const [attendance, holidaysThisYear, holidaysNextYear, leaveSettings, leaveTypes] = await Promise.all([
+  const [attendance, holidaysThisYear, holidaysNextYear, leaveSettings, leaveTypes, overtimeSettings] =
+    await Promise.all([
     getAttendanceSettings(companyId),
     listHolidays(companyId, year),
     listHolidays(companyId, year + 1),
     getLeaveSettings(companyId),
     listLeaveTypes(companyId),
+    getOvertimeSettings(companyId),
   ]);
   const holidays = [...holidaysThisYear, ...holidaysNextYear].map((holiday) => ({
     ...holiday,
@@ -233,6 +246,18 @@ async function AttendanceSettings({
             <LeaveTypesManager types={leaveTypes} readOnly={readOnly} />
           </div>
         </div>
+      </SettingsSection>
+
+      <SettingsSection
+        id="lembur"
+        icon={Clock3Icon}
+        title="Lembur"
+        description="Wajib tidaknya izin lembur untuk absen di hari libur, dan delegasi persetujuan lembur ke Admin HR."
+        hints={[
+          "Waktu tunggu lembur terpisah dari cuti & izin, supaya persetujuan lembur yang mendesak tidak tertahan.",
+        ]}
+      >
+        <OvertimeSettingsForm settings={overtimeSettings} canEdit={!readOnly} canDelegate={canDelegate} />
       </SettingsSection>
     </>
   );

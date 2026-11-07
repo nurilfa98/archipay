@@ -2,7 +2,7 @@
 // divalidasi ulang di server.
 
 import { z } from "zod";
-import { COMPONENT_TYPES, DAILY_RATE_METHODS, DEDUCTION_BASES, MAX_COMPONENTS } from "./constants";
+import { COMPONENT_TYPES, DAILY_RATE_METHODS, DEDUCTION_BASES, MAX_COMPONENTS, OVERTIME_METHODS } from "./constants";
 
 export const idSchema = z.string().min(1).max(36);
 export const periodSchema = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "Periode tidak valid");
@@ -48,6 +48,7 @@ export const payrollSettingsSchema = z.object({
     .min(1, "Pembagi minimal 1")
     .max(31, "Pembagi maksimal 31"),
   deductionBase: z.enum(DEDUCTION_BASES, "Pilih dasar potongan"),
+  overtimeMethod: z.enum(OVERTIME_METHODS, "Pilih cara hitung upah lembur"),
 });
 
 export const salaryComponentSchema = z.object({
@@ -62,6 +63,7 @@ export const salaryProfileSchema = z
   .object({
     baseSalary: rupiah("Gaji pokok"),
     dailyRate: optionalRupiah("Nominal per hari"),
+    overtimeHourlyRate: optionalRupiah("Tarif lembur per jam"),
     startDate: optionalDate,
     endDate: optionalDate,
     absenceExempt: checkbox,

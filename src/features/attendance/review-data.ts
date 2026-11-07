@@ -3,6 +3,7 @@
 
 import "server-only";
 import { listHolidayDates, getLeaveSettings } from "./leave-queries";
+import { listMonthOvertimeOrders } from "./overtime-queries";
 import { listMonthRecords } from "./queries";
 import { monthDates, summarizeMonth } from "./review";
 import {
@@ -17,7 +18,7 @@ export const PERIOD_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 export async function getMonthReview(companyId: string, period: string, today: string) {
   const dates = monthDates(period);
-  const [people, records, leaves, penalties, lock, pendingLeaves, settings, holidays] = await Promise.all([
+  const [people, records, leaves, penalties, lock, pendingLeaves, settings, holidays, overtimeOrders] = await Promise.all([
     listReviewPeople(companyId, period),
     listMonthRecords(companyId, period),
     listMonthLeaves(companyId, period),
@@ -26,6 +27,7 @@ export async function getMonthReview(companyId: string, period: string, today: s
     countPendingLeavesInPeriod(companyId, period),
     getLeaveSettings(companyId),
     listHolidayDates(companyId, dates[0], dates[dates.length - 1]),
+    listMonthOvertimeOrders(companyId, period),
   ]);
   const summaries = summarizeMonth({
     period,
@@ -36,8 +38,21 @@ export async function getMonthReview(companyId: string, period: string, today: s
     records,
     leaves,
     penalties,
+    overtimeOrders,
   });
-  return { dates, people, records, leaves, penalties, lock, pendingLeaves, settings, holidays, summaries };
+  return {
+    dates,
+    people,
+    records,
+    leaves,
+    penalties,
+    lock,
+    pendingLeaves,
+    settings,
+    holidays,
+    summaries,
+    overtimeOrders,
+  };
 }
 
 // "2026-11" → "November 2026"

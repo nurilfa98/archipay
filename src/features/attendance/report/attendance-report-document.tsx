@@ -6,6 +6,7 @@
 
 import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
 import { formatRupiah } from "@/lib/format";
+import { formatOvertimeHours } from "../overtime";
 
 const COLORS = { ink: "#0f172a", muted: "#64748b", line: "#e2e8f0", soft: "#f1f5f9", accent: "#4f46e5" };
 
@@ -56,6 +57,9 @@ export type ReportSummaryRow = {
   outsideCount: number;
   noCheckout: number;
   absent: number;
+  overtimeDays: number;
+  overtimeMinutes: number;
+  holidayWorkNoOrderDays: number;
   paidLeaveDays: number;
   unpaidLeaveDays: number;
   penaltyTotal: number;
@@ -71,16 +75,17 @@ export type ReportPenaltyRow = {
 };
 
 const SUMMARY_COLUMNS: { label: string; width: string; right?: boolean }[] = [
-  { label: "Karyawan", width: "22%" },
-  { label: "Hadir", width: "7%", right: true },
+  { label: "Karyawan", width: "20%" },
+  { label: "Hadir", width: "6%", right: true },
   { label: "Terlambat", width: "12%", right: true },
   { label: "Pulang cepat", width: "8%", right: true },
-  { label: "Luar radius", width: "8%", right: true },
-  { label: "Tdk absen pulang", width: "9%", right: true },
-  { label: "Tidak hadir", width: "8%", right: true },
-  { label: "Cuti dibayar", width: "8%", right: true },
-  { label: "Cuti tdk dibayar", width: "8%", right: true },
-  { label: "Denda", width: "10%", right: true },
+  { label: "Luar radius", width: "7%", right: true },
+  { label: "Tdk absen pulang", width: "8%", right: true },
+  { label: "Tidak hadir", width: "7%", right: true },
+  { label: "Cuti dibayar", width: "7%", right: true },
+  { label: "Cuti tdk dibayar", width: "7%", right: true },
+  { label: "Lembur", width: "9%", right: true },
+  { label: "Denda", width: "9%", right: true },
 ];
 
 export function AttendanceReportDocument({
@@ -136,6 +141,7 @@ export function AttendanceReportDocument({
               String(row.absent || "-"),
               String(row.paidLeaveDays || "-"),
               String(row.unpaidLeaveDays || "-"),
+              row.overtimeDays ? `${row.overtimeDays} hr (${formatOvertimeHours(row.overtimeMinutes)})` : "-",
               row.penaltyTotal ? formatRupiah(row.penaltyTotal) : "-",
             ];
             return (
@@ -153,8 +159,8 @@ export function AttendanceReportDocument({
           })
         )}
         <View style={styles.row}>
-          <Text style={[styles.bold, { width: "90%" }]}>Total denda berlaku</Text>
-          <Text style={[styles.bold, styles.right, { width: "10%" }]}>{formatRupiah(total)}</Text>
+          <Text style={[styles.bold, { width: "91%" }]}>Total denda berlaku</Text>
+          <Text style={[styles.bold, styles.right, { width: "9%" }]}>{formatRupiah(total)}</Text>
         </View>
 
         <Text style={styles.sectionTitle} break={summaries.length > 18}>

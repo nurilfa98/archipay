@@ -16,7 +16,15 @@ import {
   salaryProfiles,
   users,
 } from "@/lib/db/schema";
-import type { ComponentType, DailyRateMethod, DeductionBase, LineSource, LineType, RunStatus } from "./constants";
+import type {
+  ComponentType,
+  DailyRateMethod,
+  DeductionBase,
+  LineSource,
+  LineType,
+  OvertimeMethod,
+  RunStatus,
+} from "./constants";
 import type { PayrollSettings, SalaryProfileInput } from "./payslip-math";
 
 export async function getPayrollSettings(companyId: string): Promise<PayrollSettings & { workDays: number }> {
@@ -27,6 +35,7 @@ export async function getPayrollSettings(companyId: string): Promise<PayrollSett
       dailyRateMethod: companySettings.payrollDailyRateMethod,
       dailyDivisor: companySettings.payrollDailyDivisor,
       deductionBase: companySettings.payrollDeductionBase,
+      overtimeMethod: companySettings.payrollOvertimeMethod,
       workDays: companySettings.workDays,
     })
     .from(companySettings)
@@ -37,6 +46,7 @@ export async function getPayrollSettings(companyId: string): Promise<PayrollSett
     ...row,
     dailyRateMethod: row.dailyRateMethod as DailyRateMethod,
     deductionBase: row.deductionBase as DeductionBase,
+    overtimeMethod: row.overtimeMethod as OvertimeMethod,
   };
 }
 
@@ -138,6 +148,7 @@ export async function listProfiles(companyId: string, userIds?: string[]) {
       userId: salaryProfiles.userId,
       baseSalary: salaryProfiles.baseSalary,
       dailyRate: salaryProfiles.dailyRate,
+      overtimeHourlyRate: salaryProfiles.overtimeHourlyRate,
       startDate: salaryProfiles.startDate,
       endDate: salaryProfiles.endDate,
       absenceExempt: salaryProfiles.absenceExempt,

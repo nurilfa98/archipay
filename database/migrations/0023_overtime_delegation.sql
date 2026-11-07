@@ -1,0 +1,3 @@
+ALTER TABLE "company_settings" ADD COLUMN "overtime_delegation_enabled" boolean DEFAULT true NOT NULL;--> statement-breakpoint
+ALTER TABLE "company_settings" ADD COLUMN "overtime_delegation_hours" integer DEFAULT 4 NOT NULL;--> statement-breakpoint
+ALTER TABLE "company_settings" ADD CONSTRAINT "company_settings_overtime_delegation" CHECK ("company_settings"."overtime_delegation_hours" between 1 and 168);

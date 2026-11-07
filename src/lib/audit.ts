@@ -94,6 +94,12 @@ export type AuditAction =
   | "ATTENDANCE_CORRECTED"
   | "ATTENDANCE_PERIOD_LOCKED"
   | "ATTENDANCE_PERIOD_UNLOCKED"
+  | "OVERTIME_REQUESTED"
+  | "OVERTIME_ASSIGNED"
+  | "OVERTIME_APPROVED"
+  | "OVERTIME_REJECTED"
+  | "OVERTIME_CANCELLED"
+  | "OVERTIME_DECLINED"
   // Penggajian (BUSINESS-FLOW §20): tanpa nominal, karena Superadmin bisa
   // membuka audit log tetapi tidak boleh melihat data gaji.
   | "PAYROLL_SETTINGS_UPDATED"

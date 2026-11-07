@@ -881,7 +881,7 @@ Owner dan Admin HR (izin `attendance:configure`) sama-sama bisa mengubah pengatu
 5. Waktu absen = **jam server** menurut **zona waktu lokasi**, bukan jam HP. Tanggal kerja juga dihitung dari zona waktu itu.
 6. Bila lewat jam masuk + toleransi → **Terlambat**. Menit terlambat dihitung dari jam masuk (bukan dari akhir toleransi), dan **denda** tercatat bila nominalnya > 0. Alasan terlambat tidak wajib.
 7. Absen ditolak bila hari itu user sedang **cuti/izin seharian yang sudah disetujui** ("Anda sedang cuti; batalkan dulu bila ternyata masuk", bagian 19). Izin datang terlambat yang disetujui menggeser jam masuk hari itu; izin pulang cepat memajukan jam pulang.
-8. Hari libur atau di luar hari kerja: absen tetap boleh (misal lembur), tetapi tidak dihitung terlambat/pulang cepat dan tidak didenda.
+8. Hari libur atau di luar hari kerja: absen masuk **hanya bila ada izin lembur yang disetujui** (bagian 24) selama saklar "Wajib izin lembur" nyala (bawaan); bila dimatikan, absen tetap boleh tanpa izin. Absen di hari libur tidak dihitung terlambat/pulang cepat dan tidak didenda, berlabel **Lembur** (berizin) atau **Hari libur** (tanpa izin), dan **tidak dihitung "Hadir"** (bagian 24.3).
 9. Jadwal hari itu (jam masuk/pulang lokasi atau company, toleransi) **disalin ke absen** saat absen masuk; perubahan pengaturan tidak mengubah absen yang sudah ada. Denda dicatat di `attendance_penalties` dengan nominal saat itu (periode = bulan tanggal kerja).
 10. Mode masuk/pulang ditentukan otomatis dari absen terakhir: belum ada absen di tanggal kerja hari ini → masuk; sudah masuk & belum pulang → pulang.
 
@@ -1088,6 +1088,8 @@ Di Pengaturan → **Penggajian** (hanya tampil bila add-on aktif):
     itu menurut jadwal kerja & hari libur di pengaturan absensi.
   - **Dibagi angka tetap**: dasar ÷ pembagi yang diisi Owner (bawaan 26, 1–31).
   - **Nominal tetap per hari**: diisi per karyawan di data gajinya.
+- **Cara menghitung upah lembur** (bagian 24.5): **sesuai aturan pemerintah** (bawaan; 1/173 × pengali hari libur) atau
+  **tarif sendiri per karyawan** (jam × tarif per jam di data gaji). Butuh add-on Absensi.
 - **Dasar potongan**: **gaji pokok saja** (bawaan) atau **gaji pokok +
   tunjangan tetap bulanan**.
 
@@ -1108,6 +1110,7 @@ pokoknya; yang belum diisi tidak ikut penggajian. Per karyawan:
 - **Tanggal mulai kerja** & **tanggal berhenti** (opsional): hari kerja di
   luar rentang itu dipotong dengan tarif harian yang sama (prorata).
 - **Nominal per hari** (hanya untuk cara "nominal tetap per hari").
+- **Tarif lembur per jam** (hanya untuk cara lembur "tarif sendiri"; kosong = lembur tidak dibayar).
 - **Tidak dipotong otomatis** (centang): ketidakhadiran karyawan ini tidak
   dipotong (mis. manajer/staf lapangan yang tidak wajib absen).
 
@@ -1128,7 +1131,8 @@ Periode = **bulan kalender** ("2026-11"). Satu penggajian per bulan per company.
    |---|---|---|
    | Gaji pokok | pendapatan | dari data gaji |
    | Tunjangan tetap | pendapatan | nominal per bulan |
-   | Tunjangan per hari hadir | pendapatan | nominal × hari hadir (dari absensi; tanpa add-on Absensi atau bila karyawan tidak wajib absen = hari kerja dalam masa kerja) |
+   | Tunjangan per hari hadir | pendapatan | nominal × hari hadir (dari absensi; absen di hari libur **tidak** dihitung hadir; tanpa add-on Absensi atau bila karyawan tidak wajib absen = hari kerja dalam masa kerja) |
+   | Upah lembur | pendapatan | jam lembur dari absen di hari libur yang berizin lembur, dihitung menurut cara hitung lembur (bagian 24.5); satu baris per bulan "Upah lembur (n hari, x jam)". Tarif sendiri yang kosong menghasilkan baris Rp0 sebagai peringatan |
    | Potongan tetap | potongan | dari data gaji |
    | Masuk/berhenti di tengah bulan | potongan | hari kerja di luar masa kerja × tarif harian |
    | Tidak hadir & cuti/izin tidak dibayar | potongan | (hari tidak hadir + hari cuti/izin yang jenisnya *tidak dibayar*) × tarif harian, hanya bila potong otomatis nyala, add-on Absensi aktif, dan karyawan tidak dikecualikan |
@@ -1143,7 +1147,7 @@ Periode = **bulan kalender** ("2026-11"). Satu penggajian per bulan per company.
 3. Owner (atau Finance, lihat 20.1) memeriksa dan menyesuaikan sebelum selesai:
    - mengubah nominal / menghapus baris otomatis (sisa uang muka boleh
      dikurangi = dicicil; denda hanya bisa dihapus = ditunda ke bulan lain);
-   - menambah baris **manual** (lembur, bonus, THR, potongan lain);
+   - menambah baris **manual** (bonus, THR, potongan lain; lembur otomatis dari absensi, bagian 24);
    - **Hitung ulang** menyusun ulang semua baris otomatis dari data terbaru
      (perubahan pada baris otomatis hilang; baris manual tetap);
    - mengisi **tanggal bayar** (dicetak di slip).
@@ -1193,7 +1197,7 @@ mencatat manual).
 
 | Tabel | Isi |
 |---|---|
-| `company_settings` (+kolom) | `payroll_absence_deduction`, `payroll_daily_rate_method` (`WORKING_DAYS`/`FIXED_DIVISOR`/`FIXED_AMOUNT`), `payroll_daily_divisor`, `payroll_deduction_base` (`BASE`/`BASE_ALLOWANCES`) |
+| `company_settings` (+kolom) | `payroll_absence_deduction`, `payroll_daily_rate_method` (`WORKING_DAYS`/`FIXED_DIVISOR`/`FIXED_AMOUNT`), `payroll_daily_divisor`, `payroll_deduction_base` (`BASE`/`BASE_ALLOWANCES`), `payroll_overtime_method` (`GOVERNMENT`/`CUSTOM`) |
 | `salary_profiles` | Satu baris per pengguna: gaji pokok, nominal per hari, tanggal mulai/berhenti, tidak dipotong otomatis |
 | `salary_components` | Tunjangan (tetap / per hari hadir) & potongan tetap per pengguna |
 | `payroll_runs` | Satu per company per bulan: status `DRAFT`/`FINALIZED`, tanggal bayar, siapa & kapan diselesaikan |
@@ -1293,6 +1297,7 @@ Ada dua sumber kartu:
 | Foto wajah Anda belum ada / ditolak | Karyawan wajib absen | selama belum punya foto acuan |
 | Foto wajah menunggu persetujuan | Owner, Admin HR | ada foto menunggu |
 | Cuti & izin menunggu diproses | Owner; Admin HR setelah waktu tunggu delegasi (bila delegasi aktif) | ada pengajuan orang lain yang menunggu |
+| Lembur menunggu diproses | Owner; Admin HR setelah waktu tunggu delegasi lembur (bila aktif) | ada pengajuan lembur orang lain yang menunggu |
 | Review & kunci absensi bulan lalu | Owner | periode bulan lalu belum dikunci dan ada catatan absen |
 | Hari libur belum diisi | Owner | **1 Desember** (untuk tahun depan) sampai akhir Januari (untuk tahun berjalan), selama daftarnya kosong |
 | Sisa uang muka menunggu dipotong gaji | Owner, Finance | ada di daftar Potong Gaji |
@@ -1313,6 +1318,8 @@ Superadmin hanya melihat kartu platform (dua baris terakhir).
 | Cuti/izin disetujui atau ditolak | pengaju | WhatsApp |
 | Cuti/izin yang sudah disetujui dibatalkan | Owner | WhatsApp |
 | Slip gaji terbit (penggajian diselesaikan) | karyawan | tidak ada |
+| Ditugaskan lembur, lembur disetujui/ditolak, atau dibatalkan Owner/Admin HR | karyawan | tidak ada |
+| Karyawan membatalkan lembur yang disetujui, atau "Tidak bisa hadir" | Owner & Admin HR | tidak ada |
 
 **Tetap WhatsApp** (mendesak atau butuh jawaban): pengajuan uang muka baru ke penyetuju,
 dana dicairkan, uang muka dilaporkan tidak sesuai, nota dikembalikan untuk diperbaiki,
@@ -1324,9 +1331,9 @@ menunggu, pengajuan cuti/izin baru, dan delegasi cuti ke Admin HR (diganti kartu
 
 ---
 
-## 24. Lembur (RANCANGAN, belum dibangun)
+## 24. Lembur
 
-Disepakati 2026-11-07. Status: menunggu persetujuan rancangan sebelum dikerjakan.
+Disepakati 2026-11-07. Status: **selesai dibangun** (migration 0022–0023). Penyimpangan kecil dari rancangan awal: (1) penggajian **tidak bisa diselesaikan** selama ada baris upah lembur Rp0 (tarif belum diisi), sampai tarif diisi lalu Hitung ulang atau barisnya dihapus; (2) Review bulanan menampilkan **jam** lembur, sedangkan nominal rupiahnya ada di slip gaji.
 Lembur butuh add-on **Absensi**; upah lembur di slip gaji butuh juga add-on **Penggajian**
 (tanpa Penggajian, hanya jam lembur yang tampil).
 
@@ -1345,8 +1352,10 @@ Lembur butuh add-on **Absensi**; upah lembur di slip gaji butuh juga add-on **Pe
 
 | Jalur | Dimulai oleh | Isian | Persetujuan |
 |---|---|---|---|
-| Pengajuan | Karyawan (yang wajib absen: Karyawan, Finance, Admin HR) | tanggal libur (hari ini atau nanti, tidak boleh lampau), jam mulai & selesai rencana, alasan | Owner kapan saja; Admin HR setelah waktu tunggu delegasi yang sama dengan cuti (§19.4), tidak boleh memproses miliknya sendiri |
+| Pengajuan | Karyawan (yang wajib absen: Karyawan, Finance, Admin HR) | tanggal libur (hari ini atau nanti, tidak boleh lampau), jam mulai & selesai rencana, alasan | Owner kapan saja; Admin HR setelah **waktu tunggu delegasi lembur** (pengaturan terpisah dari cuti, bawaan **4 jam**; lihat di bawah), tidak boleh memproses miliknya sendiri |
 | Penugasan | Owner atau Admin HR | karyawan, tanggal, jam mulai & selesai, keterangan | langsung `APPROVED`; karyawan mendapat kabar di lonceng. Admin HR tidak boleh menugasi dirinya sendiri; Owner tidak absen jadi tidak bisa ditugasi |
+
+**Delegasi lembur** diatur Owner di Pengaturan → **Lembur**: nyala/mati dan waktu tunggu (1–168 jam, bawaan nyala dan 4 jam). Dipisah dari delegasi cuti (§19.4) karena persetujuan lembur biasanya perlu cepat. Seperti cuti, Admin HR tidak bisa mengubahnya.
 
 Status: `PENDING` → `APPROVED` / `REJECTED` / `CANCELLED`; penugasan juga bisa `DECLINED`
 (ditolak karyawan). Aturan:
@@ -1436,7 +1445,8 @@ Pengali dan angka 173 adalah patokan umum; klien sebaiknya memeriksanya ke konsu
 | Kemampuan | Owner | Admin HR | Finance | Karyawan | Superadmin |
 |---|:-:|:-:|:-:|:-:|:-:|
 | Mengajukan lembur (wajib absen) | | ✓ | ✓ | ✓ | |
-| Menyetujui/menolak (pakai `leave:approve` / `leave:approve-delegated`) | ✓ | setelah waktu tunggu | | | |
+| Menyetujui/menolak (pakai `leave:approve` / `leave:approve-delegated`, waktu tunggu lembur sendiri) | ✓ | setelah waktu tunggu lembur | | | |
+| Mengatur delegasi lembur (Pengaturan → Lembur) | ✓ | lihat | | | lihat |
 | Menugaskan lembur (izin baru `overtime:assign`) | ✓ | ✓ | | | |
 | Melihat semua lembur (`attendance:view-all`) | ✓ | ✓ | | | lihat |
 | Cara hitung & tarif per karyawan (`salary:manage`) | ✓ | | | | |
@@ -1449,7 +1459,7 @@ Semua tindakan tercatat di audit log (`OVERTIME_REQUESTED`, `_APPROVED`, `_REJEC
 |---|---|
 | `overtime_orders` (baru) | id, company_id, user_id, `work_date`, `start_minute`, `end_minute` (menit setempat), reason, `source` (`REQUEST`/`ASSIGNED`), status, requested_by_id, decided_by_id/at, decided_by_delegate, reject_reason, decline_reason, cancelled_at, created_at. Indeks unik parsial (user, work_date) untuk status `PENDING`/`APPROVED` |
 | `attendance_records` (+kolom) | `overtime_order_id` (boleh kosong) |
-| `company_settings` (+kolom) | `attendance_overtime_required` (bawaan nyala), `payroll_overtime_method` (`GOVERNMENT`/`CUSTOM`, bawaan `GOVERNMENT`) |
+| `company_settings` (+kolom) | `attendance_overtime_required` (bawaan nyala), `overtime_delegation_enabled` (bawaan nyala) dan `overtime_delegation_hours` (bawaan 4; migration 0023), `payroll_overtime_method` (`GOVERNMENT`/`CUSTOM`, bawaan `GOVERNMENT`) |
 | `salary_profiles` (+kolom) | `overtime_hourly_rate` (rupiah, boleh kosong) |
 | `payslip_lines` | tanpa perubahan struktur; `source` baru `OVERTIME` |
 

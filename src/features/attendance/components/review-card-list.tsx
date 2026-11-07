@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { CARD_BATCH, LoadMoreTrigger, SEARCH_MIN_LENGTH } from "@/components/data-table/data-table";
 import { Input } from "@/components/ui/input";
+import { formatOvertimeHours } from "../overtime";
 import { formatRupiah } from "@/lib/format";
 import type { PersonSummary } from "../review";
 
@@ -98,6 +99,12 @@ function ReviewCard({ row, period }: { row: PersonSummary; period: string }) {
         <Stat label="Luar radius" value={row.outsideCount || "-"} />
         <Stat label="Tdk absen pulang" value={row.noCheckout || "-"} />
         <Stat label="Tidak hadir" value={row.absent || "-"} />
+        <Stat
+          label="Lembur"
+          value={row.overtimeDays > 0 ? `${row.overtimeDays} hari (${formatOvertimeHours(row.overtimeMinutes)})` : "-"}
+          className="col-span-2"
+        />
+        <Stat label="Libur tanpa izin" value={row.holidayWorkNoOrderDays || "-"} />
         <Stat label="Cuti/izin" value={leave} className="col-span-3" />
       </dl>
     </div>

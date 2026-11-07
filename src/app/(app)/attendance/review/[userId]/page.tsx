@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RecordList } from "@/features/attendance/components/record-list";
 import { CorrectionForm, PenaltyWaiveSwitch } from "@/features/attendance/components/review-controls";
 import { listLocations } from "@/features/attendance/queries";
+import { formatOvertimeHours } from "@/features/attendance/overtime";
 import { dayStatus } from "@/features/attendance/review";
 import { getMonthReview, PERIOD_PATTERN, periodLabel, previousPeriod } from "@/features/attendance/review-data";
 import { idSchema } from "@/features/attendance/schemas";
@@ -83,6 +84,14 @@ async function ReviewPersonContent({ params, searchParams }: PageProps<"/attenda
           <ToneBadge tone="warning">
             Terlambat {summary.lateCount}× ({summary.lateMinutes} mnt)
           </ToneBadge>
+        )}
+        {summary.overtimeDays > 0 && (
+          <ToneBadge tone="active">
+            Lembur {summary.overtimeDays} hari ({formatOvertimeHours(summary.overtimeMinutes)})
+          </ToneBadge>
+        )}
+        {summary.holidayWorkNoOrderDays > 0 && (
+          <ToneBadge tone="warning">Absen libur tanpa izin {summary.holidayWorkNoOrderDays}</ToneBadge>
         )}
         {summary.earlyCount > 0 && <ToneBadge tone="warning">Pulang cepat {summary.earlyCount}</ToneBadge>}
         {summary.outsideCount > 0 && <ToneBadge tone="danger">Luar radius {summary.outsideCount}</ToneBadge>}

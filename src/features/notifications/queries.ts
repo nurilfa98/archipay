@@ -23,6 +23,7 @@ import { listAdvances } from "@/features/advances/queries";
 import { needsActionFrom } from "@/features/advances/service";
 import { isPeriodLocked } from "@/features/attendance/period-lock";
 import { getLeaveSettings } from "@/features/attendance/leave-queries";
+import { getOvertimeSettings } from "@/features/attendance/overtime-queries";
 import { countPendingFaces, getMyFaceProfiles, listHolidays } from "@/features/attendance/queries";
 import { periodLabel, previousPeriod } from "@/features/attendance/review-data";
 import { countNewErrorGroups } from "@/features/error-logs/queries";
@@ -36,7 +37,7 @@ import type { CompanyUser, CurrentUser } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import { logError } from "@/lib/error-log";
-import { attendanceRecords, leaveRequests } from "@/lib/db/schema";
+import { attendanceRecords, leaveRequests, overtimeOrders } from "@/lib/db/schema";
 import { zonedDateString } from "@/lib/dates";
 
 export type NotificationIcon =
@@ -44,6 +45,7 @@ export type NotificationIcon =
   | "settlement"
   | "face"
   | "leave"
+  | "overtime"
   | "lock"
   | "payroll"
   | "calendar"
@@ -117,6 +119,10 @@ const KIND_ICONS: Record<string, NotificationIcon> = {
   BALANCE_RECORDED: "payroll",
   LEAVE_DECIDED: "leave",
   LEAVE_CANCELLED: "leave",
+  OVERTIME_ASSIGNED: "overtime",
+  OVERTIME_DECIDED: "overtime",
+  OVERTIME_CANCELLED: "overtime",
+  OVERTIME_DECLINED: "overtime",
   PAYSLIP_PUBLISHED: "payroll",
 };
 
@@ -259,10 +265,20 @@ async function attendanceCards(user: CompanyUser): Promise<NotificationCard[]> {
   // (bila tahun berjalan masih kosong).
   const holidayYear = month === 12 ? year + 1 : month === 1 ? year : null;
 
-  const [myFaces, pendingFaces, pendingLeaves, lastMonthLocked, lastMonthHasRecords, holidays] = await Promise.all([
+  const [
+    myFaces,
+    pendingFaces,
+    pendingLeaves,
+    pendingOvertime,
+    lastMonthLocked,
+    lastMonthHasRecords,
+    holidays,
+  ] = await Promise.all([
     checksIn ? getMyFaceProfiles(companyId, user.id) : null,
     approvesFaces ? countPendingFaces(companyId) : 0,
     decidesLeave || decidesDelegated ? countLeavesForMe(user, decidesDelegated) : 0,
+    // Lembur memakai penyetuju yang sama dengan cuti, tetapi waktu tunggu delegasinya sendiri.
+    decidesLeave || decidesDelegated ? countOvertimeForMe(user, decidesDelegated) : 0,
     reviews ? isPeriodLocked(companyId, lastMonth) : true,
     reviews ? hasRecordsIn(companyId, lastMonth) : false,
     managesSettings && holidayYear ? listHolidays(companyId, holidayYear) : null,
@@ -322,6 +338,19 @@ async function attendanceCards(user: CompanyUser): Promise<NotificationCard[]> {
     });
   }
 
+  if (pendingOvertime > 0) {
+    cards.push({
+      key: "overtime-pending",
+      group: "ACTION",
+      tone: "warning",
+      icon: "overtime",
+      title: "Lembur menunggu diproses",
+      description: `${pendingOvertime} pengajuan lembur menunggu keputusan Anda.`,
+      href: "/attendance/overtime",
+      count: pendingOvertime,
+    });
+  }
+
   if (reviews && !lastMonthLocked && lastMonthHasRecords) {
     cards.push({
       key: "attendance-lock",
@@ -370,6 +399,30 @@ async function countLeavesForMe(user: CompanyUser, delegated: boolean) {
         eq(leaveRequests.status, "PENDING"),
         ne(leaveRequests.userId, user.id),
         cutoff ? lte(leaveRequests.createdAt, cutoff) : undefined,
+      ),
+    );
+  return row?.count ?? 0;
+}
+
+// Pengajuan lembur orang lain yang menunggu: Owner semuanya; Admin HR hanya yang sudah lewat
+// waktu tunggu delegasi LEMBUR (overtime-rules.ts), dan hanya bila delegasi lembur aktif.
+async function countOvertimeForMe(user: CompanyUser, delegated: boolean) {
+  const companyId = user.company.id;
+  let cutoff: Date | null = null;
+  if (delegated) {
+    const settings = await getOvertimeSettings(companyId);
+    if (!settings.overtimeDelegationEnabled) return 0;
+    cutoff = new Date(Date.now() - settings.overtimeDelegationHours * 60 * 60 * 1000);
+  }
+  const [row] = await db
+    .select({ count: sql`count(*)`.mapWith(Number) })
+    .from(overtimeOrders)
+    .where(
+      and(
+        eq(overtimeOrders.companyId, companyId),
+        eq(overtimeOrders.status, "PENDING"),
+        ne(overtimeOrders.userId, user.id),
+        cutoff ? lte(overtimeOrders.createdAt, cutoff) : undefined,
       ),
     );
   return row?.count ?? 0;

@@ -55,6 +55,9 @@ export const PERMISSIONS = [
   "leave:approve-delegated", // menyetujui/menolak setelah waktu delegasi lewat (Admin HR)
   "attendance:review", // review bulanan: koreksi absen, bebaskan denda, kunci periode (Owner)
   "attendance:configure", // atur jam kerja & denda, hari libur, kuota & jenis cuti/izin (Owner, Admin HR)
+  // Lembur (BUSINESS-FLOW §24). Mengajukan memakai attendance:check-in; menyetujui memakai
+  // leave:approve / leave:approve-delegated; melihat semua memakai attendance:view-all.
+  "overtime:assign", // menugaskan lembur di hari libur ke karyawan (Owner, Admin HR)
   // Penggajian (add-on, BUSINESS-FLOW §20). Data gaji rahasia: Superadmin tidak punya semuanya.
   // Pola maker–checker: Finance menyiapkan, Owner mengesahkan.
   "salary:prepare", // lihat data gaji & penggajian, siapkan draf, rekap & Excel transfer (Owner, Finance)
@@ -95,6 +98,7 @@ const ROLE_PERMISSIONS = {
         "leave:approve-delegated",
         "attendance:review",
         "attendance:configure",
+        "overtime:assign",
         "salary:prepare",
         "salary:manage",
         "salary:view-own",
@@ -141,6 +145,7 @@ const ROLE_PERMISSIONS = {
     "attendance:approve-face",
     "leave:approve-delegated",
     "attendance:configure",
+    "overtime:assign",
     "salary:view-own",
   ],
   EMPLOYEE: ["advance:view-own", "advance:request", "settlement:submit", "attendance:check-in", "salary:view-own"],
@@ -159,6 +164,7 @@ const ADDON_PERMISSIONS: Record<AddonKey, readonly Permission[]> = {
     "leave:approve-delegated",
     "attendance:review",
     "attendance:configure",
+    "overtime:assign",
   ],
   payroll: ["salary:prepare", "salary:manage", "salary:view-own"],
 };

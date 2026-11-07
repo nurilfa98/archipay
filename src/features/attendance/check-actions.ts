@@ -36,6 +36,7 @@ import {
   type AttendanceRecordRow,
 } from "./queries";
 import { listApprovedLeavesOn } from "./leave-queries";
+import { getOvertimeSettings, listMyActiveOvertimeOn } from "./overtime-queries";
 import { isWorkDay } from "./schedule";
 import { checkSubmissionSchema, GPS_ACCURACY_MAX, gpsSchema, REASON_MIN } from "./schemas";
 
@@ -114,6 +115,17 @@ async function leavesByDate(companyId: string, userId: string, dates: string[]) 
   return map;
 }
 
+// Hari libur (BUSINESS-FLOW §24.3): absen masuk butuh izin lembur yang disetujui, kecuali perusahaan
+// mematikan saklar "wajib izin lembur".
+type OvertimeGate = { holidayBlocked: boolean; pendingOvertime: boolean; overtimeOrderId: string | null };
+
+function holidayMessage(gate: OvertimeGate) {
+  if (!gate.holidayBlocked) return null;
+  return gate.pendingOvertime
+    ? "Hari ini libur. Pengajuan lembur Anda masih menunggu persetujuan."
+    : "Hari ini libur. Ajukan lembur di menu Absensi → Lembur dan tunggu persetujuan dulu.";
+}
+
 function onLeaveMessage(leave: DayLeave["fullDay"]) {
   return leave
     ? `Anda sedang ${leave.typeName} hari ini (${leave.number}). Bila ternyata masuk, batalkan dulu di menu Cuti & izin.`
@@ -121,12 +133,13 @@ function onLeaveMessage(leave: DayLeave["fullDay"]) {
 }
 
 async function locationsAround(companyId: string, userId: string, point: { lat: number; lng: number }, now: Date) {
-  const [locations, settings] = await Promise.all([
+  const [locations, settings, overtimeSettings] = await Promise.all([
     db
       .select()
       .from(attendanceLocations)
       .where(and(eq(attendanceLocations.companyId, companyId), eq(attendanceLocations.isActive, true))),
     getAttendanceSettings(companyId),
+    getOvertimeSettings(companyId),
   ]);
   const dates = [...new Set(locations.map((location) => localTime(now, location.timezone).date))];
   const holidays = dates.length
@@ -137,10 +150,14 @@ async function locationsAround(companyId: string, userId: string, point: { lat: 
     : [];
   const holidayDates = new Set(holidays.map((holiday) => holiday.date));
   const leaves = await leavesByDate(companyId, userId, dates);
+  const overtime = await listMyActiveOvertimeOn(companyId, userId, dates);
 
   return locations
-    .map((location): CheckLocation & { date: string; onLeave: DayLeave["fullDay"] } => {
+    .map((location): CheckLocation & { date: string; onLeave: DayLeave["fullDay"] } & OvertimeGate => {
       const local = localTime(now, location.timezone);
+      const workDay = isWorkDay(settings.workDays, local.isoWeekday) && !holidayDates.has(local.date);
+      const order = overtime.find((item) => item.workDate === local.date);
+      const approved = order?.status === "APPROVED" ? order : undefined;
       const distance = Math.round(distanceMeters(point, { lat: location.latitude, lng: location.longitude }));
       return {
         id: location.id,
@@ -153,7 +170,11 @@ async function locationsAround(companyId: string, userId: string, point: { lat: 
         timezone: location.timezone,
         localMinutes: local.minutes,
         date: local.date,
-        isWorkDay: isWorkDay(settings.workDays, local.isoWeekday) && !holidayDates.has(local.date),
+        isWorkDay: workDay,
+        // Izin lembur menghubungkan absen di hari libur ke jam lemburnya.
+        overtimeOrderId: !workDay && approved ? approved.id : null,
+        pendingOvertime: !workDay && order?.status === "PENDING",
+        holidayBlocked: !workDay && overtimeSettings.attendanceOvertimeRequired && !approved,
         // Izin datang terlambat yang disetujui: jam masuk hari itu = jam izin.
         start: Math.max(location.workStartMinute ?? settings.workStartMinute, leaves.get(local.date)?.lateArrival ?? 0),
         end: location.workEndMinute ?? settings.workEndMinute,
@@ -201,7 +222,7 @@ export async function getCheckContext(gps: unknown): Promise<ActionResult<CheckC
   const locations: CheckLocation[] = all;
 
   if (mode === "in") {
-    const blocked = onLeaveMessage(all[0].onLeave);
+    const blocked = onLeaveMessage(all[0].onLeave) ?? holidayMessage(all[0]);
     if (blocked) return { success: false, message: blocked };
     return { success: true, data: { mode, locations } };
   }
@@ -294,7 +315,7 @@ export async function submitAttendance(formData: FormData): Promise<ActionResult
   }
 
   if (input.mode === "in") {
-    const blocked = onLeaveMessage(location.onLeave);
+    const blocked = onLeaveMessage(location.onLeave) ?? holidayMessage(location);
     if (blocked) return { success: false, message: blocked };
     const lateMinutes =
       location.isWorkDay && location.localMinutes > location.start + location.tolerance
@@ -327,7 +348,7 @@ type Input = z.infer<typeof checkSubmissionSchema>;
 async function checkIn(
   actor: CompanyUser,
   input: Input,
-  location: CheckLocation & { date: string },
+  location: CheckLocation & { date: string; overtimeOrderId: string | null },
   meta: { now: Date; score: number; lateMinutes: number; ip: string | null },
 ): Promise<ActionResult<{ message: string }>> {
   const recordId = crypto.randomUUID();
@@ -341,6 +362,7 @@ async function checkIn(
         workDate: location.date,
         timezone: location.timezone,
         isWorkDay: location.isWorkDay,
+        overtimeOrderId: location.overtimeOrderId,
         scheduleStartMinute: location.start,
         scheduleEndMinute: location.end,
         toleranceMinutes: location.tolerance,
@@ -380,6 +402,7 @@ async function checkIn(
             inRadius: location.inRadius,
             lateMinutes: meta.lateMinutes,
             faceScore: meta.score,
+            ...(location.overtimeOrderId ? { overtimeOrderId: location.overtimeOrderId } : {}),
           },
           ipAddress: meta.ip,
         },

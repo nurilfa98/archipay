@@ -46,6 +46,7 @@ export async function updatePayrollSettings(
     dailyRateMethod: formData.get("dailyRateMethod"),
     dailyDivisor: formData.get("dailyDivisor"),
     deductionBase: formData.get("deductionBase"),
+    overtimeMethod: formData.get("overtimeMethod"),
   });
   if (!parsed.success) return invalid(parsed.error);
 
@@ -58,6 +59,7 @@ export async function updatePayrollSettings(
         payrollDailyRateMethod: parsed.data.dailyRateMethod,
         payrollDailyDivisor: parsed.data.dailyDivisor,
         payrollDeductionBase: parsed.data.deductionBase,
+        payrollOvertimeMethod: parsed.data.overtimeMethod,
         updatedById: actor.id,
       })
       .where(eq(companySettings.companyId, actor.company.id));
@@ -90,6 +92,7 @@ export async function saveSalaryProfile(userId: string, formData: FormData): Pro
   const parsed = salaryProfileSchema.safeParse({
     baseSalary: formData.get("baseSalary") ?? "",
     dailyRate: formData.get("dailyRate") ?? "",
+    overtimeHourlyRate: formData.get("overtimeHourlyRate") ?? "",
     startDate: formData.get("startDate") ?? "",
     endDate: formData.get("endDate") ?? "",
     absenceExempt: formData.get("absenceExempt"),
@@ -104,7 +107,10 @@ export async function saveSalaryProfile(userId: string, formData: FormData): Pro
     .limit(1);
   if (!target) return { success: false, message: "Pengguna tidak ditemukan." };
 
-  const { components, ...profile } = parsed.data;
+  // Tarif lembur hanya ikut diubah bila isiannya tampil di form (cara hitung "tarif sendiri");
+  // selain itu tarif yang tersimpan dipertahankan.
+  const { components, overtimeHourlyRate, ...profileRest } = parsed.data;
+  const profile = formData.has("overtimeHourlyRate") ? { ...profileRest, overtimeHourlyRate } : profileRest;
   const ip = await getClientIp();
   await db.transaction(async (tx) => {
     const values = { ...profile, updatedById: actor.id };

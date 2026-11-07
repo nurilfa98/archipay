@@ -92,8 +92,7 @@ export function LeaveSettingsForm({
               <div className="flex flex-col gap-0.5">
                 <FieldLabel htmlFor="leaveDelegationEnabled">Delegasikan ke Admin HR bila saya belum memproses</FieldLabel>
                 <FieldDescription>
-                  Berlaku bila perusahaan punya pengguna dengan role Admin HR. Tanpa Admin HR, pengajuan tetap menunggu
-                  Anda.
+                  Berlaku bila perusahaan punya pengguna dengan role Admin HR. Tanpa Admin HR, pengajuan tetap menunggu Owner.
                 </FieldDescription>
               </div>
             </Field>

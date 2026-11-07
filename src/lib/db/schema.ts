@@ -363,6 +363,16 @@ export const companySettings = pgTable(
     payrollDailyDivisor: smallint("payroll_daily_divisor").notNull().default(26),
     // Dasar tarif: BASE (gaji pokok) atau BASE_ALLOWANCES (+ tunjangan tetap bulanan).
     payrollDeductionBase: varchar("payroll_deduction_base", { length: 20 }).notNull().default("BASE"),
+    // --- Lembur (BUSINESS-FLOW §24) ---
+    // true = absen di hari libur hanya bila ada izin lembur yang disetujui.
+    attendanceOvertimeRequired: boolean("attendance_overtime_required").notNull().default(true),
+    // Delegasi persetujuan lembur ke Admin HR, terpisah dari delegasi cuti/izin
+    // (lembur biasanya perlu lebih cepat, jadi bawaannya 4 jam).
+    overtimeDelegationEnabled: boolean("overtime_delegation_enabled").notNull().default(true),
+    overtimeDelegationHours: integer("overtime_delegation_hours").notNull().default(4),
+    // Cara hitung upah lembur: GOVERNMENT (1/173 x pengali) atau CUSTOM
+    // (jam x salary_profiles.overtime_hourly_rate).
+    payrollOvertimeMethod: varchar("payroll_overtime_method", { length: 20 }).notNull().default("GOVERNMENT"),
     updatedAt: timestamptz("updated_at")
       .notNull()
       .defaultNow()
@@ -389,6 +399,8 @@ export const companySettings = pgTable(
     ),
     check("company_settings_payroll_divisor", sql`${t.payrollDailyDivisor} between 1 and 31`),
     check("company_settings_payroll_base", sql`${t.payrollDeductionBase} IN ('BASE', 'BASE_ALLOWANCES')`),
+    check("company_settings_overtime_method", sql`${t.payrollOvertimeMethod} IN ('GOVERNMENT', 'CUSTOM')`),
+    check("company_settings_overtime_delegation", sql`${t.overtimeDelegationHours} between 1 and 168`),
   ],
 );
 
@@ -1099,6 +1111,55 @@ export const faceProfiles = pgTable(
   ],
 );
 
+// Izin lembur di hari libur (BUSINESS-FLOW §24): diajukan karyawan (REQUEST,
+// perlu persetujuan) atau ditugaskan Owner/Admin HR (ASSIGNED, langsung APPROVED).
+// Jam rencana = menit setempat sejak 00.00 (tidak melewati tengah malam).
+// Satu izin aktif (PENDING/APPROVED) per karyawan per tanggal. Jam lembur yang
+// dihitung berasal dari absen nyata, dibatasi durasi rencana (features/attendance/overtime.ts).
+export const overtimeOrders = pgTable(
+  "overtime_orders",
+  {
+    id: id(),
+    companyId: companyRef(),
+    userId: varchar("user_id", { length: 36 })
+      .notNull()
+      .references(() => users.id),
+    workDate: date("work_date").notNull(),
+    startMinute: integer("start_minute").notNull(),
+    endMinute: integer("end_minute").notNull(),
+    reason: varchar("reason", { length: 500 }).notNull(),
+    source: varchar("source", { length: 10 }).notNull(),
+    // PENDING, APPROVED, REJECTED, CANCELLED, DECLINED (ditolak karyawan).
+    status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+    // REQUEST: karyawan itu sendiri. ASSIGNED: Owner/Admin HR yang menugaskan.
+    requestedById: userRef("requested_by_id").notNull(),
+    decidedById: userRef("decided_by_id"),
+    decidedAt: timestamptz("decided_at"),
+    // true = diproses Admin HR lewat delegasi (Owner belum memproses).
+    decidedByDelegate: boolean("decided_by_delegate").notNull().default(false),
+    rejectReason: varchar("reject_reason", { length: 300 }),
+    declineReason: varchar("decline_reason", { length: 300 }),
+    cancelledAt: timestamptz("cancelled_at"),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index("overtime_orders_company_status_idx").on(t.companyId, t.status),
+    index("overtime_orders_user_date_idx").on(t.userId, t.workDate),
+    uniqueIndex("overtime_orders_one_active")
+      .on(t.userId, t.workDate)
+      .where(sql`${t.status} IN ('PENDING', 'APPROVED')`),
+    check("overtime_orders_source", sql`${t.source} IN ('REQUEST', 'ASSIGNED')`),
+    check(
+      "overtime_orders_status",
+      sql`${t.status} IN ('PENDING', 'APPROVED', 'REJECTED', 'CANCELLED', 'DECLINED')`,
+    ),
+    check(
+      "overtime_orders_minutes",
+      sql`${t.startMinute} between 0 and 1439 AND ${t.endMinute} between 1 and 1440 AND ${t.endMinute} > ${t.startMinute}`,
+    ),
+  ],
+);
+
 // Satu baris per user per tanggal kerja: absen masuk & pulang
 // (BUSINESS-FLOW §18.5–18.8). Tanggal kerja & menit setempat dihitung dari
 // zona waktu LOKASI absen masuk. Jadwal (jam masuk/pulang, toleransi) disalin
@@ -1157,6 +1218,8 @@ export const attendanceRecords = pgTable(
     correctionNote: varchar("correction_note", { length: 500 }),
     correctedById: userRef("corrected_by_id"),
     correctedAt: timestamptz("corrected_at"),
+    // Izin lembur yang dipakai absen ini (absen di hari libur, BUSINESS-FLOW §24).
+    overtimeOrderId: varchar("overtime_order_id", { length: 36 }).references(() => overtimeOrders.id),
     createdAt: createdAt(),
   },
   (t) => [
@@ -1314,6 +1377,8 @@ export const salaryProfiles = pgTable(
     baseSalary: rupiah("base_salary").notNull(),
     // Hanya untuk cara tarif FIXED_AMOUNT (company_settings.payroll_daily_rate_method).
     dailyRate: rupiah("daily_rate"),
+    // Hanya untuk cara hitung lembur CUSTOM (company_settings.payroll_overtime_method).
+    overtimeHourlyRate: rupiah("overtime_hourly_rate"),
     // Masa kerja (opsional): hari kerja di luar rentang ini dipotong prorata.
     startDate: date("start_date"),
     endDate: date("end_date"),
@@ -1329,6 +1394,7 @@ export const salaryProfiles = pgTable(
   (t) => [
     index("salary_profiles_company_idx").on(t.companyId),
     check("salary_profiles_amounts", sql`${t.baseSalary} >= 0 AND (${t.dailyRate} IS NULL OR ${t.dailyRate} >= 0)`),
+    check("salary_profiles_overtime_rate", sql`${t.overtimeHourlyRate} IS NULL OR ${t.overtimeHourlyRate} >= 0`),
     check(
       "salary_profiles_dates",
       sql`${t.endDate} IS NULL OR ${t.startDate} IS NULL OR ${t.endDate} >= ${t.startDate}`,
@@ -1431,7 +1497,7 @@ export const payslips = pgTable(
 // Baris slip. `source` = asal baris (BUSINESS-FLOW §20.4):
 //   BASE, ALLOWANCE, ALLOWANCE_PER_DAY, FIXED_DEDUCTION, PRORATE, ABSENCE,
 //   ADVANCE (sisa uang muka; ref_id = settlement id), PENALTY (denda; ref_id =
-//   bulan absen "2026-10"), MANUAL (ditambah Owner).
+//   bulan absen "2026-10"), OVERTIME (upah lembur, BUSINESS-FLOW §24), MANUAL (ditambah Owner).
 // Baris selain MANUAL disusun ulang saat "Hitung ulang", kecuali yang sudah
 // dicatat (`posted_at`: ledger potong gaji / denda ditandai dipotong).
 export const payslipLines = pgTable(
@@ -1473,7 +1539,8 @@ export const notifications = pgTable(
       .notNull()
       .references(() => users.id),
     // ADVANCE_REJECTED, ADVANCE_CANCELLED, SETTLEMENT_VERIFIED, BALANCE_RECORDED,
-    // LEAVE_DECIDED, LEAVE_CANCELLED, PAYSLIP_PUBLISHED.
+    // LEAVE_DECIDED, LEAVE_CANCELLED, PAYSLIP_PUBLISHED, OVERTIME_ASSIGNED, OVERTIME_DECIDED,
+    // OVERTIME_CANCELLED, OVERTIME_DECLINED.
     kind: varchar("kind", { length: 30 }).notNull(),
     title: varchar("title", { length: 120 }).notNull(),
     body: varchar("body", { length: 300 }),

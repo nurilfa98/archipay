@@ -28,7 +28,7 @@ import { formatRupiah } from "@/lib/format";
 import { notify } from "@/lib/notify";
 import type { ActionResult } from "@/types/action-result";
 import { saveSalaryProfile } from "../actions";
-import { MAX_COMPONENTS, type ComponentType, type DailyRateMethod } from "../constants";
+import { MAX_COMPONENTS, type ComponentType, type DailyRateMethod, type OvertimeMethod } from "../constants";
 import type { SalaryProfileInput } from "../payslip-math";
 
 type Row = { key: number; type: ComponentType; name: string; amount: string; perDay: boolean };
@@ -46,11 +46,13 @@ export function SalaryProfileForm({
   userId,
   profile,
   dailyRateMethod,
+  overtimeMethod,
   readOnly = false,
 }: {
   userId: string;
   profile: SalaryProfileInput | null;
   dailyRateMethod: DailyRateMethod;
+  overtimeMethod: OvertimeMethod;
   readOnly?: boolean;
 }) {
   const router = useRouter();
@@ -114,6 +116,16 @@ export function SalaryProfileForm({
                 description="Tarif potongan tidak hadir & prorata (Pengaturan → Penggajian)."
                 optional
                 error={fieldError("dailyRate")}
+              />
+            )}
+            {overtimeMethod === "CUSTOM" && (
+              <RupiahInput
+                name="overtimeHourlyRate"
+                label="Tarif lembur per jam"
+                defaultValue={profile?.overtimeHourlyRate ?? null}
+                description="Upah lembur = jam lembur × tarif ini (Pengaturan → Penggajian). Kosong = lembur tidak dibayar."
+                optional
+                error={fieldError("overtimeHourlyRate")}
               />
             )}
           </div>

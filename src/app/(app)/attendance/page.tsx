@@ -12,6 +12,7 @@ import {
   ClipboardListIcon,
   ClockIcon,
   LockIcon,
+  Clock3Icon,
   PlaneIcon,
   LogInIcon,
   LogOutIcon,
@@ -34,7 +35,13 @@ import { FaceModelPreloader } from "@/features/attendance/components/face-model-
 import { FaceSubmissionCard } from "@/features/attendance/components/face-submission-card";
 import { MyRecordsFeed } from "@/features/attendance/components/my-records-feed";
 import { RecordList } from "@/features/attendance/components/record-list";
-import { countPendingLeaves } from "@/features/attendance/leave-queries";
+import { isoWeekdayOf } from "@/features/attendance/leave-days";
+import { countPendingLeaves, listHolidayDates } from "@/features/attendance/leave-queries";
+import {
+  countPendingOvertime,
+  getOvertimeSettings,
+  listMyActiveOvertimeOn,
+} from "@/features/attendance/overtime-queries";
 import {
   countActiveLocations,
   countPendingFaces,
@@ -46,7 +53,7 @@ import {
   listMyRecordsPage,
 } from "@/features/attendance/queries";
 import { faceChangeLockedUntil, showFaceSubmission } from "@/features/attendance/constants";
-import { formatMinutes, formatWorkDays } from "@/features/attendance/schedule";
+import { formatMinutes, formatWorkDays, isWorkDay } from "@/features/attendance/schedule";
 import { requireAttendanceAddon } from "@/lib/auth/dal";
 import { can } from "@/lib/auth/permissions";
 import { formatDateTime, formatShortDate, zonedDateString } from "@/lib/dates";
@@ -80,8 +87,22 @@ async function AttendanceContent() {
   // (node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md).
   await io();
   const now = new Date();
-  const period = zonedDateString(now).slice(0, 7);
-  const [settings, faces, consented, locationCount, pendingFaces, latest, records, pendingLeaves] = await Promise.all([
+  const today = zonedDateString(now);
+  const period = today.slice(0, 7);
+  const [
+    settings,
+    faces,
+    consented,
+    locationCount,
+    pendingFaces,
+    latest,
+    records,
+    pendingLeaves,
+    pendingOvertime,
+    holidayDates,
+    overtimeToday,
+    overtimeSettings,
+  ] = await Promise.all([
     getAttendanceSettings(companyId),
     checksIn ? getMyFaceProfiles(companyId, user.id) : null,
     checksIn ? hasConsent(user.id) : false,
@@ -90,10 +111,21 @@ async function AttendanceContent() {
     checksIn ? getLatestRecord(companyId, user.id) : null,
     checksIn ? listMyRecordsPage(companyId, user.id, period) : { rows: [], hasMore: false },
     viewsAll ? countPendingLeaves(companyId) : 0,
+    viewsAll ? countPendingOvertime(companyId) : 0,
+    checksIn ? listHolidayDates(companyId, today, today) : new Set<string>(),
+    checksIn ? listMyActiveOvertimeOn(companyId, user.id, [today]) : [],
+    checksIn ? getOvertimeSettings(companyId) : null,
   ]);
   // Sama dengan modeOf() di check-actions.ts.
   const sameDay = latest && latest.workDate === localTime(now, latest.timezone).date;
   const mode = !sameDay ? "in" : latest.checkOutAt ? "done" : "out";
+  // Hari libur (BUSINESS-FLOW §24.3). Hanya perkiraan untuk kartu ini (tanggal menurut zona waktu
+  // perusahaan); server memeriksa ulang dengan zona waktu lokasi saat absen.
+  const holidayToday = !(isWorkDay(settings.workDays, isoWeekdayOf(today)) && !holidayDates.has(today));
+  const overtimeOrder = overtimeToday[0] ?? null;
+  const overtimeApproved = overtimeOrder?.status === "APPROVED";
+  const holidayBlocked =
+    checksIn && mode === "in" && holidayToday && !!overtimeSettings?.attendanceOvertimeRequired && !overtimeApproved;
   // Kartu "Foto yang diajukan": foto menunggu, atau penolakan. Bila karyawan
   // masih punya foto acuan, penolakan hanya tampil FACE_REJECT_NOTICE_DAYS hari.
   const submission = faces?.latest ?? null;
@@ -104,26 +136,44 @@ async function AttendanceContent() {
   return (
     <>
       {/* Belum absen pulang/masuk hari ini: siapkan model wajah sebelum tombol ditekan. */}
-      {checksIn && faces?.approved && mode !== "done" && <FaceModelPreloader />}
+      {checksIn && faces?.approved && mode !== "done" && !holidayBlocked && <FaceModelPreloader />}
 
       {checksIn && faces?.approved && (
         <Card>
           <CardHeader>
             <CardTitle>Absen hari ini</CardTitle>
             <CardDescription>
-              {mode === "in"
-                ? "Anda belum absen masuk hari ini."
-                : mode === "out"
-                  ? "Anda sudah absen masuk. Jangan lupa absen pulang sebelum pukul 23.59."
-                  : "Anda sudah absen masuk dan pulang hari ini."}
+              {holidayBlocked
+                ? overtimeOrder
+                  ? "Hari ini libur. Pengajuan lembur Anda masih menunggu persetujuan."
+                  : "Hari ini libur. Absen di hari libur butuh izin lembur yang disetujui."
+                : mode === "in"
+                  ? holidayToday && overtimeApproved
+                    ? `Hari ini libur, lembur disetujui ${formatMinutes(overtimeOrder.startMinute)} – ${formatMinutes(overtimeOrder.endMinute)}. Anda belum absen masuk.`
+                    : "Anda belum absen masuk hari ini."
+                  : mode === "out"
+                    ? "Anda sudah absen masuk. Jangan lupa absen pulang sebelum pukul 23.59."
+                    : "Anda sudah absen masuk dan pulang hari ini."}
             </CardDescription>
           </CardHeader>
           {mode !== "done" && (
             <CardContent>
-              <Button size="lg" nativeButton={false} render={<Link href="/attendance/check" />}>
-                {mode === "in" ? <LogInIcon /> : <LogOutIcon />}
-                {mode === "in" ? "Absen masuk" : "Absen pulang"}
-              </Button>
+              {holidayBlocked ? (
+                <Button
+                  size="lg"
+                  variant="brand"
+                  nativeButton={false}
+                  render={<Link href="/attendance/overtime" />}
+                >
+                  <Clock3Icon />
+                  {overtimeOrder ? "Lihat pengajuan lembur" : "Ajukan lembur"}
+                </Button>
+              ) : (
+                <Button size="lg" nativeButton={false} render={<Link href="/attendance/check" />}>
+                  {mode === "in" ? <LogInIcon /> : <LogOutIcon />}
+                  {mode === "in" ? "Absen masuk" : "Absen pulang"}
+                </Button>
+              )}
             </CardContent>
           )}
         </Card>
@@ -136,6 +186,15 @@ async function AttendanceContent() {
           icon={<PlaneIcon />}
           title="Cuti & izin"
           description="Ajukan cuti, sakit, izin, atau izin datang terlambat / pulang cepat"
+        />
+      )}
+
+      {checksIn && !viewsAll && (
+        <Shortcut
+          href="/attendance/overtime"
+          icon={<Clock3Icon />}
+          title="Lembur"
+          description="Ajukan lembur di hari libur; absen di hari libur butuh izin lembur"
         />
       )}
 
@@ -186,6 +245,13 @@ async function AttendanceContent() {
             title="Cuti & izin"
             description={pendingLeaves > 0 ? `${pendingLeaves} menunggu persetujuan` : "Tidak ada yang menunggu"}
             badge={pendingLeaves > 0 ? <ToneBadge tone="warning">{pendingLeaves}</ToneBadge> : null}
+          />
+          <Shortcut
+            href="/attendance/overtime"
+            icon={<Clock3Icon />}
+            title="Lembur"
+            description={pendingOvertime > 0 ? `${pendingOvertime} menunggu persetujuan` : "Tidak ada yang menunggu"}
+            badge={pendingOvertime > 0 ? <ToneBadge tone="warning">{pendingOvertime}</ToneBadge> : null}
           />
           <Shortcut
             href="/attendance/review"

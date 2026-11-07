@@ -18,6 +18,21 @@ export const DAILY_RATE_METHOD_DESCRIPTIONS: Record<DailyRateMethod, string> = {
   FIXED_AMOUNT: "Diisi di data gaji masing-masing karyawan.",
 };
 
+// Cara menghitung upah lembur (§24.5).
+export const OVERTIME_METHODS = ["GOVERNMENT", "CUSTOM"] as const;
+export type OvertimeMethod = (typeof OVERTIME_METHODS)[number];
+
+export const OVERTIME_METHOD_LABELS: Record<OvertimeMethod, string> = {
+  GOVERNMENT: "Sesuai aturan pemerintah",
+  CUSTOM: "Tarif sendiri per karyawan",
+};
+
+export const OVERTIME_METHOD_DESCRIPTIONS: Record<OvertimeMethod, string> = {
+  GOVERNMENT:
+    "Upah sejam = (gaji pokok + tunjangan tetap bulanan) ÷ 173, dikali pengali lembur di hari libur (Kepmenakertrans 102/2004).",
+  CUSTOM: "Jam lembur × tarif per jam yang diisi di data gaji masing-masing karyawan, tanpa pengali.",
+};
+
 // Dasar tarif per hari.
 export const DEDUCTION_BASES = ["BASE", "BASE_ALLOWANCES"] as const;
 export type DeductionBase = (typeof DEDUCTION_BASES)[number];
@@ -58,13 +73,21 @@ export const LINE_SOURCES = [
   "ADVANCE",
   "REIMBURSE",
   "PENALTY",
+  "OVERTIME",
   "MANUAL",
 ] as const;
 export type LineSource = (typeof LINE_SOURCES)[number];
 
 // Baris yang nominalnya boleh diubah Owner di draf. Gaji pokok/tunjangan/
 // potongan tetap diubah lewat data gaji; denda hanya bisa dihapus (ditunda).
-export const EDITABLE_SOURCES: readonly LineSource[] = ["PRORATE", "ABSENCE", "ADVANCE", "REIMBURSE", "MANUAL"];
+export const EDITABLE_SOURCES: readonly LineSource[] = [
+  "PRORATE",
+  "ABSENCE",
+  "ADVANCE",
+  "REIMBURSE",
+  "OVERTIME",
+  "MANUAL",
+];
 // Baris yang boleh dihapus dari draf.
 export const REMOVABLE_SOURCES: readonly LineSource[] = [
   "ALLOWANCE",
@@ -75,6 +98,7 @@ export const REMOVABLE_SOURCES: readonly LineSource[] = [
   "ADVANCE",
   "REIMBURSE",
   "PENALTY",
+  "OVERTIME",
   "MANUAL",
 ];
 

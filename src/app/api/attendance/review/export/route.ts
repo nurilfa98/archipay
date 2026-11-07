@@ -76,6 +76,9 @@ export async function GET(request: Request) {
       "Di luar radius",
       "Tidak absen pulang",
       "Tidak hadir",
+      "Lembur (hari)",
+      "Lembur (jam)",
+      "Absen hari libur tanpa izin (hari)",
       "Cuti/izin dibayar (hari)",
       "Cuti/izin tidak dibayar (hari)",
       "Denda berlaku (Rp)",
@@ -90,6 +93,9 @@ export async function GET(request: Request) {
       { value: row.outsideCount, type: Number },
       { value: row.noCheckout, type: Number },
       { value: row.absent, type: Number },
+      { value: row.overtimeDays, type: Number },
+      { value: row.overtimeMinutes / 60, type: Number, format: "0.0" },
+      { value: row.holidayWorkNoOrderDays, type: Number },
       { value: row.paidLeaveDays, type: Number },
       { value: row.unpaidLeaveDays, type: Number },
       { value: row.penaltyTotal, type: Number, format: "#,##0" },
@@ -110,7 +116,7 @@ export async function GET(request: Request) {
     {
       data: summaryRows,
       sheet: "Rekap",
-      columns: [{ width: 28 }, ...Array.from({ length: 11 }, () => ({ width: 14 }))],
+      columns: [{ width: 28 }, ...Array.from({ length: 14 }, () => ({ width: 14 }))],
       stickyRowsCount: 1,
     },
     {

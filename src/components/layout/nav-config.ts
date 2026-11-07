@@ -152,6 +152,7 @@ export const SUB_PAGES: {
   { title: "Absen", href: "/attendance/check", parent: "/attendance" },
   { title: "Hari ini", href: "/attendance/today", parent: "/attendance" },
   { title: "Cuti & izin", href: "/attendance/leave", parent: "/attendance" },
+  { title: "Lembur", href: "/attendance/overtime", parent: "/attendance" },
   { title: "Review bulanan", href: "/attendance/review", parent: "/attendance", keepParams: ["period"] },
   { title: "Data gaji", href: "/payroll/salaries", parent: "/payroll" },
 ];
