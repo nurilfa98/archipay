@@ -30,7 +30,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { localTime } from "@/features/attendance/clock";
+import { FaceModelPreloader } from "@/features/attendance/components/face-model-preloader";
 import { FaceSubmissionCard } from "@/features/attendance/components/face-submission-card";
+import { MyRecordsFeed } from "@/features/attendance/components/my-records-feed";
 import { RecordList } from "@/features/attendance/components/record-list";
 import { countPendingLeaves } from "@/features/attendance/leave-queries";
 import {
@@ -40,7 +42,8 @@ import {
   getLatestRecord,
   getMyFaceProfiles,
   hasConsent,
-  listMyRecords,
+  MY_RECORDS_PAGE_SIZE,
+  listMyRecordsPage,
 } from "@/features/attendance/queries";
 import { faceChangeLockedUntil, showFaceSubmission } from "@/features/attendance/constants";
 import { formatMinutes, formatWorkDays } from "@/features/attendance/schedule";
@@ -77,6 +80,7 @@ async function AttendanceContent() {
   // (node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md).
   await io();
   const now = new Date();
+  const period = zonedDateString(now).slice(0, 7);
   const [settings, faces, consented, locationCount, pendingFaces, latest, records, pendingLeaves] = await Promise.all([
     getAttendanceSettings(companyId),
     checksIn ? getMyFaceProfiles(companyId, user.id) : null,
@@ -84,7 +88,7 @@ async function AttendanceContent() {
     viewsAll ? countActiveLocations(companyId) : 0,
     viewsAll ? countPendingFaces(companyId) : 0,
     checksIn ? getLatestRecord(companyId, user.id) : null,
-    checksIn ? listMyRecords(companyId, user.id, zonedDateString(now).slice(0, 7)) : [],
+    checksIn ? listMyRecordsPage(companyId, user.id, period) : { rows: [], hasMore: false },
     viewsAll ? countPendingLeaves(companyId) : 0,
   ]);
   // Sama dengan modeOf() di check-actions.ts.
@@ -99,6 +103,9 @@ async function AttendanceContent() {
 
   return (
     <>
+      {/* Belum absen pulang/masuk hari ini: siapkan model wajah sebelum tombol ditekan. */}
+      {checksIn && faces?.approved && mode !== "done" && <FaceModelPreloader />}
+
       {checksIn && faces?.approved && (
         <Card>
           <CardHeader>
@@ -120,6 +127,16 @@ async function AttendanceContent() {
             </CardContent>
           )}
         </Card>
+      )}
+
+      {/* Di atas riwayat: riwayat makin panjang, jangan sampai menu ini terdorong ke bawah. */}
+      {checksIn && !viewsAll && (
+        <Shortcut
+          href="/attendance/leave"
+          icon={<PlaneIcon />}
+          title="Cuti & izin"
+          description="Ajukan cuti, sakit, izin, atau izin datang terlambat / pulang cepat"
+        />
       )}
 
       {checksIn && faces && (
@@ -159,24 +176,6 @@ async function AttendanceContent() {
 
       {checksIn && faces && showSubmission && submission && (
         <FaceSubmissionCard submission={submission} hasApproved={!!faces.approved} />
-      )}
-
-      {checksIn && faces?.approved && (
-        <section className="flex flex-col gap-3" aria-labelledby="my-records">
-          <h2 id="my-records" className="font-medium">
-            Riwayat absen bulan ini
-          </h2>
-          <RecordList records={records} now={now} emptyText="Belum ada absen bulan ini." />
-        </section>
-      )}
-
-      {checksIn && !viewsAll && (
-        <Shortcut
-          href="/attendance/leave"
-          icon={<PlaneIcon />}
-          title="Cuti & izin"
-          description="Ajukan cuti, sakit, izin, atau izin datang terlambat / pulang cepat"
-        />
       )}
 
       {viewsAll && (
@@ -226,6 +225,25 @@ async function AttendanceContent() {
             />
           )}
         </div>
+      )}
+
+      {/* Paling bawah: panjangnya bertambah sepanjang bulan, 10 dulu lalu dimuat saat di-scroll. */}
+      {checksIn && faces?.approved && (
+        <section className="flex flex-col gap-3" aria-labelledby="my-records">
+          <h2 id="my-records" className="font-medium">
+            Riwayat absen bulan ini
+          </h2>
+          {records.rows.length === 0 ? (
+            <RecordList records={[]} now={now} emptyText="Belum ada absen bulan ini." />
+          ) : (
+            <MyRecordsFeed
+              initial={<RecordList records={records.rows} now={now} emptyText="" />}
+              period={period}
+              initialHasMore={records.hasMore}
+              pageSize={MY_RECORDS_PAGE_SIZE}
+            />
+          )}
+        </section>
       )}
     </>
   );
@@ -303,7 +321,7 @@ function MyFaceStatus({
         {!submissionShown && approved && lockedUntil && (
           <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
             <LockIcon className="mt-0.5 size-3.5 shrink-0" />
-            Foto bisa diganti sekali seminggu. Ganti lagi mulai {formatDateTime(lockedUntil)}.
+            Terkunci sampai {formatDateTime(lockedUntil)}.
           </p>
         )}
       </div>

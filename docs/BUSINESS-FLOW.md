@@ -817,7 +817,8 @@ bagian 2). Admin HR dihitung sebagai pengguna aktif di Langganan.
 | Kelola lokasi absensi | ✓ | ✓ | | | lihat |
 | Menyetujui foto acuan wajah | ✓ | ✓ | | | |
 | Melihat absensi & cuti/izin semua orang | ✓ | ✓ | | | lihat |
-| Pengaturan absensi (jam kerja, toleransi, denda, hari kerja/libur, jenis cuti, kuota) | ✓ | | | | lihat |
+| Pengaturan absensi (jam kerja, toleransi, denda, hari kerja/libur, jenis cuti, kuota) | ✓ | ✓ | | | lihat |
+| Pengaturan delegasi cuti ke Admin HR (bagian 19.4) | ✓ | lihat | | | lihat |
 | Menyetujui/menolak cuti/izin | ✓ | | | | |
 | Review bulanan: koreksi, bebaskan denda (waive), kunci periode | ✓ | | | | |
 | Denda keterlambatan di Potong Gaji: lihat & ekspor / tandai dipotong | ✓ | | ✓ | | lihat |
@@ -825,7 +826,9 @@ bagian 2). Admin HR dihitung sebagai pengguna aktif di Langganan.
 Owner **tidak** absen. User dengan role Owner tidak wajib absen walaupun juga
 punya role lain.
 
-### 18.2 Pengaturan (Owner)
+### 18.2 Pengaturan (Owner & Admin HR)
+
+Owner dan Admin HR (izin `attendance:configure`) sama-sama bisa mengubah pengaturan di bawah ini, hari libur, serta kuota & jenis cuti/izin, supaya tugas Owner lebih ringan. Admin HR membuka menu Pengaturan hanya untuk bagian absensi & cuti; kebijakan uang muka dan kategori biaya tidak tampil untuknya. **Pengecualian:** delegasi cuti ke Admin HR hanya diatur Owner (Admin HR tidak boleh memberi dirinya wewenang menyetujui).
 
 | Pengaturan | Bawaan |
 |---|---|
@@ -833,7 +836,7 @@ punya role lain.
 | Toleransi keterlambatan | 15 menit |
 | Denda per kejadian terlambat | Rp0 (belum dipakai sampai diisi) |
 | Hari kerja | Senin – Sabtu |
-| Hari libur | daftar tanggal + nama, diisi Owner |
+| Hari libur | daftar tanggal + nama, diisi Owner atau Admin HR |
 
 - Denda disimpan sebagai **snapshot** saat terlambat terjadi; mengubah nominal tidak mengubah denda yang sudah tercatat.
 - Denda keterlambatan wajib sudah diatur di Perjanjian Kerja / Peraturan Perusahaan klien (PP 36/2021). Total potongan gaji per periode tetap maks. 50% upah (bagian 8.2), dicek bagian penggajian.
@@ -1008,7 +1011,7 @@ diajukan, jadi mengubah jenis tidak mengubah pengajuan lama. Lampiran: foto
 - Disetujui → hari itu tampil sebagai Cuti/Sakit/Izin di absensi, bukan Tidak hadir.
 - **Izin datang terlambat** disetujui → absen masuk sampai jam yang diizinkan + toleransi **tidak didenda**. Bila disetujui setelah karyawan terlanjur absen terlambat, dendanya otomatis dibebaskan (tercatat sebagai "dibebaskan karena izin").
 - **Izin pulang cepat** disetujui → pulang mulai jam yang diizinkan tidak ditandai pulang cepat.
-- **Delegasi ke Admin HR** (pengaturan khusus Owner: aktif/nonaktif + waktu tunggu, bawaan 24 jam): pengajuan cuti/izin yang belum diproses Owner setelah waktu tunggu boleh diproses Admin HR; pengajuan yang kini jadi tugasnya muncul sebagai kartu **"Cuti & izin menunggu diproses"** di lonceng Admin HR (tanpa WhatsApp). Pengajuan baru tetap dikabari lewat WhatsApp ke Owner dan Admin HR. Owner tetap bisa memproses kapan saja (yang lebih dulu berlaku). Admin HR tidak bisa memproses pengajuannya sendiri. Persetujuan uang muka, bebaskan denda, dan kunci periode **tidak** didelegasikan (menyangkut uang).
+- **Delegasi ke Admin HR** (pengaturan khusus Owner: aktif/nonaktif + waktu tunggu, bawaan 24 jam): pengajuan cuti/izin yang belum diproses Owner setelah waktu tunggu boleh diproses Admin HR; pengajuan yang kini jadi tugasnya muncul sebagai kartu **"Cuti & izin menunggu diproses"** di lonceng Admin HR (tanpa WhatsApp). Pengajuan baru juga tidak lagi dikabari lewat WhatsApp: Owner melihatnya sebagai kartu yang sama di lonceng. Owner tetap bisa memproses kapan saja (yang lebih dulu berlaku). Admin HR tidak bisa memproses pengajuannya sendiri. Persetujuan uang muka, bebaskan denda, dan kunci periode **tidak** didelegasikan (menyangkut uang).
 
 ### 19.5 Pembatalan
 
@@ -1314,6 +1317,156 @@ Superadmin hanya melihat kartu platform (dua baris terakhir).
 **Tetap WhatsApp** (mendesak atau butuh jawaban): pengajuan uang muka baru ke penyetuju,
 dana dicairkan, uang muka dilaporkan tidak sesuai, nota dikembalikan untuk diperbaiki,
 penggantian dibayar (karyawan harus menjawab) dan belum diterima, laporan pengembalian
-ditolak, pengajuan cuti/izin baru ke Owner dan Admin HR, pengingat batas nota, pengingat
+ditolak, pengingat batas nota, pengingat
 langganan, OTP, dan perangkat baru. WhatsApp **tidak lagi** dipakai untuk foto wajah
-menunggu dan delegasi cuti ke Admin HR (diganti kartu lonceng).
+menunggu, pengajuan cuti/izin baru, dan delegasi cuti ke Admin HR (diganti kartu lonceng).
+
+
+---
+
+## 24. Lembur (RANCANGAN, belum dibangun)
+
+Disepakati 2026-11-07. Status: menunggu persetujuan rancangan sebelum dikerjakan.
+Lembur butuh add-on **Absensi**; upah lembur di slip gaji butuh juga add-on **Penggajian**
+(tanpa Penggajian, hanya jam lembur yang tampil).
+
+### 24.1 Prinsip
+
+- **Absen di hari libur diblokir** agar rekap kehadiran sesuai kenyataan. Hari libur = hari
+  libur nasional/perusahaan di pengaturan absensi, atau hari di luar hari kerja (mis. Minggu).
+  Karyawan hanya bisa absen di hari itu bila punya **izin lembur** yang berlaku pada tanggal tersebut.
+- Izin lembur datang dari dua jalur: **pengajuan karyawan** (perlu persetujuan) atau
+  **penugasan** oleh Owner/Admin HR (langsung berlaku). Penugasan boleh **ditolak** karyawan
+  ("Tidak bisa hadir" + alasan), karena lembur harus atas persetujuan pekerja.
+- Jam lembur diambil dari **absen masuk/pulang yang nyata**, bukan dari rencana.
+- Fase 1 hanya **hari libur**. Lembur di hari kerja setelah jam pulang menyusul di fase 2.
+
+### 24.2 Alur
+
+| Jalur | Dimulai oleh | Isian | Persetujuan |
+|---|---|---|---|
+| Pengajuan | Karyawan (yang wajib absen: Karyawan, Finance, Admin HR) | tanggal libur (hari ini atau nanti, tidak boleh lampau), jam mulai & selesai rencana, alasan | Owner kapan saja; Admin HR setelah waktu tunggu delegasi yang sama dengan cuti (§19.4), tidak boleh memproses miliknya sendiri |
+| Penugasan | Owner atau Admin HR | karyawan, tanggal, jam mulai & selesai, keterangan | langsung `APPROVED`; karyawan mendapat kabar di lonceng. Admin HR tidak boleh menugasi dirinya sendiri; Owner tidak absen jadi tidak bisa ditugasi |
+
+Status: `PENDING` → `APPROVED` / `REJECTED` / `CANCELLED`; penugasan juga bisa `DECLINED`
+(ditolak karyawan). Aturan:
+
+- Satu izin aktif (`PENDING`/`APPROVED`) per karyawan per tanggal.
+- Ditolak bila tanggal itu bukan hari libur, karyawan sedang cuti/izin seharian yang disetujui, atau periode absensi tanggal itu sudah dikunci.
+- Dibatalkan (karyawan untuk miliknya, Owner/Admin HR untuk semuanya) **hanya sebelum** karyawan absen di tanggal itu.
+- Penugasan **tanggal lampau** boleh oleh Owner/Admin HR selama periode belum dikunci (untuk karyawan yang terlanjur bekerja); koreksi absen Owner di tanggal itu otomatis tertaut ke izinnya.
+- Koreksi absen Owner di hari libur **tanpa** izin lembur tidak menghasilkan jam lembur.
+
+### 24.3 Absen
+
+- `/attendance/check` dan server (`getCheckContext`, `submitAttendance`) menolak absen **masuk** di hari libur tanpa izin `APPROVED` untuk tanggal setempat lokasi. Pesan: "Hari ini libur. Ajukan lembur dan tunggu persetujuan dulu."
+- Dengan izin: absen biasa (GPS, wajah, radius tetap berlaku), tidak dihitung terlambat/pulang cepat/denda (aturan hari libur §18.5 butir 8), absen ditautkan ke izin (`attendance_records.overtime_order_id`) dan diberi label **Lembur** (menggantikan "Hari libur").
+- Kartu "Absen hari ini" di menu Absensi: di hari libur menampilkan "Libur" + tombol **Ajukan lembur**, atau jam lembur yang disetujui.
+
+**Saklar "Wajib izin lembur untuk absen di hari libur"** (Pengaturan → Absensi, `company_settings.attendance_overtime_required`, bawaan **nyala**):
+
+| | Nyala (bawaan) | Mati |
+|---|---|---|
+| Absen masuk di hari libur tanpa izin lembur | **ditolak** | **boleh**, seperti sekarang (§18.5 butir 8) |
+| Label di riwayat | Lembur (selalu ada izin) | **Hari libur** bila tanpa izin; **Lembur** bila ada izin |
+| Terlambat / pulang cepat / denda | tidak dihitung | tidak dihitung |
+| Jam & upah lembur | dari izin yang disetujui | **hanya** dari izin yang disetujui; absen libur tanpa izin tidak menghasilkan lembur |
+| Review bulanan | hanya absen berizin | absen libur tanpa izin tampil terpisah sebagai **"Absen di hari libur (tanpa izin)"** agar Owner bisa memeriksanya |
+
+Saat saklar mati, pengajuan dan penugasan lembur tetap bisa dipakai. Penugasan susulan
+(tanggal lampau, periode belum dikunci) menautkan absen yang sudah ada di tanggal itu ke
+izinnya, sehingga jam dan upahnya terhitung. Perusahaan dengan sistem lembur sendiri cukup
+mematikan saklar ini dan memakai tarif kustom (§24.5) atau menambah baris manual di slip.
+
+**Hari libur tidak dihitung "Hadir".** Absen di hari libur (berizin atau tidak) **tidak**
+menambah jumlah *hari hadir* di Review bulanan maupun hitungan *tunjangan per hari hadir*
+di penggajian (uang makan/transport), karena kehadiran dihitung terhadap hari kerja. Absen
+itu dihitung terpisah sebagai lembur. Ini mengubah perilaku sekarang, yang menghitung semua
+absen sebagai hadir.
+
+### 24.4 Jam lembur
+
+Dihitung saat ditampilkan (fungsi murni, ikut berubah bila absen dikoreksi), per hari:
+
+```
+menit      = min(pulang - masuk, jam selesai rencana - jam mulai rencana)
+jam lembur = menit dibulatkan KE BAWAH per 30 menit / 60
+```
+
+Belum absen pulang → 0 jam (Owner bisa mengoreksi di Review bulanan). Jam memakai zona waktu lokasi absen.
+
+### 24.5 Upah lembur
+
+Pengaturan Penggajian (Owner) mendapat pilihan **Cara hitung upah lembur**:
+
+1. **Sesuai aturan pemerintah** (bawaan). Tarif per jam = `(gaji pokok + tunjangan tetap bulanan) / 173`. Pengali dihitung per hari lembur di hari libur (Kepmenakertrans 102/2004). Jenis pekan diambil dari jumlah hari kerja di pengaturan absensi: 5 hari atau kurang = pekan 5 hari, selebihnya = pekan 6 hari.
+
+   | Pekan kerja | Jam lembur dan pengalinya |
+   |---|---|
+   | 6 hari | 7 jam pertama ×2, jam ke-8 ×3, jam ke-9 dan seterusnya ×4 |
+   | 5 hari | 8 jam pertama ×2, jam ke-9 ×3, jam ke-10 dan seterusnya ×4 |
+
+   Contoh (gaji pokok Rp4.400.000 + tunjangan tetap Rp600.000 = Rp5.000.000, tarif Rp28.901,73/jam, pekan 6 hari): lembur 5 jam = 5 × 2 × tarif = **Rp289.017**; lembur 9 jam = (7×2 + 1×3 + 1×4) × tarif = 21 × tarif = **Rp606.936**. Pembulatan ke rupiah hanya di hasil akhir per bulan.
+2. **Tarif sendiri per karyawan.** Untuk perusahaan dengan aturan lembur sendiri: field **Tarif lembur per jam** di Data gaji tiap karyawan (kosong = tidak ada upah lembur, dengan peringatan di draf). Upah = jam lembur × tarif (tanpa pengali).
+
+Pengali dan angka 173 adalah patokan umum; klien sebaiknya memeriksanya ke konsultan HR. Batas lembur harian/mingguan tidak ditegakkan sistem.
+
+### 24.6 Slip gaji
+
+- Draf penggajian (§20.4) menambah baris pendapatan otomatis **Upah lembur** (`source = OVERTIME`), satu baris per bulan dengan keterangan "n hari, x jam". Muncul di slip PDF, rekap, dan Excel; ikut disusun ulang oleh **Hitung ulang**; Owner boleh mengubah nominalnya (ditandai diubah).
+- **Selesaikan penggajian** mewajibkan periode absensi bulan itu sudah dikunci bila ada baris lembur (selain aturan potong otomatis yang sudah ada), agar jamnya final.
+- Tanpa add-on Penggajian: tidak ada baris; jam lembur tampil di Review bulanan saja.
+
+### 24.7 Tampilan
+
+- Menu **Absensi → Lembur** (`/attendance/overtime`): karyawan mengajukan dan melihat riwayat serta statusnya (batal / "Tidak bisa hadir"); Owner/Admin HR memproses yang menunggu, **Tugaskan lembur** (dialog: karyawan, tanggal, jam, keterangan), dan melihat riwayat.
+- **Review bulanan**: kolom jam lembur per karyawan; detail harian berlabel Lembur. Upah rupiah hanya terlihat oleh pemegang `salary:prepare` (data gaji rahasia). PDF & Excel review ikut.
+- Slip gaji karyawan: baris Upah lembur beserta rinciannya.
+
+### 24.8 Lonceng (tanpa WhatsApp)
+
+| Untuk | Isi | Jenis |
+|---|---|---|
+| Owner; Admin HR setelah waktu tunggu | "Lembur menunggu diproses" (jumlah) | kartu tugas, hilang sendiri setelah diproses |
+| Karyawan | lembur disetujui/ditolak (`OVERTIME_DECIDED`), ditugaskan lembur (`OVERTIME_ASSIGNED`) | kabar sekali lewat |
+| Owner & Admin HR | karyawan menolak penugasan (`OVERTIME_DECLINED`), karyawan membatalkan (`OVERTIME_CANCELLED`) | kabar sekali lewat |
+
+### 24.9 Hak akses
+
+| Kemampuan | Owner | Admin HR | Finance | Karyawan | Superadmin |
+|---|:-:|:-:|:-:|:-:|:-:|
+| Mengajukan lembur (wajib absen) | | ✓ | ✓ | ✓ | |
+| Menyetujui/menolak (pakai `leave:approve` / `leave:approve-delegated`) | ✓ | setelah waktu tunggu | | | |
+| Menugaskan lembur (izin baru `overtime:assign`) | ✓ | ✓ | | | |
+| Melihat semua lembur (`attendance:view-all`) | ✓ | ✓ | | | lihat |
+| Cara hitung & tarif per karyawan (`salary:manage`) | ✓ | | | | |
+
+Semua tindakan tercatat di audit log (`OVERTIME_REQUESTED`, `_APPROVED`, `_REJECTED`, `_ASSIGNED`, `_DECLINED`, `_CANCELLED`).
+
+### 24.10 Data (migration 0022)
+
+| Tabel | Isi |
+|---|---|
+| `overtime_orders` (baru) | id, company_id, user_id, `work_date`, `start_minute`, `end_minute` (menit setempat), reason, `source` (`REQUEST`/`ASSIGNED`), status, requested_by_id, decided_by_id/at, decided_by_delegate, reject_reason, decline_reason, cancelled_at, created_at. Indeks unik parsial (user, work_date) untuk status `PENDING`/`APPROVED` |
+| `attendance_records` (+kolom) | `overtime_order_id` (boleh kosong) |
+| `company_settings` (+kolom) | `attendance_overtime_required` (bawaan nyala), `payroll_overtime_method` (`GOVERNMENT`/`CUSTOM`, bawaan `GOVERNMENT`) |
+| `salary_profiles` (+kolom) | `overtime_hourly_rate` (rupiah, boleh kosong) |
+| `payslip_lines` | tanpa perubahan struktur; `source` baru `OVERTIME` |
+
+Hapus company ikut menghapus `overtime_orders`.
+
+### 24.11 Urutan pengerjaan
+
+1. Migration, skema, konstanta, dan fungsi murni (jam lembur, upah lembur) beserta pengecekan hitungannya.
+2. Pengajuan, penugasan, persetujuan, pembatalan (actions + halaman Lembur) dan audit log.
+3. Blokir absen di hari libur + tampilan kartu Absen hari ini + label Lembur.
+4. Lonceng: kartu tugas dan kabar.
+5. Review bulanan (kolom jam, PDF, Excel).
+6. Penggajian: pilihan cara hitung, tarif per karyawan, baris slip, syarat kunci periode.
+7. Pembaruan §18.5 butir 8, §20, §23, dan memori proyek.
+
+### 24.12 Keputusan
+
+1. Saklar "Wajib izin lembur untuk absen di hari libur" ada, bawaan **nyala** (disepakati 2026-11-07); perlakuan saat mati di 24.3.
+2. Hari libur resmi memakai tabel pengali yang sama dengan libur mingguan, sesuai jenis pekan perusahaan (5 atau 6 hari) (disepakati 2026-11-07).
+3. **Menunggu persetujuan:** absen di hari libur tidak dihitung "Hadir" dan tidak memicu tunjangan per hari hadir (24.3).

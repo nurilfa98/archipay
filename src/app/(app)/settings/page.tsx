@@ -1,9 +1,11 @@
 // Halaman /settings (Pengaturan): kebijakan uang muka, kategori biaya, penggajian,
 // serta jam kerja/denda, hari libur, dan cuti & izin (bagian #absensi, #cuti;
 // BUSINESS-FLOW §18.2, hanya bila add-on Absensi aktif).
-// OWNER mengubahnya (settings:manage); superadmin hanya melihat (settings:view),
-// semua isian & tombol ubah dinonaktifkan/disembunyikan. Polanya sama dengan halaman lain: judul statis di luar
-// <Suspense>, cek permission & data di dalamnya.
+// Uang muka & kategori biaya: OWNER mengubahnya (settings:manage), superadmin hanya
+// melihat. Absensi & cuti: OWNER dan Admin HR mengubahnya (attendance:configure).
+// Admin HR tidak melihat bagian uang muka (bukan urusannya). Isian & tombol ubah
+// dinonaktifkan/disembunyikan bagi yang hanya melihat. Polanya sama dengan halaman
+// lain: judul statis di luar <Suspense>, cek permission & data di dalamnya.
 //
 // Tampilan: tiap bagian = SettingsSection (penjelasan di kiri, isian di kanan),
 // dengan baris pintasan (anchor) yang menempel di atas untuk lompat antar bagian.
@@ -49,18 +51,27 @@ export default function SettingsPage() {
 async function SettingsContent() {
   const user = await requirePermission("settings:view");
   const readOnly = !can(user, "settings:manage");
+  const attendanceReadOnly = !can(user, "attendance:configure");
   const showPayroll = can(user, "salary:manage");
   const showAttendance = user.company.attendance;
-  const [settings, updateInfo, categories] = await Promise.all([
-    getCompanySettings(user.company.id),
-    getSettingsUpdateInfo(user.company.id),
-    listAllExpenseCategories(user.company.id),
-  ]);
+  // Kebijakan uang muka & kategori biaya hanya untuk yang mengurus uang muka (bukan Admin HR).
+  const showAdvance = can(user, "advance:view-all");
+  const [settings, updateInfo, categories] = showAdvance
+    ? await Promise.all([
+        getCompanySettings(user.company.id),
+        getSettingsUpdateInfo(user.company.id),
+        listAllExpenseCategories(user.company.id),
+      ])
+    : [null, null, []];
 
   // Pintasan ke tiap bagian; bagian add-on hanya muncul bila add-on aktif.
   const jumps = [
-    { id: "uang-muka", label: "Uang muka" },
-    { id: "kategori", label: "Kategori biaya" },
+    ...(showAdvance
+      ? [
+          { id: "uang-muka", label: "Uang muka" },
+          { id: "kategori", label: "Kategori biaya" },
+        ]
+      : []),
     ...(showPayroll ? [{ id: "penggajian", label: "Penggajian" }] : []),
     ...(showAttendance
       ? [
@@ -88,12 +99,20 @@ async function SettingsContent() {
         ))}
       </nav>
 
-      {readOnly && (
+      {jumps.length === 0 && (
+        <p className="rounded-lg border border-dashed px-3 py-6 text-center text-sm text-muted-foreground">
+          Belum ada pengaturan yang tersedia untuk Anda.
+        </p>
+      )}
+
+      {((showAdvance && readOnly) || (showAttendance && attendanceReadOnly)) && (
         <p className="rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground">
           Anda hanya bisa melihat pengaturan ini. Perubahan dilakukan oleh Owner perusahaan.
         </p>
       )}
 
+      {showAdvance && settings && updateInfo && (
+        <>
       <SettingsSection
         id="uang-muka"
         icon={BanknoteIcon}
@@ -121,6 +140,8 @@ async function SettingsContent() {
       >
         <ExpenseCategoriesManager categories={categories} readOnly={readOnly} />
       </SettingsSection>
+        </>
+      )}
 
       {/* Penggajian: hanya Owner (data gaji rahasia) & bila add-on Penggajian aktif (lib/addons.ts). */}
       {showPayroll && (
@@ -139,12 +160,26 @@ async function SettingsContent() {
       )}
 
       {/* Tanpa add-on Absensi (lib/addons.ts), pengaturan absensi & cuti disembunyikan. */}
-      {showAttendance && <AttendanceSettings companyId={user.company.id} readOnly={readOnly} />}
+      {showAttendance && (
+        <AttendanceSettings
+          companyId={user.company.id}
+          readOnly={attendanceReadOnly}
+          canDelegate={can(user, "leave:approve")}
+        />
+      )}
     </>
   );
 }
 
-async function AttendanceSettings({ companyId, readOnly }: { companyId: string; readOnly: boolean }) {
+async function AttendanceSettings({
+  companyId,
+  readOnly,
+  canDelegate,
+}: {
+  companyId: string;
+  readOnly: boolean;
+  canDelegate: boolean;
+}) {
   // Hari libur tahun ini & tahun depan (tahun menurut zona waktu perusahaan).
   const year = Number(zonedDateString(new Date()).slice(0, 4));
   const [attendance, holidaysThisYear, holidaysNextYear, leaveSettings, leaveTypes] = await Promise.all([
@@ -192,7 +227,7 @@ async function AttendanceSettings({ companyId, readOnly }: { companyId: string; 
         hints={["Jenis cuti/izin yang dinonaktifkan tidak muncul di form pengajuan, tetapi pengajuan lama tetap tersimpan."]}
       >
         <div className="flex flex-col gap-6">
-          <LeaveSettingsForm settings={leaveSettings} readOnly={readOnly} />
+          <LeaveSettingsForm settings={leaveSettings} readOnly={readOnly} canDelegate={canDelegate} />
           <div className="flex flex-col gap-2 border-t pt-5">
             <h3 className="text-sm font-medium">Jenis cuti & izin</h3>
             <LeaveTypesManager types={leaveTypes} readOnly={readOnly} />

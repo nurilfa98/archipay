@@ -1,4 +1,4 @@
-// Server Action pengaturan absensi (khusus OWNER, permission settings:manage):
+// Server Action pengaturan absensi (Owner & Admin HR, permission attendance:configure):
 // jam kerja, toleransi, denda keterlambatan, hari kerja, dan hari libur
 // (BUSINESS-FLOW §18.2). Nilainya disimpan di company_settings.
 
@@ -25,7 +25,7 @@ const FORBIDDEN = {
 // Pengaturan absensi/cuti hanya bisa diubah selama add-on Absensi aktif.
 async function getSettingsManager() {
   const actor = await verifySession();
-  return can(actor, "settings:manage") && actor.company.attendance ? actor : null;
+  return can(actor, "attendance:configure") && actor.company.attendance ? actor : null;
 }
 
 export async function updateAttendanceSettings(

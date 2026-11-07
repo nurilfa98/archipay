@@ -72,6 +72,10 @@ export type NotificationCard = {
 const PAYROLL_REMINDER_DAY = 25;
 
 export const getNotifications = cache(async (user: CurrentUser): Promise<NotificationCard[]> => {
+  // Cache Components: data ini dinamis. io() HARUS ditunggu di sini, di luar try/catch
+  // safely() di bawah; kalau ditunggu di dalamnya, penolakan io() saat prerender
+  // ikut tertangkap dan dianggap error biasa (node_modules/next/dist/docs/01-app/03-api-reference/04-functions/io.md).
+  await io();
   if (user.roles.includes("SUPERADMIN")) return safely("platform", platformCards());
   if (!user.company) return [];
   const me = user as CompanyUser;
@@ -95,6 +99,8 @@ async function safely(label: string, pending: Promise<NotificationCard[]>): Prom
   try {
     return await pending;
   } catch (error) {
+    // Bukan kegagalan data: sinyal prerender Next.js harus diteruskan ke React.
+    if (error instanceof Error && error.message.includes("During prerendering")) throw error;
     await logError(error, { source: "SERVER_ACTION", action: `pemberitahuan: ${label}` });
     return [];
   }
@@ -248,7 +254,7 @@ async function attendanceCards(user: CompanyUser): Promise<NotificationCard[]> {
   const decidesLeave = can(user, "leave:approve");
   const decidesDelegated = !decidesLeave && can(user, "leave:approve-delegated");
   const reviews = can(user, "attendance:review");
-  const managesSettings = can(user, "settings:manage");
+  const managesSettings = can(user, "attendance:configure");
   // Hari libur: diingatkan 1 Desember (untuk tahun depan) sampai akhir Januari
   // (bila tahun berjalan masih kosong).
   const holidayYear = month === 12 ? year + 1 : month === 1 ? year : null;

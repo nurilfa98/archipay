@@ -44,7 +44,7 @@ export const PERMISSIONS = [
   "subscription:view", // menu Langganan company sendiri: pilih paket & kirim bukti bayar
   "subscription:manage", // verifikasi tagihan semua company, harga paket, Pengaturan platform
   // Absensi (BUSINESS-FLOW §18). Jam kerja, toleransi, denda & hari libur
-  // memakai settings:view / settings:manage.
+  // memakai attendance:configure (Owner & Admin HR).
   "attendance:check-in", // wajib absen: daftar foto acuan wajah, absen masuk/pulang
   "attendance:view-all", // melihat absensi, lokasi & foto acuan semua orang
   "attendance:manage-locations", // tambah/ubah/nonaktifkan/impor lokasi absensi
@@ -54,6 +54,7 @@ export const PERMISSIONS = [
   "leave:approve", // menyetujui/menolak cuti & izin kapan saja (Owner)
   "leave:approve-delegated", // menyetujui/menolak setelah waktu delegasi lewat (Admin HR)
   "attendance:review", // review bulanan: koreksi absen, bebaskan denda, kunci periode (Owner)
+  "attendance:configure", // atur jam kerja & denda, hari libur, kuota & jenis cuti/izin (Owner, Admin HR)
   // Penggajian (add-on, BUSINESS-FLOW §20). Data gaji rahasia: Superadmin tidak punya semuanya.
   // Pola maker–checker: Finance menyiapkan, Owner mengesahkan.
   "salary:prepare", // lihat data gaji & penggajian, siapkan draf, rekap & Excel transfer (Owner, Finance)
@@ -93,6 +94,7 @@ const ROLE_PERMISSIONS = {
         "leave:approve",
         "leave:approve-delegated",
         "attendance:review",
+        "attendance:configure",
         "salary:prepare",
         "salary:manage",
         "salary:view-own",
@@ -131,12 +133,14 @@ const ROLE_PERMISSIONS = {
   // Admin HR mengurus absensi & akun Karyawan (features/users/access.ts).
   // Bila perlu mengajukan uang muka, beri juga role Karyawan (permission digabung).
   HR_ADMIN: [
+    "settings:view", // membuka Pengaturan; hanya bagian absensi & cuti yang tampil (lihat attendance:configure)
     "user:manage-employee",
     "attendance:check-in",
     "attendance:view-all",
     "attendance:manage-locations",
     "attendance:approve-face",
     "leave:approve-delegated",
+    "attendance:configure",
     "salary:view-own",
   ],
   EMPLOYEE: ["advance:view-own", "advance:request", "settlement:submit", "attendance:check-in", "salary:view-own"],
@@ -154,6 +158,7 @@ const ADDON_PERMISSIONS: Record<AddonKey, readonly Permission[]> = {
     "leave:approve",
     "leave:approve-delegated",
     "attendance:review",
+    "attendance:configure",
   ],
   payroll: ["salary:prepare", "salary:manage", "salary:view-own"],
 };

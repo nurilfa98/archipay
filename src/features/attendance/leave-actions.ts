@@ -32,7 +32,6 @@ import { addDays, workDatesBetween } from "./leave-days";
 import {
   notifyLeaveCancelled,
   notifyLeaveDecided,
-  notifyLeaveRequested,
   type LeaveSummary,
 } from "./leave-notifications";
 import { getLeaveQuota, getLeaveRequest, getLeaveSettings, listHolidayDates } from "./leave-queries";
@@ -194,9 +193,8 @@ export async function createLeaveRequest(formData: FormData): Promise<ActionResu
   }
 
   const ip = await getClientIp();
-  let summary: LeaveSummary;
   try {
-    summary = await db.transaction(async (tx) => {
+    await db.transaction(async (tx) => {
       const { number } = await nextDocumentNumber(tx, actor.company.id, "IZ", now);
       await tx.insert(leaveRequests).values({
         id,
@@ -227,24 +225,12 @@ export async function createLeaveRequest(formData: FormData): Promise<ActionResu
         },
         tx,
       );
-      return {
-        number,
-        typeName: type.name,
-        kind,
-        startDate: start,
-        endDate: end,
-        days,
-        timeMinute,
-        reason: input.reason,
-      };
     });
   } catch (error) {
     if (attachmentKey) await deleteObject(attachmentKey).catch(() => undefined);
     throw error;
   }
 
-  const requester = await getPerson(actor.id);
-  after(() => notifyLeaveRequested(actor.company.id, requester, summary));
   revalidateLeave();
   return { success: true, data: undefined };
 }
@@ -529,13 +515,13 @@ export async function cancelLeave(requestId: string, fromDateInput?: string): Pr
 }
 
 // ---------------------------------------------------------------------------
-// Pengaturan (Owner)
+// Pengaturan (Owner & Admin HR)
 // ---------------------------------------------------------------------------
 
 // Pengaturan absensi/cuti hanya bisa diubah selama add-on Absensi aktif.
 async function getSettingsManager() {
   const actor = await verifySession();
-  return can(actor, "settings:manage") && actor.company.attendance ? actor : null;
+  return can(actor, "attendance:configure") && actor.company.attendance ? actor : null;
 }
 
 export async function updateLeaveSettings(
@@ -544,14 +530,19 @@ export async function updateLeaveSettings(
 ): Promise<ActionResult> {
   const actor = await getSettingsManager();
   if (!actor) return FORBIDDEN;
+  const before = await getLeaveSettings(actor.company.id);
+  // Delegasi ke Admin HR hanya diatur Owner: Admin HR tidak boleh memberi dirinya wewenang
+  // menyetujui cuti. Bagi Admin HR, nilai delegasi yang ada dipertahankan.
+  const setsDelegation = can(actor, "leave:approve");
   const parsed = leaveSettingsSchema.safeParse({
     annualLeaveQuota: formData.get("annualLeaveQuota"),
-    leaveDelegationEnabled: formData.get("leaveDelegationEnabled") === "on",
-    leaveDelegationHours: formData.get("leaveDelegationHours"),
+    leaveDelegationEnabled: setsDelegation
+      ? formData.get("leaveDelegationEnabled") === "on"
+      : before.leaveDelegationEnabled,
+    leaveDelegationHours: setsDelegation ? formData.get("leaveDelegationHours") : before.leaveDelegationHours,
   });
   if (!parsed.success) return invalid(parsed.error);
 
-  const before = await getLeaveSettings(actor.company.id);
   const changed = (Object.keys(parsed.data) as (keyof typeof parsed.data)[]).filter(
     (key) => before[key] !== parsed.data[key],
   );

@@ -25,7 +25,17 @@ import type { LeaveSettings, LeaveType } from "../leave-queries";
 const selectClass =
   "h-9 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 dark:bg-input/30";
 
-export function LeaveSettingsForm({ settings, readOnly }: { settings: LeaveSettings; readOnly: boolean }) {
+// canDelegate: hanya Owner yang mengatur delegasi (Admin HR tidak boleh memberi dirinya sendiri
+// wewenang menyetujui cuti); bagi yang lain bagian itu tampil baca saja.
+export function LeaveSettingsForm({
+  settings,
+  readOnly,
+  canDelegate,
+}: {
+  settings: LeaveSettings;
+  readOnly: boolean;
+  canDelegate: boolean;
+}) {
   const [state, formAction, pending] = useActionState(updateLeaveSettings, undefined);
   const [delegation, setDelegation] = useState(settings.leaveDelegationEnabled);
   const error = state && !state.success ? state : undefined;
@@ -68,7 +78,10 @@ export function LeaveSettingsForm({ settings, readOnly }: { settings: LeaveSetti
             <FieldError>{fieldError("annualLeaveQuota")}</FieldError>
           </Field>
 
-          <div className="flex flex-col gap-4 rounded-lg border p-3 sm:p-4">
+          <fieldset disabled={!canDelegate} className="flex min-w-0 flex-col gap-4 rounded-lg border p-3 sm:p-4">
+            {!canDelegate && (
+              <p className="text-xs text-muted-foreground">Delegasi hanya bisa diatur oleh Owner.</p>
+            )}
             <Field orientation="horizontal">
               <Checkbox
                 id="leaveDelegationEnabled"
@@ -101,14 +114,14 @@ export function LeaveSettingsForm({ settings, readOnly }: { settings: LeaveSetti
                 <span className="text-sm text-muted-foreground">jam</span>
               </div>
               <FieldDescription>
-                Setelah waktu ini, Admin HR boleh menyetujui/menolak cuti & izin dan diberi tahu lewat WhatsApp. Anda
+                Setelah waktu ini, Admin HR boleh menyetujui/menolak cuti & izin dan diberi tahu lewat lonceng. Owner
                 tetap bisa memproses kapan saja.
               </FieldDescription>
               {/* Isian yang dinonaktifkan tidak terkirim: kirim nilai lama. */}
               {!delegation && <input type="hidden" name="leaveDelegationHours" value={settings.leaveDelegationHours} />}
               <FieldError>{fieldError("leaveDelegationHours")}</FieldError>
             </Field>
-          </div>
+          </fieldset>
 
           {!readOnly && (
             <Field orientation="horizontal" className="border-t pt-4">

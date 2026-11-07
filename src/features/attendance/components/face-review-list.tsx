@@ -64,25 +64,25 @@ export function FaceReviewList({
             Tidak ada foto yang menunggu persetujuan.
           </p>
         ) : (
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 md:grid-cols-4 lg:grid-cols-6">
+          <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {pending.map((row) => (
-              <li key={row.userId} className="flex min-w-0 flex-col gap-2 rounded-lg border bg-card p-2">
+              <li key={row.userId} className="flex min-w-0 flex-col gap-3 rounded-xl border bg-card p-4">
                 {/* Klik foto → pratinjau mengambang (components/file-preview.tsx). */}
                 <FilePreview
                   src={`/api/attendance/faces/${row.pending!.id}/photo`}
                   isPdf={false}
                   title={`Foto wajah ${row.fullName}`}
-                  className="group relative block w-full cursor-zoom-in overflow-hidden rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="group relative mx-auto block size-44 cursor-zoom-in overflow-hidden rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-48"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- file privat lewat route berizin */}
                   <img
                     src={`/api/attendance/faces/${row.pending!.id}/photo`}
                     alt={`Foto wajah ${row.fullName}`}
-                    className="aspect-square w-full bg-muted object-cover object-[50%_30%] transition-transform duration-200 group-hover:scale-105"
+                    className="size-full bg-muted object-cover object-[50%_30%] transition-transform duration-200 group-hover:scale-105"
                     loading="lazy"
                   />
                 </FilePreview>
-                <div className="min-w-0">
+                <div className="min-w-0 text-center">
                   <p className="truncate text-sm font-medium" title={row.fullName}>
                     {row.fullName}
                   </p>
@@ -123,7 +123,7 @@ export function FaceReviewList({
                   </div>
                 ) : (
                   canApprove && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-center text-xs text-muted-foreground">
                       Foto Anda sendiri disetujui oleh Owner atau Admin HR lain.
                     </p>
                   )

@@ -358,8 +358,17 @@ export async function getLatestRecord(companyId: string, userId: string): Promis
   return row ? toRow(row) : null;
 }
 
-// Riwayat absen user dalam satu bulan ("2026-11"), terbaru dulu.
-export async function listMyRecords(companyId: string, userId: string, period: string): Promise<AttendanceRecordRow[]> {
+// Riwayat absen user dalam satu bulan ("2026-11"), terbaru dulu, per halaman: menu Absensi
+// memuat 10 dulu, sisanya saat di-scroll (records-actions.tsx). Mengambil 1 baris lebih
+// untuk tahu masih ada lagi.
+export const MY_RECORDS_PAGE_SIZE = 10;
+
+export async function listMyRecordsPage(
+  companyId: string,
+  userId: string,
+  period: string,
+  offset = 0,
+): Promise<{ rows: AttendanceRecordRow[]; hasMore: boolean }> {
   await io();
   const [year, month] = period.split("-").map(Number);
   const next = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, "0")}-01`;
@@ -372,8 +381,10 @@ export async function listMyRecords(companyId: string, userId: string, period: s
         lt(attendanceRecords.workDate, next),
       ),
     )
-    .orderBy(desc(attendanceRecords.workDate));
-  return rows.map(toRow);
+    .orderBy(desc(attendanceRecords.workDate))
+    .limit(MY_RECORDS_PAGE_SIZE + 1)
+    .offset(offset);
+  return { rows: rows.slice(0, MY_RECORDS_PAGE_SIZE).map(toRow), hasMore: rows.length > MY_RECORDS_PAGE_SIZE };
 }
 
 // Semua absen company pada satu tanggal kerja (halaman Absensi hari ini).

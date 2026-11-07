@@ -20,6 +20,8 @@ export function NotificationBellLive({ initial }: { initial: BellState }) {
 
   useEffect(() => {
     let active = true;
+    // Tab/aplikasi yang tersembunyi tidak perlu bertanya ke server (hemat baterai & kuota);
+    // begitu terlihat lagi, angka langsung disegarkan.
     const refresh = () =>
       fetchBellState()
         .then((state) => {
@@ -31,13 +33,20 @@ export function NotificationBellLive({ initial }: { initial: BellState }) {
     if (first.current) first.current = false;
     else void refresh();
 
-    const timer = setInterval(refresh, REFRESH_MS);
+    const timer = setInterval(() => {
+      if (!document.hidden) void refresh();
+    }, REFRESH_MS);
     const onFocus = () => void refresh();
+    const onVisible = () => {
+      if (!document.hidden) void refresh();
+    };
     window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onVisible);
     return () => {
       active = false;
       clearInterval(timer);
       window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, [pathname, initialKey]);
 

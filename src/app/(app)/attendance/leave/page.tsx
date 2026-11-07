@@ -91,7 +91,7 @@ async function LeaveContent() {
     Promise.all(people.map((person) => getLeaveQuota(companyId, person.id, year))),
   ]);
   const quotaById = new Map(people.map((person, index) => [person.id, quotas[index]]));
-  const canSetQuota = can(user, "settings:manage");
+  const canSetQuota = can(user, "attendance:configure");
 
   const toRow = (row: LeaveRequestRow, own: boolean) => buildRow(row, { user, settings, now, today, own, photos });
 

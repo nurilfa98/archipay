@@ -1,20 +1,18 @@
-// Pemberitahuan cuti & izin (BUSINESS-FLOW §19). Dipanggil di dalam after() agar
-// tombol tidak menunggu Fonnte. Penerima WhatsApp tanpa nomor dilewati.
+// Pemberitahuan cuti & izin (BUSINESS-FLOW §19), dipanggil di dalam after().
 //
-// - Pengajuan baru            → WhatsApp ke Owner & Admin HR (selain pengaju)
-// - Disetujui / ditolak       → lonceng karyawan pengaju
-// - Cuti disetujui dibatalkan → lonceng Owner
-// Admin HR melihat pengajuan yang didelegasikan sebagai kartu di lonceng
-// (features/notifications/queries.ts), tanpa WhatsApp.
+// Semua lewat lonceng (features/notifications), tanpa WhatsApp:
+// - Pengajuan baru            → kartu "Cuti & izin menunggu diproses" milik Owner;
+//                               Admin HR setelah waktu tunggu delegasi
+//                               (dihitung di notifications/queries.ts, bukan di sini)
+// - Disetujui / ditolak       → kabar untuk karyawan pengaju
+// - Cuti disetujui dibatalkan → kabar untuk Owner
 
 import "server-only";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { roles, userRoles, users } from "@/lib/db/schema";
 import { formatDateOnly } from "@/lib/dates";
-import { env } from "@/lib/env";
 import { createNotifications } from "@/features/notifications/service";
-import { sendWhatsApp } from "@/lib/whatsapp";
 import { formatMinutes } from "./schedule";
 
 export type LeaveSummary = {
@@ -44,8 +42,6 @@ export function leavePeriodText(leave: Pick<LeaveSummary, "kind" | "startDate" |
   return `${range} (${leave.days} hari kerja)`;
 }
 
-const link = () => new URL("/attendance/leave", env.NEXT_PUBLIC_APP_URL).toString();
-
 // Owner & Admin HR aktif di company (penyetuju cuti/izin).
 export async function getLeaveApprovers(companyId: string, roleNames: ("OWNER" | "HR_ADMIN")[]): Promise<Person[]> {
   const rows = await db
@@ -55,18 +51,6 @@ export async function getLeaveApprovers(companyId: string, roleNames: ("OWNER" |
     .innerJoin(roles, eq(userRoles.roleId, roles.id))
     .where(and(eq(users.companyId, companyId), eq(users.isActive, true), inArray(roles.name, roleNames)));
   return [...new Map(rows.map((row) => [row.id, row])).values()];
-}
-
-export async function notifyLeaveRequested(companyId: string, requester: Person, leave: LeaveSummary) {
-  const approvers = (await getLeaveApprovers(companyId, ["OWNER", "HR_ADMIN"])).filter(
-    (person) => person.id !== requester.id,
-  );
-  await send(
-    approvers,
-    (person) =>
-      `Halo ${person.fullName},\n\n${requester.fullName} mengajukan *${leave.typeName}* (${leave.number}): ` +
-      `${leavePeriodText(leave)}.\nAlasan: ${leave.reason}\n\nSetujui atau tolak di ArchiPay:\n${link()}`,
-  );
 }
 
 export async function notifyLeaveDecided(
@@ -101,13 +85,5 @@ export async function notifyLeaveCancelled(companyId: string, requester: Person,
         body: `${leave.number} · ${leavePeriodText(leave)}. ${note}`,
         href: "/attendance/leave",
       })),
-  );
-}
-
-async function send(people: Person[], text: (person: Person) => string) {
-  await Promise.allSettled(
-    people
-      .filter((person) => person.phoneNumber)
-      .map((person) => sendWhatsApp({ to: person.phoneNumber!, text: text(person) })),
   );
 }

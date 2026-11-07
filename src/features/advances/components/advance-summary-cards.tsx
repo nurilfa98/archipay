@@ -82,7 +82,7 @@ function SummaryCard({
       </div>
       <div className="flex min-w-0 flex-col gap-0.5">
         <p className="text-sm text-muted-foreground">{title}</p>
-        <p className="text-2xl leading-tight font-semibold tabular-nums">{value}</p>
+        <p className="text-lg leading-tight font-semibold tabular-nums sm:text-2xl">{value}</p>
         <p className="text-xs text-muted-foreground">{note}</p>
       </div>
     </div>

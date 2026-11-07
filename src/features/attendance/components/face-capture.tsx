@@ -153,6 +153,11 @@ function loadHuman() {
   return sharedHuman;
 }
 
+// Dipanggil lebih awal (FaceModelPreloader) agar model sudah siap saat kamera dibuka.
+export function preloadFaceModel() {
+  return loadHuman();
+}
+
 export function SelfieCamera({
   onChange,
   disabled = false,

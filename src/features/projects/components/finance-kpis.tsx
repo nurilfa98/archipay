@@ -82,7 +82,8 @@ function Kpi({
   tone?: "danger";
 }) {
   return (
-    <Card>
+    // gap-1.5: angka menempel lebih dekat ke judul kartu (bawaan Card 16 px terlalu renggang).
+    <Card className="gap-1.5">
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <CardDescription>{title}</CardDescription>
         <div className="flex size-8 items-center justify-center rounded-lg bg-brand/10 text-brand">
